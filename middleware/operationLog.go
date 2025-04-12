@@ -40,7 +40,7 @@ func OperationLogger() gin.HandlerFunc {
 			IP:        c.ClientIP(),
 			Params:    string(bodyBytes),
 			Status:    int16(statusCode),
-			CreatedAt: carbon.DateTime{Carbon: startTime},
+			CreatedAt: carbon.DateTime(startTime.String()),
 		}
 		id, _ := utils.GenerateSnowflakeId()
 		log.ID = id
