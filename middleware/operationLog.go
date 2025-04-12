@@ -1,0 +1,58 @@
+package middleware
+
+import (
+	"Art-Design-Backend/global"
+	"Art-Design-Backend/model/entity"
+	"Art-Design-Backend/pkg/utils"
+	"bytes"
+	"github.com/dromara/carbon/v2"
+	"github.com/gin-gonic/gin"
+	"io"
+)
+
+// OperationLogger 日志中间件
+func OperationLogger() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		startTime := carbon.Now()
+		var bodyBytes []byte
+		// 检查 Content-Type 是否为 application/json
+		contentType := c.GetHeader("Content-Type")
+		if contentType == "application/json" {
+			// 读取请求参数
+			bodyBytes, _ = io.ReadAll(c.Request.Body)
+			c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes)) // 重置 body，供后续中间件使用
+		}
+
+		// 处理请求
+		c.Next()
+
+		// 获取用户信息 (示例代码，实际可通过 Token 或上下文获取)
+		userID := utils.GetUserID(c)
+
+		// 收集响应信息
+		statusCode := c.Writer.Status()
+
+		// 创建操作日志
+		log := &entity.OperationLog{
+			UserID:    userID,
+			Method:    c.Request.Method,
+			Path:      c.Request.URL.Path,
+			IP:        c.ClientIP(),
+			Params:    string(bodyBytes),
+			Status:    int16(statusCode),
+			CreatedAt: carbon.DateTime{Carbon: startTime},
+		}
+		id, _ := utils.GenerateSnowflakeId()
+		log.ID = id
+
+		// 保存日志到数据库
+		go func() { // 异步保存，避免阻塞请求
+			if err := global.DB.Create(&log).Error; err != nil {
+				// 打印日志或记录到其他地方
+				global.Logger.Error("Failed to save operation log\n")
+				// 打印具体错误
+				global.Logger.Error(err.Error())
+			}
+		}()
+	}
+}
