@@ -80,7 +80,7 @@ func userPage(c *gin.Context) {
 		response.FailWithMessage("分页查询失败", c)
 		return
 	}
-	pageResp := base.BuildPageResp[resp.User](users, total, user.PaginationQ)
+	pageResp := base.BuildPageResp[resp.User](users, total, user.PaginationReq)
 	response.OkWithData(pageResp, c)
 }
 

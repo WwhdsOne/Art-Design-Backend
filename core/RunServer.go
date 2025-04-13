@@ -5,6 +5,7 @@ import (
 	"Art-Design-Backend/global"
 	"Art-Design-Backend/initialize"
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert/yaml"
 	"os"
 )
@@ -29,6 +30,7 @@ func readConfig() (cfg *config.Config) {
 		data, err = os.ReadFile("conf/config.yaml")
 	} else {
 		data, err = os.ReadFile("config.dev.yaml")
+		gin.SetMode(gin.ReleaseMode)
 	}
 	if err != nil {
 		fmt.Printf("error: %v", err)
@@ -49,11 +51,11 @@ func RunServer() {
 	// 初始化全局变量
 	initGlobal(cfg)
 	// 初始化GIN
-	gin := initialize.InitGin()
+	r := initialize.InitGin()
 	// 初始化路由
-	initialize.InitRouter(gin)
+	initialize.InitRouter(r)
 	// 启动
-	gin.Run(cfg.Server.Port)
+	r.Run(cfg.Server.Port)
 }
 
 func displayGodAnimal() {

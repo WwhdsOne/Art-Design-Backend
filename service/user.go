@@ -166,7 +166,7 @@ func UserPage(u *query.User) ([]resp.User, int64, error) {
 	}
 	// 执行分页查询
 	global.DB.
-		Scopes(u.PaginationQ.Paginate()). // 组装分页条件
+		Scopes(u.PaginationReq.Paginate()). // 组装分页条件
 		Find(&users)
 	//组装数据
 	var userResponses []resp.User
