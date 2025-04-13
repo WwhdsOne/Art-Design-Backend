@@ -42,9 +42,7 @@ func OperationLogger() gin.HandlerFunc {
 			Status:    int16(statusCode),
 			CreatedAt: carbon.DateTime(startTime.String()),
 		}
-		id, _ := utils.GenerateSnowflakeId()
-		log.ID.Val = id
-
+		log.ID.Val = utils.GenerateSnowflakeId()
 		// 保存日志到数据库
 		go func() { // 异步保存，避免阻塞请求
 			if err := global.DB.Create(&log).Error; err != nil {

@@ -15,11 +15,7 @@ type ID struct {
 
 func (i *ID) BeforeCreate(db *gorm.DB) (err error) {
 	// 单条记录生成 ID
-	id, err := utils.GenerateSnowflakeId()
-	if err == nil {
-		i.Val = id
-		return
-	}
+	i.Val = utils.GenerateSnowflakeId()
 	return
 }
 

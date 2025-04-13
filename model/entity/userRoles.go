@@ -1,10 +1,7 @@
 package entity
 
-import "Art-Design-Backend/model/base"
-
 // UserRoles 定义用户和角色的多对多关联表
 type UserRoles struct {
-	base.ID
 	UserID int64 `gorm:"column:user_id;type:bigint;not null;comment:用户ID"` // 用户ID，非空且建立索引
 	RoleID int64 `gorm:"column:role_id;type:bigint;not null;comment:角色ID"` // 角色ID，非空且建立索引
 }
