@@ -1,6 +1,6 @@
 module Art-Design-Backend
 
-go 1.24
+go 1.24.2
 
 require (
 	github.com/aliyun/alibabacloud-oss-go-sdk-v2 v1.2.1

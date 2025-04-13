@@ -43,7 +43,7 @@ func OperationLogger() gin.HandlerFunc {
 			CreatedAt: carbon.DateTime(startTime.String()),
 		}
 		id, _ := utils.GenerateSnowflakeId()
-		log.ID = id
+		log.ID.Val = id
 
 		// 保存日志到数据库
 		go func() { // 异步保存，避免阻塞请求

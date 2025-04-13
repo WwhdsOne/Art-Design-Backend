@@ -6,7 +6,6 @@ import (
 	"Art-Design-Backend/initialize"
 	"fmt"
 	"github.com/stretchr/testify/assert/yaml"
-	"log"
 	"os"
 )
 
@@ -23,7 +22,7 @@ func initGlobal(cfg *config.Config) {
 	global.OSSClient = initialize.InitOSSClient(cfg)
 }
 
-func readConfig() (cfg config.Config) {
+func readConfig() (cfg *config.Config) {
 	var data []byte
 	var err error
 	if os.Getenv("ENV") == "DEV" {
@@ -32,17 +31,32 @@ func readConfig() (cfg config.Config) {
 		data, err = os.ReadFile("config.dev.yaml")
 	}
 	if err != nil {
-		log.Fatalf("error: %v", err)
+		fmt.Printf("error: %v", err)
 	}
-	err = yaml.Unmarshal(data, cfg)
+	err = yaml.Unmarshal(data, &cfg)
 	if err != nil {
-		log.Fatalf("error: %v", err)
+		fmt.Printf("error: %v", err)
 	}
 	fmt.Printf("配置如下 : %v\n", cfg)
 	return
 }
 
 func RunServer() {
+	// 展示神兽
+	displayGodAnimal()
+	// 读取配置文件
+	cfg := readConfig()
+	// 初始化全局变量
+	initGlobal(cfg)
+	// 初始化GIN
+	gin := initialize.InitGin()
+	// 初始化路由
+	initialize.InitRouter(gin)
+	// 启动
+	gin.Run(cfg.Server.Port)
+}
+
+func displayGodAnimal() {
 	fmt.Println(`
                            ┏━┓     ┏━┓
                           ┏┛ ┻━━━━━┛ ┻┓
@@ -61,14 +75,4 @@ func RunServer() {
                             ┗━┓ ┓ ┏━━━┳ ┓ ┏━┛
                               ┃ ┫ ┫   ┃ ┫ ┫
                               ┗━┻━┛   ┗━┻━┛`)
-	// 读取配置文件
-	cfg := readConfig()
-	// 初始化全局变量
-	initGlobal(&cfg)
-	// 初始化GIN
-	gin := initialize.InitGin()
-	// 初始化路由
-	initialize.InitRouter(gin)
-	// 启动
-	gin.Run(cfg.Server.Port)
 }

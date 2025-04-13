@@ -41,11 +41,11 @@ func login(c *gin.Context) {
 	// 创建JWT claims，包含用户ID
 	claim := global.JWT.CreateClaims(
 		jwt.BaseClaims{
-			ID: u.ID,
+			ID: u.ID.Val,
 		},
 	)
 	// 将用户ID转换为字符串
-	id := strconv.FormatInt(u.ID, 10)
+	id := strconv.FormatInt(u.ID.Val, 10)
 	// 检查是否存在当前用户的会话
 	session := redisx.Get(constant.SESSION + id)
 	// 如果会话已存在，直接返回会话信息

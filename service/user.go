@@ -14,7 +14,7 @@ import (
 
 func doToResp(user entity.User) resp.User {
 	return resp.User{
-		ID:        user.ID,
+		ID:        user.ID.Val,
 		Username:  user.Username,
 		Nickname:  user.Nickname,
 		CreatedAt: user.CreatedAt,

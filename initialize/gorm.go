@@ -1,0 +1,108 @@
+package initialize
+
+import (
+	"Art-Design-Backend/config"
+	"Art-Design-Backend/global"
+	"Art-Design-Backend/model/entity"
+	"context"
+	"fmt"
+	"go.uber.org/zap"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
+	"time"
+)
+
+// AutoMigrate 自动迁移
+func AutoMigrate(db *gorm.DB) {
+	// 1. 操作日志
+	db.AutoMigrate(&entity.OperationLog{})
+	// 2. 用户
+	db.AutoMigrate(&entity.User{})
+	// 3. 角色
+	db.AutoMigrate(&entity.Role{})
+	// 4. 权限
+	db.AutoMigrate(&entity.Permission{})
+}
+
+// zapGormLogger 实现 gorm.Logger.Interface
+type zapGormLogger struct {
+	zapLogger *zap.Logger
+	logLevel  logger.LogLevel
+}
+
+func (z *zapGormLogger) LogMode(level logger.LogLevel) logger.Interface {
+	newLogger := *z
+	newLogger.logLevel = level
+	return &newLogger
+}
+
+func (z *zapGormLogger) Info(ctx context.Context, msg string, data ...interface{}) {
+	if z.logLevel >= logger.Info {
+		z.zapLogger.Sugar().Infof(msg, data...)
+	}
+}
+
+func (z *zapGormLogger) Warn(ctx context.Context, msg string, data ...interface{}) {
+	if z.logLevel >= logger.Warn {
+		z.zapLogger.Sugar().Warnf(msg, data...)
+	}
+}
+
+func (z *zapGormLogger) Error(ctx context.Context, msg string, data ...interface{}) {
+	if z.logLevel >= logger.Error {
+		z.zapLogger.Sugar().Errorf(msg, data...)
+	}
+}
+
+func (z *zapGormLogger) Trace(ctx context.Context, begin time.Time, fc func() (string, int64), err error) {
+	if z.logLevel <= logger.Silent {
+		return
+	}
+
+	elapsed := time.Since(begin)
+	sql, rows := fc()
+
+	fields := []zap.Field{
+		zap.String("sql", sql),
+		zap.Int64("affected_rows", rows),
+		zap.Duration("elapsed", elapsed),
+	}
+
+	if err != nil {
+		fields = append(fields, zap.Error(err))
+		z.zapLogger.Error("SQL Trace", fields...)
+	} else {
+		z.zapLogger.Debug("SQL Trace", fields...)
+	}
+}
+
+func InitDB(cfg *config.Config) (DB *gorm.DB) {
+	m := cfg.Mysql
+	ds := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+		m.User,     //用户名
+		m.Password, //密码
+		m.Host,     //地址
+		m.Port,     //端口
+		m.Database, //数据库
+	)
+
+	// 创建 Zap 日志适配器
+	gormLogger := &zapGormLogger{
+		zapLogger: global.Logger,
+		logLevel:  logger.Info, // 设置默认日志级别
+	}
+
+	// 连接数据库
+	DB, err := gorm.Open(mysql.Open(ds), &gorm.Config{
+		Logger: gormLogger,
+	})
+
+	if err != nil {
+		global.Logger.Fatal("数据库连接失败")
+		return
+	}
+	// 自动迁移
+	// AutoMigrate(DB)
+	return
+}

@@ -16,6 +16,7 @@ func InitOSSClient(cfg *config.Config) *oss.Client {
 
 	// 创建OSS客户端
 	client := oss.NewClient(setting)
+	// todo后续优化初始化逻辑
 	aliyun.BucketName = c.BucketName
 	return client
 }
