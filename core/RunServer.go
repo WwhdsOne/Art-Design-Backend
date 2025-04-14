@@ -52,6 +52,8 @@ func RunServer() {
 	initGlobal(cfg)
 	// 初始化GIN
 	r := initialize.InitGin()
+	// 初始化校验器
+	initialize.RegisterValidator()
 	// 初始化路由
 	initialize.InitRouter(r)
 	// 启动

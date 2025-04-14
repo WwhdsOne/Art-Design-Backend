@@ -1,10 +1,7 @@
 package api
 
 import (
-	"Art-Design-Backend/model/base"
-	"Art-Design-Backend/model/query"
 	"Art-Design-Backend/model/request"
-	"Art-Design-Backend/model/resp"
 	"Art-Design-Backend/pkg/response"
 	"Art-Design-Backend/pkg/utils"
 	"Art-Design-Backend/service"
@@ -14,25 +11,24 @@ import (
 func InitUserRouter(r *gin.RouterGroup) {
 	userRouter := r.Group("/user")
 	userRouter.POST("/add", addUser)
-	userRouter.DELETE("/delete/:ids", deleteUser)
-	userRouter.PUT("/update/:id", updateUser)
-	userRouter.POST("/page", userPage)
-	userRouter.GET("/info", userInfo)
+	//userRouter.DELETE("/delete/:ids", deleteUser)
+	//userRouter.PUT("/update/:id", updateUser)
+	//userRouter.POST("/page", userPage)
+	//userRouter.GET("/info", userInfo)
 }
 
 func addUser(c *gin.Context) {
 	var userReq request.User
 	err := c.ShouldBindJSON(&userReq)
 	if err != nil {
-		response.FailWithMessage("用户名或密码不能为空", c)
 		return
 	}
 	err = service.AddUser(c, &userReq)
 	if err != nil {
-		response.FailWithMessage("用户名已存在", c)
+		response.FailWithMessage(err.Error(), c)
 		return
 	}
-	response.OkWithMessage("新增用户成功", c)
+	response.OkWithMessage("注册成功", c)
 }
 
 func deleteUser(c *gin.Context) {
@@ -68,28 +64,28 @@ func updateUser(c *gin.Context) {
 	response.OkWithMessage("更新用户成功", c)
 }
 
-func userPage(c *gin.Context) {
-	var user query.User
-	err := c.ShouldBindJSON(&user)
-	if err != nil {
-		response.FailWithMessage("分页参数填写错误", c)
-		return
-	}
-	users, total, err := service.UserPage(&user)
-	if err != nil {
-		response.FailWithMessage("分页查询失败", c)
-		return
-	}
-	pageResp := base.BuildPageResp[resp.User](users, total, user.PaginationReq)
-	response.OkWithData(pageResp, c)
-}
-
-func userInfo(c *gin.Context) {
-	id := utils.GetUserID(c)
-	userResp, err := service.GetUserById(id)
-	if err != nil {
-		response.FailWithMessage("查询用户失败", c)
-		return
-	}
-	response.OkWithData(userResp, c)
-}
+//func userPage(c *gin.Context) {
+//	var user query.User
+//	err := c.ShouldBindJSON(&user)
+//	if err != nil {
+//		response.FailWithMessage("分页参数填写错误", c)
+//		return
+//	}
+//	users, total, err := service.UserPage(&user)
+//	if err != nil {
+//		response.FailWithMessage("分页查询失败", c)
+//		return
+//	}
+//	pageResp := base.BuildPageResp[resp.User](users, total, user.PaginationReq)
+//	response.OkWithData(pageResp, c)
+//}
+//
+//func userInfo(c *gin.Context) {
+//	id := utils.GetUserID(c)
+//	userResp, err := service.GetUserById(id)
+//	if err != nil {
+//		response.FailWithMessage("查询用户失败", c)
+//		return
+//	}
+//	response.OkWithData(userResp, c)
+//}

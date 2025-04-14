@@ -13,5 +13,7 @@ func InitGin() *gin.Engine {
 	r.Use(gzip.Gzip(gzip.DefaultCompression))
 	// 添加操作日志记录
 	r.Use(middleware.OperationLogger())
+	// 添加校验器
+	r.Use(middleware.ValidationErrorMiddleware())
 	return r
 }
