@@ -7,12 +7,13 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert/yaml"
+	"log"
 	"os"
 )
 
-func initGlobal(cfg *config.Config) {
+func initGlobal(cfg *config.Config, isDev bool) {
 	// 初始化日志
-	global.Logger = initialize.InitLogger()
+	global.Logger = initialize.InitLogger(!isDev)
 	// 初始化数据库
 	global.DB = initialize.InitDB(cfg)
 	// 初始化Redis
@@ -23,21 +24,21 @@ func initGlobal(cfg *config.Config) {
 	global.OSSClient = initialize.InitOSSClient(cfg)
 }
 
-func readConfig() (cfg *config.Config) {
+func readConfig(isDev bool) (cfg *config.Config) {
 	var data []byte
 	var err error
-	if os.Getenv("ENV") == "DEV" {
-		data, err = os.ReadFile("conf/config.yaml")
+	if !isDev {
+		data, err = os.ReadFile("config.yaml")
 	} else {
-		data, err = os.ReadFile("config.dev.yaml")
-		gin.SetMode(gin.ReleaseMode)
+		data, err = os.ReadFile("conf/config.yaml")
+
 	}
 	if err != nil {
-		fmt.Printf("error: %v", err)
+		log.Fatalf("error: %v", err)
 	}
 	err = yaml.Unmarshal(data, &cfg)
 	if err != nil {
-		fmt.Printf("error: %v", err)
+		log.Fatalf("error: %v", err)
 	}
 	fmt.Printf("配置如下 : %v\n", cfg)
 	return
@@ -46,10 +47,14 @@ func readConfig() (cfg *config.Config) {
 func RunServer() {
 	// 展示神兽
 	displayGodAnimal()
+	isDev := os.Getenv("ENV") == "DEV"
 	// 读取配置文件
-	cfg := readConfig()
+	cfg := readConfig(isDev)
 	// 初始化全局变量
-	initGlobal(cfg)
+	initGlobal(cfg, isDev)
+	if !isDev {
+		gin.SetMode(gin.ReleaseMode)
+	}
 	// 初始化GIN
 	r := initialize.InitGin()
 	// 初始化校验器
@@ -57,6 +62,7 @@ func RunServer() {
 	// 初始化路由
 	initialize.InitRouter(r)
 	// 启动
+	global.Logger.Info(fmt.Sprintf("%s服务启动成功，端口号为：%s", cfg.Server.App, cfg.Server.Port))
 	r.Run(cfg.Server.Port)
 }
 
