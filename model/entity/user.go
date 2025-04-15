@@ -5,7 +5,6 @@ import (
 	"Art-Design-Backend/model/request"
 	"fmt"
 	"golang.org/x/crypto/bcrypt"
-	"gorm.io/gorm"
 )
 
 // User 结构体定义了用户的基本信息
@@ -31,39 +30,8 @@ func (u *User) TableName() string {
 	return "user"
 }
 
-func (u *User) BeforeCreate(db *gorm.DB) (err error) {
-	var result struct {
-		UsernameExists bool
-		EmailExists    bool
-		PhoneExists    bool
-	}
-
-	// 检查当前记录是否有ID，如果有，则在查询中排除它
-	excludeID := ""
-	if u.ID.Val != 0 {
-		excludeID = fmt.Sprintf("AND id != %d", u.ID)
-	}
-
-	// 单次查询检查所有字段，排除当前ID
-	db.Raw("SELECT"+
-		"EXISTS(SELECT 1 FROM user WHERE username = ?"+excludeID+") AS username_exists",
-		"EXISTS(SELECT 1 FROM user WHERE email = ?"+excludeID+") AS username_exists",
-		"EXISTS(SELECT 1 FROM user WHERE phone = ?"+excludeID+") AS username_exists",
-		u.Username, u.Email, u.Phone).Scan(&result)
-
-	switch {
-	case result.UsernameExists:
-		err = fmt.Errorf("用户名重复")
-	case result.EmailExists:
-		err = fmt.Errorf("邮箱重复")
-	case result.PhoneExists:
-		err = fmt.Errorf("手机号重复")
-	}
-	return
-}
-
 // BeforeCopy 是 copier 的钩子函数
-func (u *User) BeforeCopy(src interface{}) error {
+func (u *User) BeforeCopy(src interface{}) (err error) {
 	userReq, ok := src.(request.User)
 	if !ok {
 		return fmt.Errorf("源类型错误")
@@ -74,5 +42,8 @@ func (u *User) BeforeCopy(src interface{}) error {
 	u.Email = string(email)
 	phone, _ := bcrypt.GenerateFromPassword([]byte(userReq.Phone), bcrypt.DefaultCost)
 	u.Phone = string(phone)
-	return nil
+	if userReq.ID != 0 {
+		u.ID = userReq.ID
+	}
+	return
 }

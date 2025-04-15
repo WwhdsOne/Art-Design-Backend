@@ -4,25 +4,80 @@ import (
 	"Art-Design-Backend/config"
 	"Art-Design-Backend/global"
 	"Art-Design-Backend/model/entity"
+	"Art-Design-Backend/pkg/utils"
 	"context"
 	"fmt"
 	"go.uber.org/zap"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+	"reflect"
+	"sync"
 	"time"
 )
 
-// AutoMigrate 自动迁移
-func AutoMigrate(db *gorm.DB) {
-	// 1. 操作日志
-	//db.AutoMigrate(&entity.OperationLog{})
-	// 2. 用户
-	db.AutoMigrate(&entity.User{})
-	// 3. 角色
-	//db.AutoMigrate(&entity.Role{})
-	// 4. 权限
-	//db.AutoMigrate(&entity.Permission{})
+func init() {
+	// 提前注册需要生成ID的模型
+	RegisterIDField(&entity.User{}, "ID")
+	RegisterIDField(&entity.OperationLog{}, "ID")
+}
+
+// idFieldsMap 存储需要生成ID的模型和字段名
+var idFieldsMap = sync.Map{}
+
+// RegisterIDField 注册需要自动生成ID的模型和字段
+// 参数：
+//
+//	model：需要生成ID的模型
+//	fieldName：需要生成ID的字段名
+func RegisterIDField(model interface{}, fieldName string) {
+
+	t := reflect.TypeOf(model)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	idFieldsMap.Store(model, fieldName)
+}
+
+// SnowflakeIDPlugin GORM插件实现
+type SnowflakeIDPlugin struct{}
+
+func (p *SnowflakeIDPlugin) Name() string {
+	return "snowflake_id_plugin"
+}
+
+// Initialize 初始化数据库
+// 雪花ID生成插件
+func (p *SnowflakeIDPlugin) Initialize(db *gorm.DB) error {
+	db.Callback().Create().Before("gorm:create").Register("generate_snowflake_id", p.generateID)
+	return nil
+}
+
+func (p *SnowflakeIDPlugin) generateID(db *gorm.DB) {
+	if db.Statement.Schema == nil || db.Statement.Model == nil {
+		return
+	}
+
+	// 获取模型类型
+	modelType := reflect.TypeOf(db.Statement.Model)
+	if modelType.Kind() == reflect.Ptr {
+		modelType = modelType.Elem()
+	}
+
+	// 查找已注册的字段名
+	loadedFieldName, exists := idFieldsMap.Load(modelType)
+	// 如果不存在，则返回
+	if !exists {
+		return
+	}
+	fieldName := loadedFieldName.(string)
+
+	// 设置ID
+	modelValue := reflect.ValueOf(db.Statement.Model).Elem()
+	field := modelValue.FieldByName(fieldName)
+	if field.IsValid() && field.CanSet() && field.Int() == 0 {
+		field.SetInt(utils.GenerateSnowflakeId())
+	}
 }
 
 // zapGormLogger 实现 gorm.Logger.Interface
@@ -77,6 +132,18 @@ func (z *zapGormLogger) Trace(ctx context.Context, begin time.Time, fc func() (s
 	}
 }
 
+// AutoMigrate 自动迁移
+func AutoMigrate(db *gorm.DB) {
+	// 1. 操作日志
+	db.AutoMigrate(&entity.OperationLog{})
+	// 2. 用户
+	db.AutoMigrate(&entity.User{})
+	// 3. 角色
+	db.AutoMigrate(&entity.Role{})
+	// 4. 权限
+	db.AutoMigrate(&entity.Permission{})
+}
+
 func InitDB(cfg *config.Config) (DB *gorm.DB) {
 	m := cfg.Mysql
 	ds := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
@@ -104,6 +171,6 @@ func InitDB(cfg *config.Config) (DB *gorm.DB) {
 		return
 	}
 	// 自动迁移
-	AutoMigrate(DB)
+	//AutoMigrate(DB)
 	return
 }

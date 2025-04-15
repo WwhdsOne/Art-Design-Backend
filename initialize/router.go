@@ -6,12 +6,13 @@ import (
 )
 
 func InitRouter(r *gin.Engine) {
+	allGroup := r.Group("/api/v1")
 	{
-		publicGroup := r.Group("/")
+		publicGroup := allGroup.Group("/")
 		api.InitAuthRouter(publicGroup)
 	}
 	{
-		privateGroup := r.Group("/")
+		privateGroup := allGroup.Group("/")
 		//privateGroup.Use(middleware.JWTAuth())
 		api.InitUserRouter(privateGroup)
 	}

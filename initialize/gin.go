@@ -1,7 +1,7 @@
 package initialize
 
 import (
-	"Art-Design-Backend/middleware"
+	"Art-Design-Backend/pkg/middleware"
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 )
@@ -13,7 +13,7 @@ func InitGin() *gin.Engine {
 	r.Use(gzip.Gzip(gzip.DefaultCompression))
 	// 添加操作日志记录
 	r.Use(middleware.OperationLogger())
-	// 添加校验器
-	r.Use(middleware.ValidationErrorMiddleware())
+	// 添加全局错误校验器错误中间件
+	r.Use(middleware.ErrorHandlingMiddleware())
 	return r
 }

@@ -15,8 +15,10 @@ import (
 )
 
 func InitAuthRouter(r *gin.RouterGroup) {
-	r.POST("/login", login)
-	r.POST("/logout", logout)
+	authRouter := r.Group("/auth")
+	authRouter.POST("/login", login)
+	authRouter.POST("/logout", logout)
+	authRouter.POST("/register", register)
 }
 
 // login 处理用户登录请求
@@ -41,11 +43,11 @@ func login(c *gin.Context) {
 	// 创建JWT claims，包含用户ID
 	claim := global.JWT.CreateClaims(
 		jwt.BaseClaims{
-			ID: u.ID.Val,
+			ID: u.ID,
 		},
 	)
 	// 将用户ID转换为字符串
-	id := strconv.FormatInt(u.ID.Val, 10)
+	id := strconv.FormatInt(u.ID, 10)
 	// 检查是否存在当前用户的会话
 	session := redisx.Get(constant.SESSION + id)
 	// 如果会话已存在，直接返回会话信息
@@ -110,4 +112,20 @@ func logout(c *gin.Context) {
 	}
 
 	response.OkWithMessage("注销成功", c)
+}
+
+func register(c *gin.Context) {
+	var userReq request.User
+	err := c.ShouldBindJSON(&userReq)
+	if err != nil {
+		c.Error(err)
+		c.Set(gin.BindKey, userReq)
+		return
+	}
+	err = service.AddUser(c, &userReq)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	response.OkWithMessage("注册成功", c)
 }

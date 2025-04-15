@@ -1,12 +1,11 @@
 package entity
 
 import (
-	"Art-Design-Backend/model/base"
 	"github.com/dromara/carbon/v2"
 )
 
 type OperationLog struct {
-	base.ID
+	ID        int64           `gorm:"type:bigint;column:id;primarykey"` // 雪花ID
 	UserID    int64           `gorm:"column:user_id;type:bigint;not null;index;comment:'操作人ID'"`
 	Method    string          `gorm:"column:method;type:varchar(10);not null;comment:'HTTP请求方法(GET/POST等)'"`
 	Path      string          `gorm:"column:path;type:varchar(255);not null;comment:'请求路径'"`

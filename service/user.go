@@ -4,12 +4,47 @@ import (
 	"Art-Design-Backend/global"
 	"Art-Design-Backend/model/entity"
 	"Art-Design-Backend/model/request"
+	"Art-Design-Backend/pkg/errorTypes"
 	"errors"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
+
+// 检查用户名、邮箱和手机号是否重复
+func checkDuplicate(u *entity.User) (err error) {
+
+	var result struct {
+		UsernameExists bool
+		EmailExists    bool
+		PhoneExists    bool
+	}
+
+	// 检查当前记录是否有ID，如果有，则在查询中排除它
+	excludeID := ""
+	if u.ID != 0 {
+		excludeID = fmt.Sprintf("AND id != %d", u.ID)
+	}
+
+	// 单次查询检查所有字段，排除当前ID
+	global.DB.Raw("SELECT "+
+		"EXISTS(SELECT 1 FROM user WHERE username = ? "+excludeID+") AS username_exists,"+
+		"EXISTS(SELECT 1 FROM user WHERE email = ? "+excludeID+") AS email_exists,"+
+		"EXISTS(SELECT 1 FROM user WHERE phone = ? "+excludeID+") AS phone_exists",
+		u.Username, u.Email, u.Phone).Scan(&result)
+
+	switch {
+	case result.UsernameExists:
+		err = errorTypes.NewGormError("用户名重复")
+	case result.EmailExists:
+		err = errorTypes.NewGormError("邮箱重复")
+	case result.PhoneExists:
+		err = errorTypes.NewGormError("手机号重复")
+	}
+	return
+}
 
 func Login(ctx *gin.Context, u request.Login) (resp entity.User, err error) {
 	global.DB.
@@ -27,12 +62,17 @@ func Login(ctx *gin.Context, u request.Login) (resp entity.User, err error) {
 
 func AddUser(c *gin.Context, userReq *request.User) (err error) {
 	var user entity.User
-	// 属性复制
+	// 属性复制，同时进行邮箱、手机号和密码加密操作
 	err = copier.Copy(&user, userReq)
 	if err != nil {
 		global.Logger.Error("复制属性失败", zap.Error(err))
 		return
 	}
+	// 判重
+	if err = checkDuplicate(&user); err != nil {
+		return
+	}
+	// 插入
 	if err = global.DB.WithContext(c).Create(&user).Error; err != nil {
 		// 处理错误
 		global.Logger.Error("新增用户失败", zap.Error(err))

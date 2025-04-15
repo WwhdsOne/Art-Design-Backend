@@ -9,26 +9,11 @@ import (
 )
 
 func InitUserRouter(r *gin.RouterGroup) {
-	userRouter := r.Group("/user")
-	userRouter.POST("/add", addUser)
+	//userRouter := r.Group("/user")
 	//userRouter.DELETE("/delete/:ids", deleteUser)
 	//userRouter.PUT("/update/:id", updateUser)
 	//userRouter.POST("/page", userPage)
 	//userRouter.GET("/info", userInfo)
-}
-
-func addUser(c *gin.Context) {
-	var userReq request.User
-	err := c.ShouldBindJSON(&userReq)
-	if err != nil {
-		return
-	}
-	err = service.AddUser(c, &userReq)
-	if err != nil {
-		response.FailWithMessage(err.Error(), c)
-		return
-	}
-	response.OkWithMessage("注册成功", c)
 }
 
 func deleteUser(c *gin.Context) {
