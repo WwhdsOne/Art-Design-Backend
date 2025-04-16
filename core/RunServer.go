@@ -11,9 +11,9 @@ import (
 	"os"
 )
 
-func initGlobal(cfg *config.Config, isDev bool) {
+func initGlobal(cfg *config.Config) {
 	// 初始化日志
-	global.Logger = initialize.InitLogger(!isDev)
+	global.Logger = initialize.InitLogger(cfg)
 	// 初始化数据库
 	global.DB = initialize.InitDB(cfg)
 	// 初始化Redis
@@ -51,10 +51,13 @@ func RunServer() {
 	// 读取配置文件
 	cfg := readConfig(isDev)
 	// 初始化全局变量
-	initGlobal(cfg, isDev)
+	initGlobal(cfg)
+	// 设置GIN模式
 	if !isDev {
 		gin.SetMode(gin.ReleaseMode)
 	}
+	// 初始化模型信息
+	initialize.InitModelInfo()
 	// 初始化GIN
 	r := initialize.InitGin()
 	// 初始化校验器

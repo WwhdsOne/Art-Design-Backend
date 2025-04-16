@@ -7,6 +7,7 @@ require (
 	github.com/bytedance/sonic v1.13.2
 	github.com/dromara/carbon/v2 v2.6.2
 	github.com/gin-contrib/gzip v1.2.3
+	github.com/gin-contrib/zap v1.1.5
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-playground/validator/v10 v10.26.0
 	github.com/golang-jwt/jwt/v5 v5.2.2

@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"Art-Design-Backend/model/entity"
 	"Art-Design-Backend/pkg/errorTypes"
 	"Art-Design-Backend/pkg/response"
 	"errors"
@@ -12,20 +11,8 @@ import (
 	"strings"
 )
 
-// 可以在init()中预先缓存结构体信息
-var fieldLabels = make(map[string]string)
-
-func init() {
-	var t reflect.Type
-	// 解读并缓存标签
-	{
-		t = reflect.TypeOf(entity.User{})
-	}
-	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
-		fieldLabels[field.Name] = field.Tag.Get("label")
-	}
-}
+// FieldLabels 字段标签映射
+var FieldLabels = make(map[string]string)
 
 func getFieldLabel(obj interface{}, fieldName string) string {
 	t := reflect.TypeOf(obj)
@@ -39,7 +26,7 @@ func getFieldLabel(obj interface{}, fieldName string) string {
 	}
 
 	// 检查是否有预定义的标签映射
-	if label, ok := fieldLabels[fieldName]; ok && label != "" {
+	if label, ok := FieldLabels[fieldName]; ok && label != "" {
 		return label
 	}
 

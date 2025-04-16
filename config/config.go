@@ -7,4 +7,5 @@ type Config struct {
 	Redis  Redis  `yaml:"redis"`
 	JWT    JWT    `yaml:"jwt"`
 	OSS    OSS    `yaml:"oss"`
+	Zap    Zap    `yaml:"zap"`
 }

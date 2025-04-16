@@ -12,51 +12,26 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 	"reflect"
-	"sync"
 	"time"
 )
 
-func init() {
-	// 提前注册需要生成ID的模型
-	RegisterIDField(&entity.User{}, "ID")
-	RegisterIDField(&entity.OperationLog{}, "ID")
-}
+// snowflakeIDPlugin GORM插件实现
+type snowflakeIDPlugin struct{}
 
-// idFieldsMap 存储需要生成ID的模型和字段名
-var idFieldsMap = sync.Map{}
-
-// RegisterIDField 注册需要自动生成ID的模型和字段
-// 参数：
-//
-//	model：需要生成ID的模型
-//	fieldName：需要生成ID的字段名
-func RegisterIDField(model interface{}, fieldName string) {
-
-	t := reflect.TypeOf(model)
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
-	idFieldsMap.Store(model, fieldName)
-}
-
-// SnowflakeIDPlugin GORM插件实现
-type SnowflakeIDPlugin struct{}
-
-func (p *SnowflakeIDPlugin) Name() string {
+func (p *snowflakeIDPlugin) Name() string {
 	return "snowflake_id_plugin"
 }
 
-// Initialize 初始化数据库
+// initialize 初始化数据库
 // 雪花ID生成插件
-func (p *SnowflakeIDPlugin) Initialize(db *gorm.DB) error {
-	db.Callback().Create().Before("gorm:create").Register("generate_snowflake_id", p.generateID)
-	return nil
+func (p *snowflakeIDPlugin) initialize(db *gorm.DB) (err error) {
+	err = db.Callback().Create().
+		Before("gorm:create").
+		Register("generate_snowflake_id", p.generateID)
+	return
 }
 
-func (p *SnowflakeIDPlugin) generateID(db *gorm.DB) {
-	if db.Statement.Schema == nil || db.Statement.Model == nil {
-		return
-	}
+func (p *snowflakeIDPlugin) generateID(db *gorm.DB) {
 
 	// 获取模型类型
 	modelType := reflect.TypeOf(db.Statement.Model)
@@ -64,20 +39,19 @@ func (p *SnowflakeIDPlugin) generateID(db *gorm.DB) {
 		modelType = modelType.Elem()
 	}
 
-	// 查找已注册的字段名
-	loadedFieldName, exists := idFieldsMap.Load(modelType)
-	// 如果不存在，则返回
-	if !exists {
-		return
+	// 如果存在
+	if loadedFieldName, exist := snowflakeIdFieldsMap[modelType]; exist {
+		// 获取字段
+		fieldName := loadedFieldName
+		modelValue := reflect.ValueOf(db.Statement.Model).Elem()
+		field := modelValue.FieldByName(fieldName)
+		// 如果字段为0，则设置雪花ID
+		if field.Int() == 0 {
+			field.SetInt(utils.GenerateSnowflakeId())
+		}
 	}
-	fieldName := loadedFieldName.(string)
-
-	// 设置ID
-	modelValue := reflect.ValueOf(db.Statement.Model).Elem()
-	field := modelValue.FieldByName(fieldName)
-	if field.IsValid() && field.CanSet() && field.Int() == 0 {
-		field.SetInt(utils.GenerateSnowflakeId())
-	}
+	// 不存在直接返回
+	return
 }
 
 // zapGormLogger 实现 gorm.Logger.Interface
@@ -171,6 +145,6 @@ func InitDB(cfg *config.Config) (DB *gorm.DB) {
 		return
 	}
 	// 自动迁移
-	//AutoMigrate(DB)
+	AutoMigrate(DB)
 	return
 }

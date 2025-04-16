@@ -34,18 +34,18 @@ func OperationLogger() gin.HandlerFunc {
 
 		// 创建操作日志
 		log := &entity.OperationLog{
-			UserID:    userID,
-			Method:    c.Request.Method,
-			Path:      c.Request.URL.Path,
-			IP:        c.ClientIP(),
-			Params:    string(bodyBytes),
-			Status:    int16(statusCode),
-			CreatedAt: carbon.DateTime(startTime.String()),
+			OperatorID: userID,
+			Method:     c.Request.Method,
+			Path:       c.Request.URL.Path,
+			IP:         c.ClientIP(),
+			Params:     string(bodyBytes),
+			Status:     int16(statusCode),
+			CreatedAt:  carbon.DateTime(startTime.String()),
 		}
-		log.ID = utils.GenerateSnowflakeId()
+		cCp := c.Copy()
 		// 保存日志到数据库
 		go func() { // 异步保存，避免阻塞请求
-			if err := global.DB.Create(&log).Error; err != nil {
+			if err := global.DB.WithContext(cCp).Create(&log).Error; err != nil {
 				// 打印日志或记录到其他地方
 				global.Logger.Error("Failed to save operation log\n")
 				// 打印具体错误
