@@ -17,15 +17,18 @@ func Set(id, value string, duration time.Duration) (err error) {
 	return
 }
 
-func Get(key string) string {
+func Get(key string) (val string) {
 	timeout, cancelFunc := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancelFunc()
 	val, err := global.Redis.Get(timeout, key).Result()
 	if err != nil {
+		if err.Error() == "redis: nil" {
+			return
+		}
 		global.Logger.Error(err.Error())
-		return ""
+		return
 	}
-	return val
+	return
 }
 
 func Delete(key string) (err error) {

@@ -9,11 +9,11 @@ import (
 )
 
 func InitUserRouter(r *gin.RouterGroup) {
-	//userRouter := r.Group("/user")
+	userRouter := r.Group("/user")
 	//userRouter.DELETE("/delete/:ids", deleteUser)
 	//userRouter.PUT("/update/:id", updateUser)
 	//userRouter.POST("/page", userPage)
-	//userRouter.GET("/info", userInfo)
+	userRouter.GET("/info", getUserInfo)
 }
 
 func deleteUser(c *gin.Context) {
@@ -49,28 +49,27 @@ func updateUser(c *gin.Context) {
 	response.OkWithMessage("更新用户成功", c)
 }
 
-//func userPage(c *gin.Context) {
-//	var user query.User
-//	err := c.ShouldBindJSON(&user)
-//	if err != nil {
-//		response.FailWithMessage("分页参数填写错误", c)
-//		return
+//	func userPage(c *gin.Context) {
+//		var user query.User
+//		err := c.ShouldBindJSON(&user)
+//		if err != nil {
+//			response.FailWithMessage("分页参数填写错误", c)
+//			return
+//		}
+//		users, total, err := service.UserPage(&user)
+//		if err != nil {
+//			response.FailWithMessage("分页查询失败", c)
+//			return
+//		}
+//		pageResp := base.BuildPageResp[resp.User](users, total, user.PaginationReq)
+//		response.OkWithData(pageResp, c)
 //	}
-//	users, total, err := service.UserPage(&user)
-//	if err != nil {
-//		response.FailWithMessage("分页查询失败", c)
-//		return
-//	}
-//	pageResp := base.BuildPageResp[resp.User](users, total, user.PaginationReq)
-//	response.OkWithData(pageResp, c)
-//}
-//
-//func userInfo(c *gin.Context) {
-//	id := utils.GetUserID(c)
-//	userResp, err := service.GetUserById(id)
-//	if err != nil {
-//		response.FailWithMessage("查询用户失败", c)
-//		return
-//	}
-//	response.OkWithData(userResp, c)
-//}
+func getUserInfo(c *gin.Context) {
+	id := utils.GetUserID(c)
+	userResp, err := service.GetUserById(id)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	response.OkWithData(userResp, c)
+}

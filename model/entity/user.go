@@ -43,7 +43,7 @@ func (u *User) BeforeCopy(src interface{}) (err error) {
 	phone, _ := bcrypt.GenerateFromPassword([]byte(userReq.Phone), bcrypt.DefaultCost)
 	u.Phone = string(phone)
 	if userReq.ID != 0 {
-		u.ID = userReq.ID
+		u.ID = int64(userReq.ID)
 	}
 	return
 }

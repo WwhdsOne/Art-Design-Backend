@@ -30,14 +30,15 @@ func login(c *gin.Context) {
 	err := c.ShouldBindJSON(&loginReq)
 	// 如果绑定过程中出现错误，返回错误响应并结束函数执行
 	if err != nil {
-		response.FailWithMessage("用户名或密码不能为空", c)
+		c.Error(err)
+		c.Set(gin.BindKey, loginReq)
 		return
 	}
 	// 调用service.Login函数尝试验证用户登录信息
 	u, err := service.Login(c, loginReq)
 	// 如果登录验证失败，返回错误响应并结束函数执行
 	if err != nil {
-		response.FailWithMessage("用户名或密码错误", c)
+		c.Error(err)
 		return
 	}
 	// 创建JWT claims，包含用户ID

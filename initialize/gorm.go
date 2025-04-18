@@ -145,6 +145,6 @@ func InitDB(cfg *config.Config) (DB *gorm.DB) {
 		return
 	}
 	// 自动迁移
-	AutoMigrate(DB)
+	//AutoMigrate(DB)
 	return
 }

@@ -15,8 +15,8 @@ func GetUserID(c context.Context) int64 {
 	return -1
 }
 
-// GetToken 从header中获取x-token
+// GetToken 从header中获取authorization
 func GetToken(c *gin.Context) string {
-	token := c.GetHeader("x-token")
+	token := c.GetHeader("authorization")
 	return token
 }

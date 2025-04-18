@@ -4,6 +4,7 @@ import (
 	"Art-Design-Backend/global"
 	"Art-Design-Backend/model/entity"
 	"Art-Design-Backend/model/request"
+	"Art-Design-Backend/model/resp"
 	"Art-Design-Backend/pkg/errorTypes"
 	"errors"
 	"fmt"
@@ -47,15 +48,15 @@ func checkDuplicate(u *entity.User) (err error) {
 }
 
 func Login(ctx *gin.Context, u request.Login) (resp entity.User, err error) {
-	global.DB.
+	err = global.DB.
 		WithContext(ctx).
 		Select("id", "password").
 		Where("Username = ?", u.Username).
-		First(&resp)
+		First(&resp).Error
 	err = bcrypt.CompareHashAndPassword([]byte(resp.Password), []byte(u.Password))
 	if err != nil {
 		// 密码错误
-		return
+		return resp, errorTypes.NewGormError("用户名或密码错误")
 	}
 	return
 }
@@ -72,6 +73,8 @@ func AddUser(c *gin.Context, userReq *request.User) (err error) {
 	if err = checkDuplicate(&user); err != nil {
 		return
 	}
+	password, _ := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+	user.Password = string(password)
 	// 插入
 	if err = global.DB.WithContext(c).Create(&user).Error; err != nil {
 		// 处理错误
@@ -197,3 +200,19 @@ func UpdateUser(c *gin.Context, userReq *request.User, id int64) error {
 //
 //	return userResponses, total, nil
 //}
+
+func GetUserById(id int64) (res resp.User, err error) {
+	var user entity.User
+	if err = global.DB.Where("id = ?", id).First(&user).Error; err != nil {
+		// 处理错误，例如可以返回 nil 或者记录错误日志
+		global.Logger.Error("获取用户失败")
+		err = errorTypes.NewGormError("获取用户失败")
+		return
+	}
+	err = copier.Copy(&res, &user)
+	if err != nil {
+		global.Logger.Error("复制属性失败")
+		return
+	}
+	return
+}
