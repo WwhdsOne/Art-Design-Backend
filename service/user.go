@@ -15,7 +15,7 @@ import (
 )
 
 // 检查用户名、邮箱和手机号是否重复
-func checkDuplicate(u *entity.User) (err error) {
+func checkUserDuplicate(u *entity.User) (err error) {
 
 	var result struct {
 		UsernameExists bool
@@ -70,7 +70,7 @@ func AddUser(c *gin.Context, userReq *request.User) (err error) {
 		return
 	}
 	// 判重
-	if err = checkDuplicate(&user); err != nil {
+	if err = checkUserDuplicate(&user); err != nil {
 		return
 	}
 	password, _ := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
@@ -134,7 +134,6 @@ func UpdateUser(c *gin.Context, userReq *request.User, id int64) error {
 		Model(&entity.User{}).
 		Where("username = ? AND id != ?", user.Username, id).
 		Count(&count).Error; err != nil {
-
 		global.Logger.Error("查询用户名失败", zap.Error(err))
 		return err
 	}

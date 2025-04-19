@@ -5,7 +5,7 @@ import (
 )
 
 type OperationLog struct {
-	ID         int64           `gorm:"type:bigint;column:id;primarykey"` // 雪花ID
+	ID         int64           `gorm:"column:id;type:bigint;primarykey"` // 雪花ID
 	OperatorID int64           `gorm:"column:operator_id;type:bigint;not null;index;comment:操作人ID,非鉴权接口则为-1"`
 	Method     string          `gorm:"column:method;type:varchar(10);not null;comment:HTTP请求方法(GET/POST等)"`
 	Path       string          `gorm:"column:path;type:varchar(255);not null;comment:请求路径"`

@@ -109,13 +109,13 @@ func (z *zapGormLogger) Trace(ctx context.Context, begin time.Time, fc func() (s
 // AutoMigrate 自动迁移
 func AutoMigrate(db *gorm.DB) {
 	// 1. 操作日志
-	db.AutoMigrate(&entity.OperationLog{})
-	// 2. 用户
-	db.AutoMigrate(&entity.User{})
-	// 3. 角色
-	db.AutoMigrate(&entity.Role{})
+	//db.AutoMigrate(&entity.OperationLog{})
+	//// 2. 用户
+	//db.AutoMigrate(&entity.User{})
+	//// 3. 角色
+	//db.AutoMigrate(&entity.Role{})
 	// 4. 权限
-	db.AutoMigrate(&entity.Permission{})
+	//db.AutoMigrate(&entity.Menu{})
 }
 
 func InitDB(cfg *config.Config) (DB *gorm.DB) {
@@ -145,6 +145,6 @@ func InitDB(cfg *config.Config) (DB *gorm.DB) {
 		return
 	}
 	// 自动迁移
-	//AutoMigrate(DB)
+	AutoMigrate(DB)
 	return
 }
