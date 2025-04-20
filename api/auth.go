@@ -11,14 +11,15 @@ import (
 	"Art-Design-Backend/service"
 	"github.com/gin-gonic/gin"
 	"strconv"
-	"time"
 )
 
-func InitAuthRouter(r *gin.RouterGroup) {
-	authRouter := r.Group("/auth")
-	authRouter.POST("/login", login)
-	authRouter.POST("/logout", logout)
-	authRouter.POST("/register", register)
+func InitSecuredAuthRouter(r *gin.RouterGroup) {
+	r.POST("/logout", logout)
+}
+
+func InitOpenAuthRouter(r *gin.RouterGroup) {
+	r.POST("/login", login)
+	r.POST("/register", register)
 }
 
 // login 处理用户登录请求
@@ -64,14 +65,14 @@ func login(c *gin.Context) {
 		return
 	}
 	// 设置token方便获取是否登录
-	err = redisx.Set(constant.LOGIN+token, id, 24*time.Hour)
+	err = redisx.Set(constant.LOGIN+token, id, global.JWT.ExpiresTime)
 	// 如果设置token失败，返回错误响应并结束函数执行
 	if err != nil {
 		response.FailWithMessage("设置token失败", c)
 		return
 	}
 	// 设置会话防止重复登录
-	err = redisx.Set(constant.SESSION+id, token, 24*time.Hour)
+	err = redisx.Set(constant.SESSION+id, token, global.JWT.ExpiresTime)
 	// 如果设置会话失败，返回错误响应并结束函数执行
 	if err != nil {
 		response.FailWithMessage("设置会话失败", c)

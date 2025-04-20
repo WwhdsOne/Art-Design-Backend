@@ -1,6 +1,6 @@
 package constant
 
 var (
-	LOGIN   = "LOGIN:"
-	SESSION = "SESSION:"
+	LOGIN   = "AUTH:LOGIN:"
+	SESSION = "AUTH:SESSION:"
 )

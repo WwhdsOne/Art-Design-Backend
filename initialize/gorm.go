@@ -3,7 +3,6 @@ package initialize
 import (
 	"Art-Design-Backend/config"
 	"Art-Design-Backend/global"
-	"Art-Design-Backend/model/entity"
 	"Art-Design-Backend/pkg/utils"
 	"context"
 	"fmt"

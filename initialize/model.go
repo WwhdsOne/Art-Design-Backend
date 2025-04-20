@@ -17,6 +17,7 @@ func InitModelInfo() {
 	{
 		registerIDField(&entity.User{}, "ID")
 		registerIDField(&entity.OperationLog{}, "ID")
+		registerIDField(&entity.Menu{}, "ID")
 	}
 	// 2. 校验器错误返回信息
 	{
