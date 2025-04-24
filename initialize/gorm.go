@@ -14,6 +14,18 @@ import (
 	"time"
 )
 
+// AutoMigrate 自动迁移
+func AutoMigrate(db *gorm.DB) {
+	// 1. 操作日志
+	//db.AutoMigrate(&entity.OperationLog{})
+	//// 2. 用户
+	//db.AutoMigrate(&entity.User{})
+	//// 3. 角色
+	//db.AutoMigrate(&entity.Role{})
+	//// 4. 菜单
+	//db.AutoMigrate(&entity.Menu{})
+}
+
 // snowflakeIDPlugin GORM插件实现
 type snowflakeIDPlugin struct{}
 
@@ -105,18 +117,6 @@ func (z *zapGormLogger) Trace(ctx context.Context, begin time.Time, fc func() (s
 	}
 }
 
-// AutoMigrate 自动迁移
-func AutoMigrate(db *gorm.DB) {
-	// 1. 操作日志
-	//db.AutoMigrate(&entity.OperationLog{})
-	//// 2. 用户
-	//db.AutoMigrate(&entity.User{})
-	//// 3. 角色
-	//db.AutoMigrate(&entity.Role{})
-	// 4. 权限
-	//db.AutoMigrate(&entity.Menu{})
-}
-
 func InitDB(cfg *config.Config) (DB *gorm.DB) {
 	m := cfg.Mysql
 	ds := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
@@ -141,6 +141,13 @@ func InitDB(cfg *config.Config) (DB *gorm.DB) {
 
 	if err != nil {
 		global.Logger.Fatal("数据库连接失败")
+		return
+	}
+
+	// 雪花ID插件
+	snowflakeID := &snowflakeIDPlugin{}
+	if err = snowflakeID.initialize(DB); err != nil {
+		global.Logger.Fatal("雪花ID插件注册失败", zap.Error(err))
 		return
 	}
 	// 自动迁移

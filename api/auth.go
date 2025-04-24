@@ -14,12 +14,14 @@ import (
 )
 
 func InitSecuredAuthRouter(r *gin.RouterGroup) {
-	r.POST("/logout", logout)
+	securedRouter := r.Group("/auth")
+	securedRouter.POST("/logout", logout)
 }
 
 func InitOpenAuthRouter(r *gin.RouterGroup) {
-	r.POST("/login", login)
-	r.POST("/register", register)
+	openRouter := r.Group("/auth")
+	openRouter.POST("/login", login)
+	openRouter.POST("/register", register)
 }
 
 // login 处理用户登录请求

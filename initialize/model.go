@@ -39,6 +39,12 @@ func registerIDField(model interface{}, fieldName string) {
 	snowflakeIdFieldsMap[model] = fieldName
 }
 
+// RegisterValidator 注册校验器错误返回信息
+// 参数：
+//
+//	model：需要注册校验器的模型
+// 	label：属性名
+
 func registerValidator(model interface{}) {
 	var t reflect.Type
 	// 解读并缓存标签
