@@ -12,8 +12,10 @@ type Response struct {
 }
 
 const (
-	ERROR   = 500
-	SUCCESS = 200
+	ERROR         = 500
+	NOAUTH        = 401
+	SHOULDREFRESH = 402
+	SUCCESS       = 200
 )
 
 func Result(code int, data interface{}, msg string, c *gin.Context) {
@@ -48,8 +50,16 @@ func FailWithMessage(message string, c *gin.Context) {
 
 func NoAuth(message string, c *gin.Context) {
 	c.JSON(http.StatusUnauthorized, Response{
-		401,
+		NOAUTH,
 		message,
+		nil,
+	})
+}
+
+func ShouldRefresh(c *gin.Context) {
+	c.JSON(http.StatusUnauthorized, Response{
+		SHOULDREFRESH,
+		"需要刷新Token",
 		nil,
 	})
 }

@@ -3,6 +3,7 @@ package initialize
 import (
 	"Art-Design-Backend/config"
 	"Art-Design-Backend/global"
+	"Art-Design-Backend/model/entity"
 	"Art-Design-Backend/pkg/utils"
 	"context"
 	"fmt"
@@ -23,7 +24,7 @@ func AutoMigrate(db *gorm.DB) {
 	//// 3. 角色
 	//db.AutoMigrate(&entity.Role{})
 	//// 4. 菜单
-	//db.AutoMigrate(&entity.Menu{})
+	db.AutoMigrate(&entity.Menu{})
 }
 
 // snowflakeIDPlugin GORM插件实现

@@ -1,21 +1,18 @@
 package api
 
 import (
-	"Art-Design-Backend/global"
 	"Art-Design-Backend/model/request"
-	"Art-Design-Backend/pkg/constant"
 	"Art-Design-Backend/pkg/jwt"
-	"Art-Design-Backend/pkg/redisx"
 	"Art-Design-Backend/pkg/response"
 	"Art-Design-Backend/pkg/utils"
 	"Art-Design-Backend/service"
 	"github.com/gin-gonic/gin"
-	"strconv"
 )
 
 func InitSecuredAuthRouter(r *gin.RouterGroup) {
 	securedRouter := r.Group("/auth")
 	securedRouter.POST("/logout", logout)
+	securedRouter.POST("/refreshToken", refreshToken)
 }
 
 func InitOpenAuthRouter(r *gin.RouterGroup) {
@@ -44,40 +41,11 @@ func login(c *gin.Context) {
 		c.Error(err)
 		return
 	}
-	// 创建JWT claims，包含用户ID
-	claim := global.JWT.CreateClaims(
-		jwt.BaseClaims{
-			ID: u.ID,
-		},
-	)
-	// 将用户ID转换为字符串
-	id := strconv.FormatInt(u.ID, 10)
-	// 检查是否存在当前用户的会话
-	session := redisx.Get(constant.SESSION + id)
-	// 如果会话已存在，直接返回会话信息
-	if session != "" {
-		response.OkWithData(session, c)
-		return
-	}
-	// 生成JWT token
-	token, err := global.JWT.CreateToken(claim)
-	// 如果生成token失败，返回错误响应并结束函数执行
+	token, err := jwt.CreateToken(jwt.BaseClaims{
+		ID: u.ID,
+	})
 	if err != nil {
 		response.FailWithMessage("生成token失败", c)
-		return
-	}
-	// 设置token方便获取是否登录
-	err = redisx.Set(constant.LOGIN+token, id, global.JWT.ExpiresTime)
-	// 如果设置token失败，返回错误响应并结束函数执行
-	if err != nil {
-		response.FailWithMessage("设置token失败", c)
-		return
-	}
-	// 设置会话防止重复登录
-	err = redisx.Set(constant.SESSION+id, token, global.JWT.ExpiresTime)
-	// 如果设置会话失败，返回错误响应并结束函数执行
-	if err != nil {
-		response.FailWithMessage("设置会话失败", c)
 		return
 	}
 	// 返回生成的token
@@ -87,37 +55,30 @@ func login(c *gin.Context) {
 func logout(c *gin.Context) {
 	// 从请求头中获取 token
 	token := utils.GetToken(c)
-	if token == "" {
-		response.FailWithMessage("当前未登录", c)
-		return
-	}
-	// 从 Redis 中获取用户 ID
-	claims, err := global.JWT.ParseToken(token)
-
+	// 调用 jwt 包中的 LogoutToken 函数注销 token
+	err := jwt.LogoutToken(token)
 	if err != nil {
-		response.FailWithMessage("解析token失败", c)
+		response.FailWithMessage("注销失败", c)
 		return
 	}
-
-	id := strconv.FormatInt(claims.BaseClaims.ID, 10)
-
-	// 删除 Redis 中的会话信息
-	err = redisx.Delete(constant.SESSION + id)
-	if err != nil {
-		response.FailWithMessage("删除会话失败", c)
-		return
-	}
-
-	// 删除 Redis 中的登录信息
-	err = redisx.Delete(constant.LOGIN + token)
-	if err != nil {
-		response.FailWithMessage("删除登录信息失败", c)
-		return
-	}
-
 	response.OkWithMessage("注销成功", c)
 }
 
+// refreshToken 处理用户刷新 token 请求
+func refreshToken(c *gin.Context) {
+	// 从上下文中获取用户 ID
+	id := utils.GetUserID(c)
+	token, err := jwt.CreateToken(jwt.BaseClaims{
+		ID: id,
+	})
+	if err != nil {
+		response.FailWithMessage("刷新token失败", c)
+		return
+	}
+	response.OkWithData(token, c)
+}
+
+// register 处理用户注册请求
 func register(c *gin.Context) {
 	var userReq request.User
 	err := c.ShouldBindJSON(&userReq)

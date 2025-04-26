@@ -4,6 +4,7 @@ import "Art-Design-Backend/model/base"
 
 type Menu struct {
 	base.BaseModel
+	Name      string `gorm:"type:varchar(30);not null;unique;comment:组件名称"`
 	Type      int8   `gorm:"type:tinyint;not null;default:1;comment:类型（1：目录；2：菜单；3：按钮）"`
 	Path      string `gorm:"type:varchar(255);not null;unique;comment:路由地址"`
 	Component string `gorm:"type:varchar(255);not null;unique;comment:组件路径"`

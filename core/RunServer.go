@@ -4,6 +4,8 @@ import (
 	"Art-Design-Backend/config"
 	"Art-Design-Backend/global"
 	"Art-Design-Backend/initialize"
+	"Art-Design-Backend/pkg/jwt"
+	"Art-Design-Backend/pkg/redisx"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert/yaml"
@@ -17,9 +19,9 @@ func initGlobal(cfg *config.Config) {
 	// 初始化数据库
 	global.DB = initialize.InitDB(cfg)
 	// 初始化Redis
-	global.Redis = initialize.InitRedis(cfg)
+	redisx.NewRedisWrapper(initialize.InitRedis(cfg))
 	// 初始化JWT
-	global.JWT = initialize.InitJWT(cfg)
+	jwt.NewJWT(initialize.InitJWT(cfg))
 	// 初始化OSS客户端
 	global.OSSClient = initialize.InitOSSClient(cfg)
 }
@@ -31,7 +33,6 @@ func readConfig(isDev bool) (cfg *config.Config) {
 		data, err = os.ReadFile("config.yaml")
 	} else {
 		data, err = os.ReadFile("conf/config.yaml")
-
 	}
 	if err != nil {
 		log.Fatalf("error: %v", err)
