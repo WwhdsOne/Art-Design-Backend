@@ -40,7 +40,7 @@ func (m *Middlewares) OperationLoggerMiddleware() gin.HandlerFunc {
 			IP:         c.ClientIP(),
 			Params:     string(bodyBytes),
 			Status:     int16(statusCode),
-			CreatedAt:  carbon.DateTime(startTime.String()),
+			CreatedAt:  *carbon.NewDateTime(startTime),
 		}
 		cCp := c.Copy()
 		// 保存日志到数据库
