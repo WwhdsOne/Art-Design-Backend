@@ -1,14 +1,24 @@
-package initialize
+package config
 
 import (
-	"Art-Design-Backend/config"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"os"
 	"time"
 )
 
-func encoder(z *config.Zap) zapcore.Encoder {
+type Zap struct {
+	Level         string `yaml:"level"`          // 级别
+	Prefix        string `yaml:"prefix"`         // 日志前缀
+	Format        string `yaml:"format"`         // 输出
+	Director      string `yaml:"director"`       // 日志文件夹
+	EncodeLevel   string `yaml:"encode-level"`   // 编码级
+	StacktraceKey string `yaml:"stacktrace-key"` // 栈名
+	ShowLine      bool   `yaml:"show-line"`      // 显示行
+	LogInConsole  bool   `yaml:"log-in-console"` // 输出控制台
+}
+
+func encoder(z *Zap) zapcore.Encoder {
 	cfg := zapcore.EncoderConfig{
 		TimeKey:       "time",
 		NameKey:       "name",
@@ -34,7 +44,6 @@ func encoder(z *config.Zap) zapcore.Encoder {
 }
 
 // LevelEncoder 根据 EncodeLevel 返回 zapcore.LevelEncoder
-// Author [SliverHorn](https://github.com/SliverHorn)
 func levelEncoder(encodeLevel string) zapcore.LevelEncoder {
 	switch {
 	case encodeLevel == "LowercaseLevelEncoder": // 小写编码器(默认)
@@ -50,12 +59,11 @@ func levelEncoder(encodeLevel string) zapcore.LevelEncoder {
 	}
 }
 
-// InitLogger 初始化 Zap Logger
-func InitLogger(c *config.Config) (logger *zap.Logger) {
-
-	z := c.Zap
+// NewLogger 初始化并替换全局 Zap Logger
+func NewLogger(c *Config) *zap.Logger {
+	cfg := c.Zap
 	// 创建编码器
-	zapEncoder := encoder(&z)
+	zapEncoder := encoder(&cfg)
 
 	// 创建输出目标，这里输出到控制台
 	writer := zapcore.AddSync(os.Stdout)
@@ -66,7 +74,10 @@ func InitLogger(c *config.Config) (logger *zap.Logger) {
 	// 创建 Core
 	core := zapcore.NewCore(zapEncoder, writer, logLevel)
 
-	logger = zap.New(core)
+	logger := zap.New(core)
 
-	return
+	// 替换全局的 logger
+	zap.ReplaceGlobals(logger)
+
+	return logger
 }

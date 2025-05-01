@@ -1,8 +1,6 @@
-package initialize
+package config
 
 import (
-	"Art-Design-Backend/config"
-	"Art-Design-Backend/global"
 	"Art-Design-Backend/model/entity"
 	"Art-Design-Backend/pkg/utils"
 	"context"
@@ -14,6 +12,16 @@ import (
 	"reflect"
 	"time"
 )
+
+type Mysql struct {
+	Host     string `yaml:"host"`
+	Port     int    `yaml:"port"`
+	User     string `yaml:"user"`
+	Password string `yaml:"password"`
+	Database string `yaml:"database"`
+}
+
+var snowflakeIdFieldsMap = make(map[interface{}]string)
 
 // AutoMigrate 自动迁移
 func AutoMigrate(db *gorm.DB) {
@@ -118,7 +126,16 @@ func (z *zapGormLogger) Trace(ctx context.Context, begin time.Time, fc func() (s
 	}
 }
 
-func InitDB(cfg *config.Config) (DB *gorm.DB) {
+// RegisterIDField 注册需要自动生成ID的模型和字段
+func registerIDField(model interface{}, fieldName string) {
+	t := reflect.TypeOf(model)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	snowflakeIdFieldsMap[model] = fieldName
+}
+
+func NewGorm(cfg *Config) (DB *gorm.DB) {
 	m := cfg.Mysql
 	ds := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
 		m.User,     //用户名
@@ -130,7 +147,7 @@ func InitDB(cfg *config.Config) (DB *gorm.DB) {
 
 	// 创建 Zap 日志适配器
 	gormLogger := &zapGormLogger{
-		zapLogger: global.Logger,
+		zapLogger: zap.L(),
 		logLevel:  logger.Info, // 设置默认日志级别
 	}
 
@@ -141,14 +158,21 @@ func InitDB(cfg *config.Config) (DB *gorm.DB) {
 	})
 
 	if err != nil {
-		global.Logger.Fatal("数据库连接失败")
+		zap.L().Fatal("数据库连接失败")
 		return
+	}
+
+	// 注册模型应当自动填充雪花ID的字段
+	{
+		registerIDField(&entity.User{}, "ID")
+		registerIDField(&entity.OperationLog{}, "ID")
+		registerIDField(&entity.Menu{}, "ID")
 	}
 
 	// 雪花ID插件
 	snowflakeID := &snowflakeIDPlugin{}
 	if err = snowflakeID.initialize(DB); err != nil {
-		global.Logger.Fatal("雪花ID插件注册失败", zap.Error(err))
+		zap.L().Fatal("雪花ID插件注册失败", zap.Error(err))
 		return
 	}
 	// 自动迁移

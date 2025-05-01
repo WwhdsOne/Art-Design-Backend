@@ -1,32 +1,31 @@
 package middleware
 
 import (
-	"Art-Design-Backend/global"
+	"Art-Design-Backend/pkg/auth"
 	"Art-Design-Backend/pkg/constant"
 	"Art-Design-Backend/pkg/jwt"
-	"Art-Design-Backend/pkg/redisx"
 	"Art-Design-Backend/pkg/response"
-	"Art-Design-Backend/pkg/utils"
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
-func JWTAuth() gin.HandlerFunc {
+func (m *Middlewares) AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// 我们这里jwt鉴权取头部信息 x-token 登录时回返回token信息 这里前端需要把token存储到cookie或者本地localStorage中 不过需要跟后端协商过期时间 可以约定刷新令牌或者重新登录
-		token := utils.GetToken(c)
-		id := redisx.Get(constant.LOGIN + token)
+		token := auth.GetToken(c)
+		id := m.Redis.Get(constant.LOGIN + token)
 		if id != "" {
-			global.Logger.Info(fmt.Sprintf("Auth Token: %s", token))
+			zap.L().Info(fmt.Sprintf("Auth Token: %s", token))
 		} else {
-			global.Logger.Error(fmt.Sprintf("Key %s does not exist", token))
+			zap.L().Error(fmt.Sprintf("Key %s does not exist", token))
 			response.NoAuth("当前未登录", c)
 			c.Abort()
 			return
 		}
 		// parseToken 解析token包含的信息
-		claims, err := jwt.ParseToken(token)
+		claims, err := m.Jwt.ParseToken(token)
 		if err == nil {
 			c.Set("claims", claims)
 			c.Next()

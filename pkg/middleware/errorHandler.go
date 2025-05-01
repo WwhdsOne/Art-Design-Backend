@@ -11,8 +11,8 @@ import (
 	"strings"
 )
 
-// FieldLabels 字段标签映射
-var FieldLabels = make(map[string]string)
+// fieldLabels 字段标签映射
+var fieldLabels = make(map[string]string)
 
 func getFieldLabel(obj interface{}, fieldName string) string {
 	t := reflect.TypeOf(obj)
@@ -26,7 +26,7 @@ func getFieldLabel(obj interface{}, fieldName string) string {
 	}
 
 	// 检查是否有预定义的标签映射
-	if label, ok := FieldLabels[fieldName]; ok && label != "" {
+	if label, ok := fieldLabels[fieldName]; ok && label != "" {
 		return label
 	}
 
@@ -96,8 +96,8 @@ func handleGenericErrors(c *gin.Context, ginErr *gin.Error) bool {
 	return true
 }
 
-// ErrorHandlingMiddleware 错误处理中间件
-func ErrorHandlingMiddleware() gin.HandlerFunc {
+// ErrorHandlerMiddleware 错误处理中间件
+func (m *Middlewares) ErrorHandlerMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Next() // 先调用后续的处理函数
 

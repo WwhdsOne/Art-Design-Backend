@@ -1,4 +1,4 @@
-package api
+package controller
 
 //func InitRoleRouter(r *gin.RouterGroup) {
 //	roleRouter := r.Group("/role")

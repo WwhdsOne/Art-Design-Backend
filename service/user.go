@@ -1,217 +1,149 @@
 package service
 
-import (
-	"Art-Design-Backend/global"
-	"Art-Design-Backend/model/entity"
-	"Art-Design-Backend/model/request"
-	"Art-Design-Backend/model/resp"
-	"Art-Design-Backend/pkg/errorTypes"
-	"errors"
-	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/jinzhu/copier"
-	"go.uber.org/zap"
-	"golang.org/x/crypto/bcrypt"
-)
+//import (
+//	"Art-Design-Backend/global"
+//	"Art-Design-Backend/model/entity"
+//	"Art-Design-Backend/model/request"
+//	"Art-Design-Backend/model/resp"
+//	"Art-Design-Backend/pkg/errorTypes"
+//	"errors"
+//	"fmt"
+//	"github.com/gin-gonic/gin"
+//	"github.com/jinzhu/copier"
+//	"go.uber.org/zap"
+//	"golang.org/x/crypto/bcrypt"
+//)
+//
 
-// 检查用户名、邮箱和手机号是否重复
-func checkUserDuplicate(u *entity.User) (err error) {
-
-	var result struct {
-		UsernameExists bool
-		EmailExists    bool
-		PhoneExists    bool
-	}
-
-	// 检查当前记录是否有ID，如果有，则在查询中排除它
-	excludeID := ""
-	if u.ID != 0 {
-		excludeID = fmt.Sprintf("AND id != %d", u.ID)
-	}
-
-	// 单次查询检查所有字段，排除当前ID
-	global.DB.Raw("SELECT "+
-		"EXISTS(SELECT 1 FROM user WHERE username = ? "+excludeID+") AS username_exists,"+
-		"EXISTS(SELECT 1 FROM user WHERE email = ? "+excludeID+") AS email_exists,"+
-		"EXISTS(SELECT 1 FROM user WHERE phone = ? "+excludeID+") AS phone_exists",
-		u.Username, u.Email, u.Phone).Scan(&result)
-
-	switch {
-	case result.UsernameExists:
-		err = errorTypes.NewGormError("用户名重复")
-	case result.EmailExists:
-		err = errorTypes.NewGormError("邮箱重复")
-	case result.PhoneExists:
-		err = errorTypes.NewGormError("手机号重复")
-	}
-	return
-}
-
-func Login(ctx *gin.Context, u request.Login) (resp entity.User, err error) {
-	err = global.DB.
-		WithContext(ctx).
-		Select("id", "password").
-		Where("Username = ?", u.Username).
-		First(&resp).Error
-	err = bcrypt.CompareHashAndPassword([]byte(resp.Password), []byte(u.Password))
-	if err != nil {
-		// 密码错误
-		return resp, errorTypes.NewGormError("用户名或密码错误")
-	}
-	return
-}
-
-func AddUser(c *gin.Context, userReq *request.User) (err error) {
-	var user entity.User
-	// 属性复制，同时进行邮箱、手机号和密码加密操作
-	err = copier.Copy(&user, userReq)
-	if err != nil {
-		global.Logger.Error("复制属性失败", zap.Error(err))
-		return
-	}
-	// 判重
-	if err = checkUserDuplicate(&user); err != nil {
-		return
-	}
-	password, _ := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
-	user.Password = string(password)
-	// 插入
-	if err = global.DB.WithContext(c).Create(&user).Error; err != nil {
-		// 处理错误
-		global.Logger.Error("新增用户失败", zap.Error(err))
-		return
-	}
-	return
-}
-
-func DeleteUser(ids []int64, deleteBy int64) error {
-	// 开启事务
-	tx := global.DB.Begin()
-
-	if tx.Error != nil {
-		return tx.Error
-	}
-
-	// 更新修改者 ID
-	if err := tx.Model(&entity.User{}).Where("id IN (?)", ids).Update("updated_by", deleteBy).Error; err != nil {
-		tx.Rollback() // 回滚事务
-		global.Logger.Error("更新修改者 ID 失败")
-		return err
-	}
-
-	// 删除用户
-	if err := tx.Where("id IN (?)", ids).Delete(&entity.User{}).Error; err != nil {
-		tx.Rollback() // 回滚事务
-		global.Logger.Error("删除用户失败")
-		return err
-	}
-
-	// 提交事务
-	if err := tx.Commit().Error; err != nil {
-		tx.Rollback() // 回滚事务
-		global.Logger.Error("提交事务失败")
-		return err
-	}
-
-	return nil
-}
-
-func UpdateUser(c *gin.Context, userReq *request.User, id int64) error {
-	//赋值给user
-	user := entity.User{
-		Username: userReq.Username,
-		Nickname: userReq.Nickname,
-	}
-	//判断密码是否为空
-	if user.Password != "" {
-		password, _ := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
-		user.Password = string(password)
-	}
-	var count int64
-	//判断重复
-	if err := global.DB.
-		WithContext(c).
-		Model(&entity.User{}).
-		Where("username = ? AND id != ?", user.Username, id).
-		Count(&count).Error; err != nil {
-		global.Logger.Error("查询用户名失败", zap.Error(err))
-		return err
-	}
-	if count > 0 {
-		global.Logger.Error("用户名已存在")
-		return errors.New("用户名已存在")
-	}
-	if err := global.DB.WithContext(c).Where("id = ?", id).Updates(user).Error; err != nil {
-		// 处理错误
-		global.Logger.Error("更新用户失败")
-		return err
-	}
-	return nil
-}
-
-//func GetUserById(id int64) (userResp resp.User, err error) {
+//
+//func DeleteUser(ids []int64, deleteBy int64) error {
+//	// 开启事务
+//	tx := global.DB.Begin()
+//
+//	if tx.Error != nil {
+//		return tx.Error
+//	}
+//
+//	// 更新修改者 ID
+//	if err := tx.Model(&entity.User{}).Where("id IN (?)", ids).Update("updated_by", deleteBy).Error; err != nil {
+//		tx.Rollback() // 回滚事务
+//		zap.L().Error("更新修改者 ID 失败")
+//		return err
+//	}
+//
+//	// 删除用户
+//	if err := tx.Where("id IN (?)", ids).Delete(&entity.User{}).Error; err != nil {
+//		tx.Rollback() // 回滚事务
+//		zap.L().Error("删除用户失败")
+//		return err
+//	}
+//
+//	// 提交事务
+//	if err := tx.Commit().Error; err != nil {
+//		tx.Rollback() // 回滚事务
+//		zap.L().Error("提交事务失败")
+//		return err
+//	}
+//
+//	return nil
+//}
+//
+//func UpdateUser(c *gin.Context, userReq *request.User, id int64) error {
+//	//赋值给user
+//	user := entity.User{
+//		Username: userReq.Username,
+//		Nickname: userReq.Nickname,
+//	}
+//	//判断密码是否为空
+//	if user.Password != "" {
+//		password, _ := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+//		user.Password = string(password)
+//	}
+//	var count int64
+//	//判断重复
+//	if err := global.DB.
+//		WithContext(c).
+//		Model(&entity.User{}).
+//		Where("username = ? AND id != ?", user.Username, id).
+//		Count(&count).Error; err != nil {
+//		zap.L().Error("查询用户名失败", zap.Error(err))
+//		return err
+//	}
+//	if count > 0 {
+//		zap.L().Error("用户名已存在")
+//		return errors.New("用户名已存在")
+//	}
+//	if err := global.DB.WithContext(c).Where("id = ?", id).Updates(user).Error; err != nil {
+//		// 处理错误
+//		zap.L().Error("更新用户失败")
+//		return err
+//	}
+//	return nil
+//}
+//
+////func GetUserById(id int64) (userResp resp.User, err error) {
+////	var user entity.User
+////	err = global.DB.Where("id = ?", id).First(&user).Error
+////	if err != nil {
+////		// 处理错误，例如可以返回 nil 或者记录错误日志
+////		zap.L().Info("获取用户失败")
+////		return
+////	}
+////	//组装数据
+////	userResp = doToResp(user)
+////	return
+////}
+////
+////func UserPage(u *query.User) ([]resp.User, int64, error) {
+////	var users []entity.User
+////	// 获取总记录数
+////	var total int64
+////	q := global.DB.Model(&entity.User{})
+////	// 获取符合条件的总记录数
+////	err := q.Count(&total).Error
+////	if err != nil {
+////		// 处理错误，例如可以返回 nil 或者记录错误日志
+////		zap.L().Error("获取用户列表失败")
+////		return nil, 0, err
+////	}
+////	// 执行分页查询
+////	global.DB.
+////		Scopes(u.PaginationReq.Paginate()). // 组装分页条件
+////		Find(&users)
+////	//组装数据
+////	var userResponses []resp.User
+////	for _, user := range users {
+////		//组装数据
+////		userResponse := doToResp(user)
+////		// 查询用户的创建人创建时间
+////		var nickName string
+////		// 查询用户的昵称
+////		err = global.DB.Model(&entity.User{}).
+////			Select("nickname").
+////			Where("id = ?", userResponse.CreateBy).
+////			Scan(&nickName).Error
+////		if err != nil {
+////			return nil, 0, err
+////		}
+////		userResponse.CreateUserName = nickName
+////		userResponses = append(userResponses, userResponse)
+////	}
+////
+////	return userResponses, total, nil
+////}
+//
+//func GetUserById(id int64) (res resp.User, err error) {
 //	var user entity.User
-//	err = global.DB.Where("id = ?", id).First(&user).Error
-//	if err != nil {
+//	if err = global.DB.Where("id = ?", id).First(&user).Error; err != nil {
 //		// 处理错误，例如可以返回 nil 或者记录错误日志
-//		global.Logger.Info("获取用户失败")
+//		zap.L().Error("获取用户失败")
+//		err = errorTypes.NewGormError("获取用户失败")
 //		return
 //	}
-//	//组装数据
-//	userResp = doToResp(user)
+//	err = copier.Copy(&res, &user)
+//	if err != nil {
+//		zap.L().Error("复制属性失败")
+//		return
+//	}
 //	return
 //}
-//
-//func UserPage(u *query.User) ([]resp.User, int64, error) {
-//	var users []entity.User
-//	// 获取总记录数
-//	var total int64
-//	q := global.DB.Model(&entity.User{})
-//	// 获取符合条件的总记录数
-//	err := q.Count(&total).Error
-//	if err != nil {
-//		// 处理错误，例如可以返回 nil 或者记录错误日志
-//		global.Logger.Error("获取用户列表失败")
-//		return nil, 0, err
-//	}
-//	// 执行分页查询
-//	global.DB.
-//		Scopes(u.PaginationReq.Paginate()). // 组装分页条件
-//		Find(&users)
-//	//组装数据
-//	var userResponses []resp.User
-//	for _, user := range users {
-//		//组装数据
-//		userResponse := doToResp(user)
-//		// 查询用户的创建人创建时间
-//		var nickName string
-//		// 查询用户的昵称
-//		err = global.DB.Model(&entity.User{}).
-//			Select("nickname").
-//			Where("id = ?", userResponse.CreateBy).
-//			Scan(&nickName).Error
-//		if err != nil {
-//			return nil, 0, err
-//		}
-//		userResponse.CreateUserName = nickName
-//		userResponses = append(userResponses, userResponse)
-//	}
-//
-//	return userResponses, total, nil
-//}
-
-func GetUserById(id int64) (res resp.User, err error) {
-	var user entity.User
-	if err = global.DB.Where("id = ?", id).First(&user).Error; err != nil {
-		// 处理错误，例如可以返回 nil 或者记录错误日志
-		global.Logger.Error("获取用户失败")
-		err = errorTypes.NewGormError("获取用户失败")
-		return
-	}
-	err = copier.Copy(&res, &user)
-	if err != nil {
-		global.Logger.Error("复制属性失败")
-		return
-	}
-	return
-}

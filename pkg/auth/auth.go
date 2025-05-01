@@ -1,4 +1,4 @@
-package utils
+package auth
 
 import (
 	"Art-Design-Backend/pkg/jwt"

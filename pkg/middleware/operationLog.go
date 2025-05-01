@@ -1,17 +1,17 @@
 package middleware
 
 import (
-	"Art-Design-Backend/global"
 	"Art-Design-Backend/model/entity"
-	"Art-Design-Backend/pkg/utils"
+	"Art-Design-Backend/pkg/auth"
 	"bytes"
 	"github.com/dromara/carbon/v2"
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 	"io"
 )
 
-// OperationLogger 日志中间件
-func OperationLogger() gin.HandlerFunc {
+// OperationLoggerMiddleware 日志中间件
+func (m *Middlewares) OperationLoggerMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		startTime := carbon.Now()
 		var bodyBytes []byte
@@ -27,7 +27,7 @@ func OperationLogger() gin.HandlerFunc {
 		c.Next()
 
 		// 获取用户信息 (示例代码，实际可通过 Token 或上下文获取)
-		userID := utils.GetUserID(c)
+		userID := auth.GetUserID(c)
 
 		// 收集响应信息
 		statusCode := c.Writer.Status()
@@ -45,11 +45,11 @@ func OperationLogger() gin.HandlerFunc {
 		cCp := c.Copy()
 		// 保存日志到数据库
 		go func() { // 异步保存，避免阻塞请求
-			if err := global.DB.WithContext(cCp).Create(&log).Error; err != nil {
+			if err := m.Db.WithContext(cCp).Create(&log).Error; err != nil {
 				// 打印日志或记录到其他地方
-				global.Logger.Error("Failed to save operation log\n")
+				zap.L().Error("Failed to save operation log\n")
 				// 打印具体错误
-				global.Logger.Error(err.Error())
+				zap.L().Error(err.Error())
 			}
 		}()
 	}
