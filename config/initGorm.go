@@ -1,7 +1,7 @@
 package config
 
 import (
-	"Art-Design-Backend/model/entity"
+	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/pkg/utils"
 	"context"
 	"fmt"
@@ -135,7 +135,7 @@ func registerIDField(model interface{}, fieldName string) {
 	snowflakeIdFieldsMap[model] = fieldName
 }
 
-func NewGorm(cfg *Config) (DB *gorm.DB) {
+func NewGorm(cfg *Config, log *zap.Logger) (DB *gorm.DB) {
 	m := cfg.Mysql
 	ds := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
 		m.User,     //用户名
@@ -144,10 +144,9 @@ func NewGorm(cfg *Config) (DB *gorm.DB) {
 		m.Port,     //端口
 		m.Database, //数据库
 	)
-
 	// 创建 Zap 日志适配器
 	gormLogger := &zapGormLogger{
-		zapLogger: zap.L(),
+		zapLogger: log,
 		logLevel:  logger.Info, // 设置默认日志级别
 	}
 
@@ -158,7 +157,7 @@ func NewGorm(cfg *Config) (DB *gorm.DB) {
 	})
 
 	if err != nil {
-		zap.L().Fatal("数据库连接失败")
+		log.Fatal("数据库连接失败")
 		return
 	}
 
@@ -172,7 +171,7 @@ func NewGorm(cfg *Config) (DB *gorm.DB) {
 	// 雪花ID插件
 	snowflakeID := &snowflakeIDPlugin{}
 	if err = snowflakeID.initialize(DB); err != nil {
-		zap.L().Fatal("雪花ID插件注册失败", zap.Error(err))
+		log.Fatal("雪花ID插件注册失败", zap.Error(err))
 		return
 	}
 	// 自动迁移

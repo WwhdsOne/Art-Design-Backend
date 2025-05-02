@@ -1,8 +1,9 @@
 package entity
 
 import (
-	"Art-Design-Backend/model/base"
-	"Art-Design-Backend/model/request"
+	"Art-Design-Backend/internal/model/base"
+	"Art-Design-Backend/internal/model/request"
+	"Art-Design-Backend/pkg/constant"
 	"fmt"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -27,10 +28,11 @@ type User struct {
 }
 
 func (u *User) TableName() string {
-	return "user"
+	return constant.UserTableName
 }
 
 // BeforeCopy 是 copier 的钩子函数
+// 从请求体中获取的 UserReq 转换为 User
 func (u *User) BeforeCopy(src interface{}) (err error) {
 	userReq, ok := src.(request.User)
 	if !ok {

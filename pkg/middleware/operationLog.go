@@ -1,19 +1,19 @@
 package middleware
 
 import (
-	"Art-Design-Backend/model/entity"
-	"Art-Design-Backend/pkg/auth"
+	"Art-Design-Backend/internal/model/entity"
+	"Art-Design-Backend/pkg/loginUtils"
 	"bytes"
-	"github.com/dromara/carbon/v2"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"io"
+	"time"
 )
 
 // OperationLoggerMiddleware 日志中间件
 func (m *Middlewares) OperationLoggerMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		startTime := carbon.Now()
+		startTime := time.Now()
 		var bodyBytes []byte
 		// 检查 Content-Type 是否为 application/json
 		contentType := c.GetHeader("Content-Type")
@@ -27,7 +27,7 @@ func (m *Middlewares) OperationLoggerMiddleware() gin.HandlerFunc {
 		c.Next()
 
 		// 获取用户信息 (示例代码，实际可通过 Token 或上下文获取)
-		userID := auth.GetUserID(c)
+		userID := loginUtils.GetUserID(c)
 
 		// 收集响应信息
 		statusCode := c.Writer.Status()
@@ -40,7 +40,7 @@ func (m *Middlewares) OperationLoggerMiddleware() gin.HandlerFunc {
 			IP:         c.ClientIP(),
 			Params:     string(bodyBytes),
 			Status:     int16(statusCode),
-			CreatedAt:  *carbon.NewDateTime(startTime),
+			CreatedAt:  startTime,
 		}
 		cCp := c.Copy()
 		// 保存日志到数据库

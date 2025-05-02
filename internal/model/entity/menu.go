@@ -1,6 +1,8 @@
 package entity
 
-import "Art-Design-Backend/model/base"
+import (
+	"Art-Design-Backend/internal/model/base"
+)
 
 type Menu struct {
 	base.BaseModel

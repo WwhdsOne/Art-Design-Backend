@@ -1,7 +1,7 @@
 package base
 
 import (
-	"Art-Design-Backend/pkg/auth"
+	"Art-Design-Backend/pkg/loginUtils"
 	"Art-Design-Backend/pkg/utils"
 	"context"
 	"gorm.io/gorm"
@@ -30,13 +30,13 @@ func (b *BaseModel) BeforeUpdate(db *gorm.DB) (err error) {
 }
 
 func (b *BaseModel) fillAddReq(c context.Context) {
-	userID := auth.GetUserID(c)
+	userID := loginUtils.GetUserID(c)
 	// 如果存在 claims，正常提取用户 ID
 	b.CreateBy = userID
 	b.UpdateBy = userID
 }
 
 func (b *BaseModel) fillUpdateReq(c context.Context) {
-	userID := auth.GetUserID(c)
+	userID := loginUtils.GetUserID(c)
 	b.UpdateBy = userID
 }

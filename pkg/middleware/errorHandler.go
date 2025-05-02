@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/pkg/errorTypes"
 	"Art-Design-Backend/pkg/response"
 	"errors"
@@ -13,6 +14,20 @@ import (
 
 // fieldLabels 字段标签映射
 var fieldLabels = make(map[string]string)
+
+// registerValidator 注册校验器错误返回信息
+func registerValidator(model interface{}) {
+	var t reflect.Type
+	// 解读并缓存标签
+	t = reflect.TypeOf(model)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		fieldLabels[field.Name] = field.Tag.Get("label")
+	}
+}
 
 func getFieldLabel(obj interface{}, fieldName string) string {
 	t := reflect.TypeOf(obj)
@@ -98,6 +113,10 @@ func handleGenericErrors(c *gin.Context, ginErr *gin.Error) bool {
 
 // ErrorHandlerMiddleware 错误处理中间件
 func (m *Middlewares) ErrorHandlerMiddleware() gin.HandlerFunc {
+	{
+		// 注册校验器错误返回信息
+		registerValidator(entity.User{})
+	}
 	return func(c *gin.Context) {
 		c.Next() // 先调用后续的处理函数
 

@@ -1,67 +1,29 @@
 package service
 
 import (
-	"Art-Design-Backend/model/entity"
-	"Art-Design-Backend/model/request"
+	"Art-Design-Backend/internal/model/entity"
+	"Art-Design-Backend/internal/model/request"
+	"Art-Design-Backend/internal/repository"
 	"Art-Design-Backend/pkg/constant"
 	"Art-Design-Backend/pkg/errorTypes"
 	"Art-Design-Backend/pkg/jwt"
 	"Art-Design-Backend/pkg/redisx"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
-	"gorm.io/gorm"
 	"strconv"
 )
 
 type AuthService struct {
-	Db    *gorm.DB             // 数据库
-	Redis *redisx.RedisWrapper // redis
-	Jwt   *jwt.JWT             // jwt相关
+	UserRepo *repository.UserRepository // 用户Repo
+	Redis    *redisx.RedisWrapper       // redis
+	Jwt      *jwt.JWT                   // jwt相关
 }
 
-// 检查用户名、邮箱和手机号是否重复
-func (s *AuthService) checkUserDuplicate(u *entity.User) (err error) {
-
-	var result struct {
-		UsernameExists bool
-		EmailExists    bool
-		PhoneExists    bool
-	}
-
-	// 检查当前记录是否有ID，如果有，则在查询中排除它
-	excludeID := ""
-	if u.ID != 0 {
-		excludeID = fmt.Sprintf("AND id != %d", u.ID)
-	}
-
-	// 单次查询检查所有字段，排除当前ID
-	s.Db.Raw("SELECT "+
-		"EXISTS(SELECT 1 FROM user WHERE username = ? "+excludeID+") AS username_exists,"+
-		"EXISTS(SELECT 1 FROM user WHERE email = ? "+excludeID+") AS email_exists,"+
-		"EXISTS(SELECT 1 FROM user WHERE phone = ? "+excludeID+") AS phone_exists",
-		u.Username, u.Email, u.Phone).Scan(&result)
-
-	switch {
-	case result.UsernameExists:
-		err = errorTypes.NewGormError("用户名重复")
-	case result.EmailExists:
-		err = errorTypes.NewGormError("邮箱重复")
-	case result.PhoneExists:
-		err = errorTypes.NewGormError("手机号重复")
-	}
-	return
-}
-
-func (s *AuthService) Login(ctx *gin.Context, u request.Login) (tokenStr string, err error) {
-	var user entity.User
-	err = s.Db.
-		WithContext(ctx).
-		Select("id", "password").
-		Where("Username = ?", u.Username).
-		First(&user).Error
+// Login 登录
+func (s *AuthService) Login(ctx *gin.Context, u *request.Login) (tokenStr string, err error) {
+	user, err := s.UserRepo.GetUserByUsername(ctx, u.Username)
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(u.Password))
 	if err != nil {
 		// 密码错误
@@ -127,22 +89,20 @@ func (s *AuthService) LogoutToken(tokenStr string) (err error) {
 }
 
 // Register 注册
-func (s *AuthService) Register(c *gin.Context, userReq *request.User) (err error) {
+func (s *AuthService) Register(ctx *gin.Context, userReq *request.User) (err error) {
 	var user entity.User
 	// 属性复制，同时进行邮箱、手机号和密码加密操作
-	err = copier.Copy(&user, userReq)
+	err = copier.Copy(&user, &userReq)
 	if err != nil {
 		zap.L().Error("复制属性失败", zap.Error(err))
 		return
 	}
 	// 判重
-	if err = s.checkUserDuplicate(&user); err != nil {
+	if err = s.UserRepo.CheckUserDuplicate(&user); err != nil {
 		return
 	}
-	password, _ := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
-	user.Password = string(password)
 	// 插入
-	if err = s.Db.WithContext(c).Create(&user).Error; err != nil {
+	if err = s.UserRepo.CreateUser(ctx, &user); err != nil {
 		// 处理错误
 		zap.L().Error("新增用户失败", zap.Error(err))
 		return

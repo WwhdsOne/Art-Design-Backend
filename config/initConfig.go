@@ -19,7 +19,8 @@ type Config struct {
 func NewConfig() (cfg *Config) {
 	var data []byte
 	var err error
-	data, err = os.ReadFile("conf/config.yaml")
+	workDir, _ := os.Getwd()
+	data, err = os.ReadFile(workDir + "/configs/config.yaml")
 	if err != nil {
 		log.Fatalf("error: %v", err)
 	}

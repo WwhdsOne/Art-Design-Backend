@@ -1,7 +1,7 @@
 package config
 
 import (
-	"Art-Design-Backend/controller"
+	"Art-Design-Backend/internal/controller"
 	"Art-Design-Backend/pkg/middleware"
 	"Art-Design-Backend/pkg/utils"
 	"context"
@@ -27,18 +27,20 @@ type Server struct {
 type HttpServer struct {
 	Engine         *gin.Engine                // gin引擎
 	Logger         *zap.Logger                // 日志
-	AuthController *controller.AuthController // 鉴权
+	AuthController *controller.AuthController // 鉴权Ctrl
 	Config         *Config                    // 服务器配置
 }
 
-func NewGin(m *middleware.Middlewares) *gin.Engine {
+func NewGin(m *middleware.Middlewares, logger *zap.Logger) *gin.Engine {
+	// 注册自定义校验器
+	RegisterValidator()
 	// 创建gin引擎
 	engine := gin.New()
 	// 通过Gzip压缩响应内容，减少传输数据量，提高传输速度。
 	engine.Use(gzip.Gzip(gzip.DefaultCompression))
 	// 设置日志
-	engine.Use(ginzap.Ginzap(zap.L(), time.RFC3339, true))
-	engine.Use(ginzap.RecoveryWithZap(zap.L(), true))
+	engine.Use(ginzap.Ginzap(logger, time.RFC3339, true))
+	engine.Use(ginzap.RecoveryWithZap(logger, true))
 	// 设置全局错误校验器错误中间件
 	engine.Use(m.ErrorHandlerMiddleware())
 	// 设置操作日志数据库记录中间件

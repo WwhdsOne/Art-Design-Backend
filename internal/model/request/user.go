@@ -1,6 +1,8 @@
 package request
 
-import "Art-Design-Backend/model/base"
+import (
+	"Art-Design-Backend/internal/model/base"
+)
 
 type User struct {
 	ID           base.LongStringID `json:"ID" label:"ID"`

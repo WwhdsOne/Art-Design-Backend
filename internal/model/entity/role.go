@@ -1,6 +1,8 @@
 package entity
 
-import "Art-Design-Backend/model/base"
+import (
+	"Art-Design-Backend/internal/model/base"
+)
 
 // Role 定义角色模型
 type Role struct {
