@@ -30,9 +30,8 @@ func NewRedis(cfg *Config) *redisx.RedisWrapper {
 	if err != nil {
 		zap.L().Fatal("Redis 连接失败")
 	}
-	// 自动迁移
 	return &redisx.RedisWrapper{
-		Client:         client,
-		DefaultTimeout: utils.ParseDuration(r.OperationTimeout),
+		Client:           client,
+		OperationTimeout: utils.ParseDuration(r.OperationTimeout),
 	}
 }

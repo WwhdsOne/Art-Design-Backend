@@ -51,8 +51,8 @@ func (u *UserRepository) CheckUserDuplicate(user *entity.User) (err error) {
 	return
 }
 
-func (u *UserRepository) GetUserByUsername(ctx context.Context, username string) (user *entity.User, err error) {
-	err = u.db.WithContext(ctx).
+func (u *UserRepository) GetUserByUsername(c context.Context, username string) (user *entity.User, err error) {
+	err = u.db.WithContext(c).
 		Select("id", "password").
 		Where("username = ?", username).
 		First(&user).Error
@@ -62,6 +62,16 @@ func (u *UserRepository) GetUserByUsername(ctx context.Context, username string)
 	return
 }
 
-func (u *UserRepository) CreateUser(ctx context.Context, user *entity.User) error {
-	return u.db.WithContext(ctx).Create(user).Error
+func (u *UserRepository) GetUserById(c context.Context, id int64) (user *entity.User, err error) {
+	err = u.db.WithContext(c).
+		Where("id = ?", id).
+		First(&user).Error
+	if err != nil {
+		return
+	}
+	return
+}
+
+func (u *UserRepository) CreateUser(c context.Context, user *entity.User) error {
+	return u.db.WithContext(c).Create(user).Error
 }

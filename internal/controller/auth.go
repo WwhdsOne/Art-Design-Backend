@@ -3,8 +3,6 @@ package controller
 import (
 	"Art-Design-Backend/internal/model/request"
 	"Art-Design-Backend/internal/service"
-	"Art-Design-Backend/pkg/jwt"
-	"Art-Design-Backend/pkg/loginUtils"
 	"Art-Design-Backend/pkg/middleware"
 	"Art-Design-Backend/pkg/response"
 	"github.com/gin-gonic/gin"
@@ -54,10 +52,8 @@ func (a *AuthController) login(c *gin.Context) {
 
 // logout 处理用户注销请求
 func (a *AuthController) logout(c *gin.Context) {
-	// 从请求头中获取 token
-	token := loginUtils.GetToken(c)
 	// 调用 jwt 包中的 LogoutToken 函数注销 token
-	err := a.authService.LogoutToken(token)
+	err := a.authService.LogoutToken(c)
 	if err != nil {
 		response.FailWithMessage("注销失败", c)
 		return
@@ -67,13 +63,7 @@ func (a *AuthController) logout(c *gin.Context) {
 
 // refreshToken 处理用户刷新 token 请求
 func (a *AuthController) refreshToken(c *gin.Context) {
-	// 从上下文中获取用户 ID
-	id := loginUtils.GetUserID(c)
-	//  创建一个包含用户 ID 的 Claims
-	claims := jwt.BaseClaims{
-		ID: id,
-	}
-	token, err := a.authService.CreateToken(claims)
+	token, err := a.authService.RefreshToken(c)
 	if err != nil {
 		response.FailWithMessage("刷新token失败", c)
 		return

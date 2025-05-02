@@ -42,8 +42,8 @@ func IsWithinRefreshWindow(c *CustomClaims) bool {
 	return now.Add(c.RefreshWindowTime).After(expireTime)
 }
 
-// CreateClaims 创建负载
-func (j *JWT) CreateClaims(baseClaims BaseClaims) CustomClaims {
+// createClaims 创建负载
+func (j *JWT) createClaims(baseClaims BaseClaims) CustomClaims {
 	// 设置刷新窗口时间
 	baseClaims.RefreshWindowTime = j.RefreshWindowTime
 	claims := CustomClaims{
@@ -60,7 +60,7 @@ func (j *JWT) CreateClaims(baseClaims BaseClaims) CustomClaims {
 
 // CreateToken 创建一个 token
 func (j *JWT) CreateToken(baseClaims BaseClaims) (tokenStr string, err error) {
-	claim := j.CreateClaims(baseClaims)
+	claim := j.createClaims(baseClaims)
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claim)
 	tokenStr, err = token.SignedString(j.SigningKey)
 	return

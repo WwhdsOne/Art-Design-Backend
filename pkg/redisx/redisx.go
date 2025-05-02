@@ -9,13 +9,13 @@ import (
 
 // RedisWrapper 结构体用于封装 Redis 客户端和默认操作超时时间
 type RedisWrapper struct {
-	Client         *redis.Client
-	DefaultTimeout time.Duration // 默认操作超时时间
+	Client           *redis.Client
+	OperationTimeout time.Duration // 默认操作超时时间
 }
 
 // Set 方法用于设置 Redis 键值对
 func (r *RedisWrapper) Set(id, value string, duration time.Duration) (err error) {
-	timeout, cancelFunc := context.WithTimeout(context.Background(), r.DefaultTimeout)
+	timeout, cancelFunc := context.WithTimeout(context.Background(), r.OperationTimeout)
 	defer cancelFunc()
 	err = r.Client.Set(timeout, id, value, duration).Err()
 	if err != nil {
@@ -26,7 +26,7 @@ func (r *RedisWrapper) Set(id, value string, duration time.Duration) (err error)
 
 // Get 方法用于获取 Redis 键对应的值
 func (r *RedisWrapper) Get(key string) (val string) {
-	timeout, cancelFunc := context.WithTimeout(context.Background(), r.DefaultTimeout)
+	timeout, cancelFunc := context.WithTimeout(context.Background(), r.OperationTimeout)
 	defer cancelFunc()
 	val, err := r.Client.Get(timeout, key).Result()
 	if err != nil {
@@ -41,7 +41,7 @@ func (r *RedisWrapper) Get(key string) (val string) {
 
 // Delete 方法用于删除 Redis 键
 func (r *RedisWrapper) Delete(key string) (err error) {
-	timeout, cancelFunc := context.WithTimeout(context.Background(), r.DefaultTimeout)
+	timeout, cancelFunc := context.WithTimeout(context.Background(), r.OperationTimeout)
 	defer cancelFunc()
 	err = r.Client.Del(timeout, key).Err()
 	if err != nil {
@@ -52,7 +52,7 @@ func (r *RedisWrapper) Delete(key string) (err error) {
 
 // PipelineSet 方法用于批量设置 Redis 键值对
 func (r *RedisWrapper) PipelineSet(keyVal [][2]string, duration time.Duration) (err error) {
-	timeout, cancelFunc := context.WithTimeout(context.Background(), r.DefaultTimeout)
+	timeout, cancelFunc := context.WithTimeout(context.Background(), r.OperationTimeout)
 	defer cancelFunc()
 	tx := r.Client.Pipeline()
 	for _, kv := range keyVal {
@@ -67,7 +67,7 @@ func (r *RedisWrapper) PipelineSet(keyVal [][2]string, duration time.Duration) (
 
 // PipelineDelete 方法用于批量删除 Redis 键
 func (r *RedisWrapper) PipelineDelete(key []string) (err error) {
-	timeout, cancelFunc := context.WithTimeout(context.Background(), r.DefaultTimeout)
+	timeout, cancelFunc := context.WithTimeout(context.Background(), r.OperationTimeout)
 	defer cancelFunc()
 	tx := r.Client.Pipeline()
 	for _, kv := range key {

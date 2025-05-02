@@ -7,6 +7,7 @@ import (
 	"Art-Design-Backend/pkg/constant"
 	"Art-Design-Backend/pkg/errorTypes"
 	"Art-Design-Backend/pkg/jwt"
+	"Art-Design-Backend/pkg/loginUtils"
 	"Art-Design-Backend/pkg/redisx"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
@@ -22,8 +23,8 @@ type AuthService struct {
 }
 
 // Login 登录
-func (s *AuthService) Login(ctx *gin.Context, u *request.Login) (tokenStr string, err error) {
-	user, err := s.UserRepo.GetUserByUsername(ctx, u.Username)
+func (s *AuthService) Login(c *gin.Context, u *request.Login) (tokenStr string, err error) {
+	user, err := s.UserRepo.GetUserByUsername(c, u.Username)
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(u.Password))
 	if err != nil {
 		// 密码错误
@@ -33,11 +34,19 @@ func (s *AuthService) Login(ctx *gin.Context, u *request.Login) (tokenStr string
 		ID: user.ID,
 	}
 	// 创建 token
-	return s.CreateToken(claims)
+	return s.createToken(claims)
 }
 
-// CreateToken 创建一个 token 并处理会话
-func (s *AuthService) CreateToken(baseClaims jwt.BaseClaims) (tokenStr string, err error) {
+func (s *AuthService) RefreshToken(c *gin.Context) (tokenStr string, err error) {
+	// 从上下文中获取用户 ID
+	id := loginUtils.GetUserID(c)
+	return s.createToken(jwt.BaseClaims{
+		ID: id,
+	})
+}
+
+// createToken 创建一个 token 并处理会话
+func (s *AuthService) createToken(baseClaims jwt.BaseClaims) (tokenStr string, err error) {
 	// 调用 jwt 服务的 CreateToken 方法生成令牌
 	tokenStr, err = s.Jwt.CreateToken(baseClaims)
 	if err != nil {
@@ -70,7 +79,9 @@ func (s *AuthService) CreateToken(baseClaims jwt.BaseClaims) (tokenStr string, e
 }
 
 // LogoutToken 注销 token
-func (s *AuthService) LogoutToken(tokenStr string) (err error) {
+func (s *AuthService) LogoutToken(c *gin.Context) (err error) {
+	// 从请求头中获取 token
+	tokenStr := loginUtils.GetToken(c)
 	// 解析传入的令牌以获取用户信息
 	claims, err := s.Jwt.ParseToken(tokenStr)
 	if err != nil {
@@ -89,7 +100,7 @@ func (s *AuthService) LogoutToken(tokenStr string) (err error) {
 }
 
 // Register 注册
-func (s *AuthService) Register(ctx *gin.Context, userReq *request.User) (err error) {
+func (s *AuthService) Register(c *gin.Context, userReq *request.User) (err error) {
 	var user entity.User
 	// 属性复制，同时进行邮箱、手机号和密码加密操作
 	err = copier.Copy(&user, &userReq)
@@ -102,7 +113,7 @@ func (s *AuthService) Register(ctx *gin.Context, userReq *request.User) (err err
 		return
 	}
 	// 插入
-	if err = s.UserRepo.CreateUser(ctx, &user); err != nil {
+	if err = s.UserRepo.CreateUser(c, &user); err != nil {
 		// 处理错误
 		zap.L().Error("新增用户失败", zap.Error(err))
 		return

@@ -1,19 +1,43 @@
 package service
 
-//import (
-//	"Art-Design-Backend/global"
-//	"Art-Design-Backend/model/entity"
-//	"Art-Design-Backend/model/request"
-//	"Art-Design-Backend/model/resp"
-//	"Art-Design-Backend/pkg/errorTypes"
-//	"errors"
-//	"fmt"
-//	"github.com/gin-gonic/gin"
-//	"github.com/jinzhu/copier"
-//	"go.uber.org/zap"
-//	"golang.org/x/crypto/bcrypt"
-//)
-//
+import (
+	"Art-Design-Backend/internal/model/entity"
+	"Art-Design-Backend/internal/model/resp"
+	"Art-Design-Backend/internal/repository"
+	"Art-Design-Backend/pkg/errorTypes"
+	"Art-Design-Backend/pkg/loginUtils"
+	"Art-Design-Backend/pkg/redisx"
+	"fmt"
+	"github.com/gin-gonic/gin"
+	"github.com/jinzhu/copier"
+	"go.uber.org/zap"
+)
+
+type UserService struct {
+	UserRepo *repository.UserRepository // 用户Repo
+	Redis    *redisx.RedisWrapper       // redis
+}
+
+func (u *UserService) GetUserById(c *gin.Context) (res resp.User, err error) {
+	var user *entity.User
+	id := loginUtils.GetUserID(c)
+	if id == -1 {
+		err = fmt.Errorf("当前用户未登录")
+		return
+	}
+	if user, err = u.UserRepo.GetUserById(c, id); err != nil {
+		// 处理错误，例如可以返回 nil 或者记录错误日志
+		zap.L().Error("获取用户失败")
+		err = errorTypes.NewGormError("获取用户失败")
+		return
+	}
+	err = copier.Copy(&res, &user)
+	if err != nil {
+		zap.L().Error("复制属性失败")
+		return
+	}
+	return
+}
 
 //
 //func DeleteUser(ids []int64, deleteBy int64) error {
@@ -132,18 +156,3 @@ package service
 ////	return userResponses, total, nil
 ////}
 //
-//func GetUserById(id int64) (res resp.User, err error) {
-//	var user entity.User
-//	if err = global.DB.Where("id = ?", id).First(&user).Error; err != nil {
-//		// 处理错误，例如可以返回 nil 或者记录错误日志
-//		zap.L().Error("获取用户失败")
-//		err = errorTypes.NewGormError("获取用户失败")
-//		return
-//	}
-//	err = copier.Copy(&res, &user)
-//	if err != nil {
-//		zap.L().Error("复制属性失败")
-//		return
-//	}
-//	return
-//}

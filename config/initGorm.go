@@ -86,25 +86,25 @@ func (z *zapGormLogger) LogMode(level logger.LogLevel) logger.Interface {
 	return &newLogger
 }
 
-func (z *zapGormLogger) Info(ctx context.Context, msg string, data ...interface{}) {
+func (z *zapGormLogger) Info(c context.Context, msg string, data ...interface{}) {
 	if z.logLevel >= logger.Info {
 		z.zapLogger.Sugar().Infof(msg, data...)
 	}
 }
 
-func (z *zapGormLogger) Warn(ctx context.Context, msg string, data ...interface{}) {
+func (z *zapGormLogger) Warn(c context.Context, msg string, data ...interface{}) {
 	if z.logLevel >= logger.Warn {
 		z.zapLogger.Sugar().Warnf(msg, data...)
 	}
 }
 
-func (z *zapGormLogger) Error(ctx context.Context, msg string, data ...interface{}) {
+func (z *zapGormLogger) Error(c context.Context, msg string, data ...interface{}) {
 	if z.logLevel >= logger.Error {
 		z.zapLogger.Sugar().Errorf(msg, data...)
 	}
 }
 
-func (z *zapGormLogger) Trace(ctx context.Context, begin time.Time, fc func() (string, int64), err error) {
+func (z *zapGormLogger) Trace(c context.Context, begin time.Time, fc func() (string, int64), err error) {
 	if z.logLevel <= logger.Silent {
 		return
 	}

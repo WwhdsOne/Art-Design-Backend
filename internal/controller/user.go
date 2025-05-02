@@ -1,5 +1,12 @@
 package controller
 
+import (
+	"Art-Design-Backend/internal/service"
+	"Art-Design-Backend/pkg/middleware"
+	"Art-Design-Backend/pkg/response"
+	"github.com/gin-gonic/gin"
+)
+
 //
 //import (
 //	"Art-Design-Backend/model/request"
@@ -17,6 +24,32 @@ package controller
 //	//userRouter.POST("/page", userPage)
 //	userRouter.GET("/info", getUserInfo)
 //}
+
+type UserController struct {
+	userService *service.UserService // 创建一个AuthService实例
+}
+
+func NewUserController(engine *gin.Engine, middleware *middleware.Middlewares, service *service.UserService) *UserController {
+	userCtrl := &UserController{
+		userService: service,
+	}
+	r := engine.Group("/api").Group("/user")
+	{
+		// 私有路由组（需要 JWT 认证）
+		r.GET("/info", middleware.AuthMiddleware(), userCtrl.getUserInfo)
+	}
+	return userCtrl
+}
+
+func (u *UserController) getUserInfo(c *gin.Context) {
+	user, err := u.userService.GetUserById(c)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	response.OkWithData(user, c)
+}
+
 //
 //func deleteUser(c *gin.Context) {
 //	ids, err := utils.ParseIDs(c)
@@ -66,12 +99,3 @@ package controller
 ////		pageResp := base.BuildPageResp[resp.User](users, total, user.PaginationReq)
 ////		response.OkWithData(pageResp, c)
 ////	}
-//func getUserInfo(c *gin.Context) {
-//	id := auth.GetUserID(c)
-//	userResp, err := service.GetUserById(id)
-//	if err != nil {
-//		c.Error(err)
-//		return
-//	}
-//	response.OkWithData(userResp, c)
-//}

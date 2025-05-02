@@ -18,7 +18,6 @@ import (
 )
 
 type Server struct {
-	App          string `yaml:"app"`
 	Port         string `yaml:"port"`
 	ReadTimeOut  string `yaml:"read-time-out"`
 	WriteTimeOut string `yaml:"write-time-out"`
@@ -28,6 +27,7 @@ type HttpServer struct {
 	Engine         *gin.Engine                // gin引擎
 	Logger         *zap.Logger                // 日志
 	AuthController *controller.AuthController // 鉴权Ctrl
+	UserController *controller.UserController // 用户Ctrl
 	Config         *Config                    // 服务器配置
 }
 
@@ -74,11 +74,11 @@ func (h *HttpServer) GinServer() {
 	h.Logger.Info("正在关闭服务器...")
 
 	// 创建一个上下文用于优雅关闭
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	c, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	// 尝试优雅关闭服务器
-	if err := httpServer.Shutdown(ctx); err != nil {
+	if err := httpServer.Shutdown(c); err != nil {
 		h.Logger.Fatal("服务器关闭失败: ", zap.Error(err))
 	}
 	h.Logger.Info("服务器已正常退出")
