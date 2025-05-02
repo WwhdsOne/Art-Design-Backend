@@ -1,13 +1,49 @@
 package controller
 
-//
-//import "github.com/gin-gonic/gin"
-//
-//func InitSecuredMenuRouter(r *gin.RouterGroup) {
-//	securedRouter := r.Group("/auth")
-//	securedRouter.POST("/add", addMenu)
-//}
-//
-//func addMenu(c *gin.Context) {
-//
-//}
+import (
+	"Art-Design-Backend/internal/model/request"
+	"Art-Design-Backend/internal/service"
+	"Art-Design-Backend/pkg/middleware"
+	"Art-Design-Backend/pkg/response"
+	"github.com/gin-gonic/gin"
+)
+
+type MenuController struct {
+	menuService *service.MenuService // 创建一个MenuService实例
+}
+
+func NewMenuController(engine *gin.Engine, middleware *middleware.Middlewares, service *service.MenuService) *MenuController {
+	menuCtrl := &MenuController{
+		menuService: service,
+	}
+	r := engine.Group("/api").Group("/menu").Use(middleware.AuthMiddleware())
+	{
+		// 私有路由组（需要 JWT 认证）
+		r.GET("/list", menuCtrl.getMenuList)
+		r.POST("/create", menuCtrl.createMenu)
+	}
+	return menuCtrl
+}
+
+func (m *MenuController) getMenuList(c *gin.Context) {
+	res, err := m.menuService.GetMenuList(c)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	response.OkWithData(res, c)
+}
+
+func (m *MenuController) createMenu(c *gin.Context) {
+	var menu request.Menu
+	if err := c.ShouldBindJSON(&menu); err != nil {
+		c.Error(err)
+		return
+	}
+	err := m.menuService.CreateMenu(c, &menu)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	response.OkWithMessage("添加成功", c)
+}

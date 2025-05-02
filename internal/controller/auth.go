@@ -20,10 +20,10 @@ func NewAuthController(engine *gin.Engine, middleware *middleware.Middlewares, s
 	{
 		// 私有路由组（需要 JWT 认证）
 		r.POST("/logout", middleware.AuthMiddleware(), authCtrl.logout)
-		r.POST("/refreshToken", middleware.AuthMiddleware(), authCtrl.refreshToken)
 	}
 	{
 		// 公共路由组（无需认证）
+		r.GET("/refreshToken/:id", authCtrl.refreshToken)
 		r.POST("/register", authCtrl.register)
 		r.POST("/login", authCtrl.login)
 	}
@@ -65,7 +65,7 @@ func (a *AuthController) logout(c *gin.Context) {
 func (a *AuthController) refreshToken(c *gin.Context) {
 	token, err := a.authService.RefreshToken(c)
 	if err != nil {
-		response.FailWithMessage("刷新token失败", c)
+		c.Error(err)
 		return
 	}
 	response.OkWithData(token, c)

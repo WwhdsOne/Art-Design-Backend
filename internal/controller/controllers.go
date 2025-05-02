@@ -5,7 +5,11 @@ import (
 	"github.com/google/wire"
 )
 
-var ControllersProvider = wire.NewSet(AuthCtrlProvider, UserCtrlProvider)
+var ControllersProvider = wire.NewSet(
+	AuthCtrlProvider,
+	UserCtrlProvider,
+	MenuCtrlProvider,
+)
 
 var AuthCtrlProvider = wire.NewSet(
 	NewAuthController,
@@ -15,4 +19,9 @@ var AuthCtrlProvider = wire.NewSet(
 var UserCtrlProvider = wire.NewSet(
 	NewUserController,
 	wire.Struct(new(service.UserService), "*"),
+)
+
+var MenuCtrlProvider = wire.NewSet(
+	NewMenuController,
+	wire.Struct(new(service.MenuService), "*"),
 )

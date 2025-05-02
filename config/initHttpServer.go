@@ -28,6 +28,7 @@ type HttpServer struct {
 	Logger         *zap.Logger                // 日志
 	AuthController *controller.AuthController // 鉴权Ctrl
 	UserController *controller.UserController // 用户Ctrl
+	MenuController *controller.MenuController // 菜单Ctrl
 	Config         *Config                    // 服务器配置
 }
 

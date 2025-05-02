@@ -2,13 +2,12 @@ package response
 
 import (
 	"github.com/gin-gonic/gin"
-	"net/http"
 )
 
 type Response struct {
-	Code int         `json:"code"`
-	Msg  string      `json:"msg"`
-	Data interface{} `json:"data"`
+	Code    int         `json:"code"`
+	Message string      `json:"message"`
+	Data    interface{} `json:"data"`
 }
 
 const (
@@ -21,9 +20,9 @@ const (
 func Result(code int, data interface{}, msg string, c *gin.Context) {
 	// 开始时间
 	c.JSON(200, Response{
-		Code: code,
-		Msg:  msg,
-		Data: data,
+		Code:    code,
+		Message: msg,
+		Data:    data,
 	})
 
 }
@@ -49,17 +48,9 @@ func FailWithMessage(message string, c *gin.Context) {
 }
 
 func NoAuth(message string, c *gin.Context) {
-	c.JSON(http.StatusUnauthorized, Response{
-		NOAUTH,
-		message,
-		nil,
-	})
+	Result(NOAUTH, map[string]interface{}{}, message, c)
 }
 
 func ShouldRefresh(c *gin.Context) {
-	c.JSON(http.StatusUnauthorized, Response{
-		SHOULDREFRESH,
-		"需要刷新Token",
-		nil,
-	})
+	Result(SHOULDREFRESH, map[string]interface{}{}, "需要刷新Token", c)
 }

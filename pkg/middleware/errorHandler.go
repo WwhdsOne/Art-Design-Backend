@@ -116,6 +116,7 @@ func (m *Middlewares) ErrorHandlerMiddleware() gin.HandlerFunc {
 	{
 		// 注册校验器错误返回信息
 		registerValidator(entity.User{})
+		registerValidator(entity.Menu{})
 	}
 	return func(c *gin.Context) {
 		c.Next() // 先调用后续的处理函数
