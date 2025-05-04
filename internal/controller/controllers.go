@@ -9,6 +9,7 @@ var ControllersProvider = wire.NewSet(
 	AuthCtrlProvider,
 	UserCtrlProvider,
 	MenuCtrlProvider,
+	RoleCtrlProvider,
 )
 
 var AuthCtrlProvider = wire.NewSet(
@@ -24,4 +25,9 @@ var UserCtrlProvider = wire.NewSet(
 var MenuCtrlProvider = wire.NewSet(
 	NewMenuController,
 	wire.Struct(new(service.MenuService), "*"),
+)
+
+var RoleCtrlProvider = wire.NewSet(
+	NewRoleController,
+	wire.Struct(new(service.RoleService), "*"),
 )

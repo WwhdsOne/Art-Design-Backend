@@ -2,8 +2,6 @@ package base
 
 import (
 	"Art-Design-Backend/pkg/loginUtils"
-	"Art-Design-Backend/pkg/utils"
-	"context"
 	"gorm.io/gorm"
 	"time"
 )
@@ -17,26 +15,15 @@ type BaseModel struct {
 	CreateBy  int64     `gorm:"type:bigint;column:created_by"`                   // 创建人字段，记录创建操作者的标识
 }
 
-// BeforeCreate 在创建记录之前自动生成雪花 ID
 func (b *BaseModel) BeforeCreate(db *gorm.DB) (err error) {
-	b.ID = utils.GenerateSnowflakeId()
-	b.fillAddReq(db.Statement.Context)
+	userID := loginUtils.GetUserID(db.Statement.Context)
+	b.CreateBy = userID
+	b.UpdateBy = userID
 	return
 }
 
 func (b *BaseModel) BeforeUpdate(db *gorm.DB) (err error) {
-	b.fillUpdateReq(db.Statement.Context)
+	userID := loginUtils.GetUserID(db.Statement.Context)
+	b.UpdateBy = userID
 	return
-}
-
-func (b *BaseModel) fillAddReq(c context.Context) {
-	userID := loginUtils.GetUserID(c)
-	// 如果存在 claims，正常提取用户 ID
-	b.CreateBy = userID
-	b.UpdateBy = userID
-}
-
-func (b *BaseModel) fillUpdateReq(c context.Context) {
-	userID := loginUtils.GetUserID(c)
-	b.UpdateBy = userID
 }

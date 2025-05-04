@@ -2,6 +2,7 @@ package entity
 
 import (
 	"Art-Design-Backend/internal/model/base"
+	"Art-Design-Backend/pkg/constant"
 )
 
 // Role 定义角色模型
@@ -15,5 +16,5 @@ type Role struct {
 }
 
 func (r *Role) TableName() string {
-	return "role"
+	return constant.MenuTableName
 }

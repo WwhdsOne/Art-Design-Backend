@@ -30,7 +30,8 @@ func (m *Middlewares) AuthMiddleware() gin.HandlerFunc {
 		claims, err := m.Jwt.ParseToken(token)
 		if err == nil {
 			// 需要刷新token
-			if jwt.IsWithinRefreshWindow(claims) {
+			// 登出请求不需要刷新token
+			if jwt.IsWithinRefreshWindow(claims) && c.FullPath() != "/api/auth/logout" {
 				response.ShouldRefresh(c)
 				c.Abort()
 				return

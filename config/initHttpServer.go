@@ -29,6 +29,7 @@ type HttpServer struct {
 	AuthController *controller.AuthController // 鉴权Ctrl
 	UserController *controller.UserController // 用户Ctrl
 	MenuController *controller.MenuController // 菜单Ctrl
+	RoleController *controller.RoleController // 角色Ctrl
 	Config         *Config                    // 服务器配置
 }
 

@@ -21,7 +21,8 @@ type Mysql struct {
 	Database string `yaml:"database"`
 }
 
-var snowflakeIdFieldsMap = make(map[interface{}]string)
+// snowflakeIdFieldsMap 存储类型和对应的ID字段名
+var snowflakeIdFieldsMap = make(map[reflect.Type]string)
 
 // AutoMigrate 自动迁移
 func AutoMigrate(db *gorm.DB) {
@@ -48,7 +49,19 @@ func (p *snowflakeIDPlugin) initialize(db *gorm.DB) (err error) {
 	err = db.Callback().Create().
 		Before("gorm:create").
 		Register("generate_snowflake_id", p.generateID)
+
 	return
+}
+
+// registerIDField 注册需要自动生成ID的模型和字段（基于类型而非具体值）
+func registerIDField(model interface{}, fieldName string) {
+	// 获取模型的类型（如果是指针，则取指向的类型）
+	t := reflect.TypeOf(model)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	// 存储类型和对应的ID字段名
+	snowflakeIdFieldsMap[t] = fieldName
 }
 
 func (p *snowflakeIDPlugin) generateID(db *gorm.DB) {
@@ -126,15 +139,6 @@ func (z *zapGormLogger) Trace(c context.Context, begin time.Time, fc func() (str
 	}
 }
 
-// RegisterIDField 注册需要自动生成ID的模型和字段
-func registerIDField(model interface{}, fieldName string) {
-	t := reflect.TypeOf(model)
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
-	snowflakeIdFieldsMap[model] = fieldName
-}
-
 func NewGorm(cfg *Config, log *zap.Logger) (DB *gorm.DB) {
 	m := cfg.Mysql
 	ds := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
@@ -163,6 +167,7 @@ func NewGorm(cfg *Config, log *zap.Logger) (DB *gorm.DB) {
 
 	// 注册模型应当自动填充雪花ID的字段
 	{
+		registerIDField(&entity.Role{}, "ID")
 		registerIDField(&entity.User{}, "ID")
 		registerIDField(&entity.OperationLog{}, "ID")
 		registerIDField(&entity.Menu{}, "ID")

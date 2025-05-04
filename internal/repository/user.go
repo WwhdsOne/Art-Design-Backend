@@ -94,10 +94,7 @@ func (u *UserRepository) GetUserByUsername(c context.Context, username string) (
 }
 
 func (u *UserRepository) GetUserById(c context.Context, id int64) (user *entity.User, err error) {
-	err = u.db.WithContext(c).
-		Where("id = ?", id).
-		First(&user).Error
-	if err != nil {
+	if err = u.db.WithContext(c).Where("id = ?", id).First(&user).Error; err != nil {
 		zap.L().Error("根据用户id查询用户失败", zap.Error(err))
 		err = errorTypes.NewGormError("用户不存在")
 		return
@@ -106,8 +103,7 @@ func (u *UserRepository) GetUserById(c context.Context, id int64) (user *entity.
 }
 
 func (u *UserRepository) CreateUser(c context.Context, user *entity.User) (err error) {
-	err = u.db.WithContext(c).Create(user).Error
-	if err != nil {
+	if err = u.db.WithContext(c).Create(user).Error; err != nil {
 		zap.L().Error("新增用户失败", zap.Error(err))
 		return errorTypes.NewGormError("新增用户失败")
 	}

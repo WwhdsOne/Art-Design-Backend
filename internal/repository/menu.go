@@ -20,7 +20,7 @@ func NewMenuRepository(db *gorm.DB) *MenuRepository {
 }
 
 func (m *MenuRepository) GetMenuList(c context.Context) (menuList []*entity.Menu, err error) {
-	if err = m.db.WithContext(c).Find(&menuList).Error; err != nil {
+	if err = m.db.WithContext(c).Find(menuList).Error; err != nil {
 		zap.L().Error("获取菜单失败", zap.Error(err))
 		return nil, errorTypes.NewGormError("获取菜单失败")
 	}
