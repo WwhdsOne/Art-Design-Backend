@@ -16,14 +16,14 @@ type BaseModel struct {
 }
 
 func (b *BaseModel) BeforeCreate(db *gorm.DB) (err error) {
-	userID := loginUtils.GetUserID(db.Statement.Context)
-	b.CreateBy = userID
-	b.UpdateBy = userID
+	operatorID := loginUtils.GetUserID(db.Statement.Context)
+	b.CreateBy = operatorID
+	b.UpdateBy = operatorID
 	return
 }
 
 func (b *BaseModel) BeforeUpdate(db *gorm.DB) (err error) {
-	userID := loginUtils.GetUserID(db.Statement.Context)
-	b.UpdateBy = userID
+	operatorID := loginUtils.GetUserID(db.Statement.Context)
+	b.UpdateBy = operatorID
 	return
 }

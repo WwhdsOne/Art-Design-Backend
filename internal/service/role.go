@@ -22,6 +22,10 @@ func (r *RoleService) CreateRole(c context.Context, role *request.Role) (err err
 		zap.L().Error("角色属性复制失败", zap.Error(err))
 		return
 	}
+	err = r.RoleRepo.CheckRoleDuplicate(c, &roleDo)
+	if err != nil {
+		return
+	}
 	err = r.RoleRepo.CreateRole(c, &roleDo)
 	if err != nil {
 		return

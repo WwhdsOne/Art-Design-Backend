@@ -4,9 +4,9 @@ import (
 	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/internal/model/resp"
 	"Art-Design-Backend/internal/repository"
-	"Art-Design-Backend/pkg/errorTypes"
 	"Art-Design-Backend/pkg/loginUtils"
 	"Art-Design-Backend/pkg/redisx"
+	"Art-Design-Backend/pkg/transaction"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
@@ -14,8 +14,10 @@ import (
 )
 
 type UserService struct {
-	UserRepo *repository.UserRepository // 用户Repo
-	Redis    *redisx.RedisWrapper       // redis
+	UserRepo    *repository.UserRepository // 用户Repo
+	RoleRepo    *repository.RoleRepository // 角色Repo
+	GormSession *transaction.GormSession   // gorm事务管理
+	Redis       *redisx.RedisWrapper       // redis
 }
 
 func (u *UserService) GetUserById(c *gin.Context) (res resp.User, err error) {
@@ -26,11 +28,17 @@ func (u *UserService) GetUserById(c *gin.Context) (res resp.User, err error) {
 		return
 	}
 	if user, err = u.UserRepo.GetUserById(c, id); err != nil {
-		// 处理错误，例如可以返回 nil 或者记录错误日志
-		zap.L().Error("获取用户失败")
-		err = errorTypes.NewGormError("获取用户失败")
 		return
 	}
+	roleList, err := u.RoleRepo.GetRoleListByUserID(c, user.ID)
+	if err != nil {
+		return
+	}
+	if len(roleList) == 0 {
+		err = fmt.Errorf("当前用户未分配角色")
+		return
+	}
+	user.Roles = roleList
 	err = copier.Copy(&res, &user)
 	if err != nil {
 		zap.L().Error("复制属性失败")

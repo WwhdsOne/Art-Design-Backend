@@ -5,6 +5,7 @@ import (
 	"Art-Design-Backend/internal/model/request"
 	"Art-Design-Backend/internal/model/resp"
 	"Art-Design-Backend/internal/repository"
+	"Art-Design-Backend/pkg/loginUtils"
 	"Art-Design-Backend/pkg/redisx"
 	"context"
 	"github.com/jinzhu/copier"
@@ -35,10 +36,11 @@ func (m *MenuService) CreateMenu(c context.Context, menu *request.Menu) (err err
 }
 
 func (m *MenuService) GetMenuList(c context.Context) (res []*resp.Menu, err error) {
-	dbMenus, err := m.MenuRepo.GetMenuList(c)
+	roleIds := loginUtils.GetUserRoleIDs(c)
+	menuList, err := m.MenuRepo.GetMenuListByRoleIDList(c, roleIds)
 	// 先用 map 存储所有菜单，方便查找
 	menuMap := make(map[int64]*resp.Menu)
-	for _, menuDo := range dbMenus {
+	for _, menuDo := range menuList {
 		var menuResp resp.Menu
 		// 如果是不是按钮类型，则初始化 AuthList 和 Children
 		if menuDo.Type != 3 {
@@ -53,7 +55,7 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*resp.Menu, err erro
 	}
 
 	// 遍历所有菜单，构建树形结构
-	for _, dbMenu := range dbMenus {
+	for _, dbMenu := range menuList {
 		frontendMenu := menuMap[dbMenu.ID]
 
 		// 跳过按钮类型（按钮的 AuthCode 会挂到父菜单上）

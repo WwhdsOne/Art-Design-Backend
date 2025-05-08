@@ -4,6 +4,7 @@ import (
 	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/pkg/constant"
 	"Art-Design-Backend/pkg/errorTypes"
+	"Art-Design-Backend/pkg/transaction"
 	"context"
 	"fmt"
 	"go.uber.org/zap"
@@ -80,13 +81,13 @@ func (u *UserRepository) CheckUserDuplicate(user *entity.User) (err error) {
 	return
 }
 
-func (u *UserRepository) GetUserByUsername(c context.Context, username string) (user *entity.User, err error) {
-	err = u.db.WithContext(c).
+func (u *UserRepository) GetLoginUserByUsername(c context.Context, username string) (user *entity.User, err error) {
+	if err = u.db.WithContext(c).
 		Select("id", "password").
 		Where("username = ?", username).
-		First(&user).Error
-	if err != nil {
-		zap.L().Error("根据用户名查询用户失败", zap.Error(err))
+		Where("status = 1").
+		First(&user).Error; err != nil {
+		zap.L().Error("根据用户名查询用户失败")
 		err = errorTypes.NewGormError("用户不存在")
 		return
 	}
@@ -94,8 +95,11 @@ func (u *UserRepository) GetUserByUsername(c context.Context, username string) (
 }
 
 func (u *UserRepository) GetUserById(c context.Context, id int64) (user *entity.User, err error) {
-	if err = u.db.WithContext(c).Where("id = ?", id).First(&user).Error; err != nil {
-		zap.L().Error("根据用户id查询用户失败", zap.Error(err))
+	if err = u.db.WithContext(c).
+		Where("id = ?", id).
+		Where("status = 1").
+		First(&user).Error; err != nil {
+		zap.L().Error("根据用户id查询用户失败")
 		err = errorTypes.NewGormError("用户不存在")
 		return
 	}
@@ -103,8 +107,9 @@ func (u *UserRepository) GetUserById(c context.Context, id int64) (user *entity.
 }
 
 func (u *UserRepository) CreateUser(c context.Context, user *entity.User) (err error) {
-	if err = u.db.WithContext(c).Create(user).Error; err != nil {
-		zap.L().Error("新增用户失败", zap.Error(err))
+	if err = transaction.DB(c, u.db).
+		Create(user).Error; err != nil {
+		zap.L().Error("新增用户失败")
 		return errorTypes.NewGormError("新增用户失败")
 	}
 	return err

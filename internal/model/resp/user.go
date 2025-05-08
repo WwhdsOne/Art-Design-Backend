@@ -12,4 +12,5 @@ type User struct {
 	Introduction string   `json:"introduction"`
 	Occupation   string   `json:"occupation"`
 	Tags         []string `json:"tags"`
+	Roles        []Role   `json:"roles"`
 }

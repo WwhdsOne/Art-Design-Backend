@@ -5,10 +5,11 @@ import (
 	"Art-Design-Backend/internal/model/request"
 	"Art-Design-Backend/internal/repository"
 	"Art-Design-Backend/pkg/constant"
-	"Art-Design-Backend/pkg/errorTypes"
 	"Art-Design-Backend/pkg/jwt"
 	"Art-Design-Backend/pkg/loginUtils"
 	"Art-Design-Backend/pkg/redisx"
+	"Art-Design-Backend/pkg/transaction"
+	"context"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
@@ -17,23 +18,32 @@ import (
 )
 
 type AuthService struct {
-	UserRepo *repository.UserRepository // 用户Repo
-	Redis    *redisx.RedisWrapper       // redis
-	Jwt      *jwt.JWT                   // jwt相关
+	UserRepo    *repository.UserRepository // 用户Repo
+	RoleRepo    *repository.RoleRepository // 角色Repo
+	GormSession *transaction.GormSession   // gorm事务管理
+	Redis       *redisx.RedisWrapper       // redis
+	Jwt         *jwt.JWT                   // jwt相关
 }
 
 // Login 登录
 func (s *AuthService) Login(c *gin.Context, u *request.Login) (tokenStr string, err error) {
-	user, err := s.UserRepo.GetUserByUsername(c, u.Username)
+	// 只验证启用状态的用户
+	user, err := s.UserRepo.GetLoginUserByUsername(c, u.Username)
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(u.Password))
 	if err != nil {
-		// 密码错误
-		return "", errorTypes.NewGormError("用户名或密码错误")
+		// todo后续修改为统一鉴权错误
+		err = fmt.Errorf("用户名或密码错误")
+		return
 	}
-	claims := jwt.BaseClaims{
-		ID: user.ID,
+	roleIdList, err := s.RoleRepo.GetRoleIDListByUserID(c, user.ID)
+	if err != nil {
+		return
 	}
-	// 创建 token
+	if len(roleIdList) == 0 {
+		err = fmt.Errorf("用户未分配角色")
+		return
+	}
+	claims := jwt.NewBaseClaims(user.ID, roleIdList)
 	return s.createToken(claims)
 }
 
@@ -44,17 +54,13 @@ func (s *AuthService) RefreshToken(c *gin.Context) (tokenStr string, err error) 
 	val := s.Redis.Get(constant.SESSION + idStr)
 	if val == "" {
 		// 如果不存在，则返回错误
-		err = errorTypes.NewGormError("用户未在登录状态")
+		// todo后续改为auth专用错误
+		err = fmt.Errorf("用户未在登录状态")
 		return
 	}
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		err = fmt.Errorf("ID参数错误")
-		return
-	}
-	return s.createToken(jwt.BaseClaims{
-		ID: id,
-	})
+	// 根据原有的用户 Claims 创建一个新的 token
+	claims := loginUtils.GetClaims(c)
+	return s.createToken(claims.BaseClaims)
 }
 
 // createToken 创建一个 token 并处理会话
@@ -66,7 +72,7 @@ func (s *AuthService) createToken(baseClaims jwt.BaseClaims) (tokenStr string, e
 	}
 
 	// 将用户 ID 转换为字符串形式
-	id := strconv.FormatInt(baseClaims.ID, 10)
+	id := strconv.FormatInt(baseClaims.UserID, 10)
 
 	// 检查 Redis 中是否已存在该用户的会话
 	existToken := s.Redis.Get(constant.SESSION + id)
@@ -101,7 +107,7 @@ func (s *AuthService) LogoutToken(c *gin.Context) (err error) {
 	}
 
 	// 将用户 ID 转换为字符串形式
-	id := strconv.FormatInt(claims.BaseClaims.ID, 10)
+	id := strconv.FormatInt(claims.BaseClaims.UserID, 10)
 
 	// 准备需要删除的 Redis 键
 	delKeys := []string{constant.SESSION + id, constant.LOGIN + tokenStr}
@@ -136,12 +142,19 @@ func (s *AuthService) Register(c *gin.Context, userReq *request.User) (err error
 	}
 	// 判重
 	if err = s.UserRepo.CheckUserDuplicate(&user); err != nil {
-		return
+		return err
 	}
-	// 插入
-	if err = s.UserRepo.CreateUser(c, &user); err != nil {
-		// 处理错误
+	// 启用事务插入用户表和用户角色关联表
+	err = s.GormSession.Transaction(c, func(ctx context.Context) (err error) {
+		if err = s.UserRepo.CreateUser(ctx, &user); err != nil {
+			return
+		}
+		// id是新用户的主键ID
+		// todo后续可能会换成动态获取
+		if err = s.RoleRepo.AssignRoleToUser(ctx, user.ID, []int64{42838646763553030}); err != nil {
+			return
+		}
 		return
-	}
+	})
 	return
 }

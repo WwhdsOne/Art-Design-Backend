@@ -27,6 +27,18 @@ func (m *MenuRepository) GetMenuList(c context.Context) (menuList []*entity.Menu
 	return
 }
 
+func (m *MenuRepository) GetMenuListByRoleIDList(c context.Context, roleIdList []int64) (menuList []*entity.Menu, err error) {
+	if err = m.db.WithContext(c).
+		Select("menu.*").
+		Joins("JOIN role_menus ON role_menus.menu_id = menu.id").
+		Where("role_menus.role_id IN ?", roleIdList).
+		Find(&menuList).Error; err != nil {
+		zap.L().Error("获取菜单失败", zap.Error(err))
+		return nil, errorTypes.NewGormError("获取菜单失败")
+	}
+	return menuList, nil
+}
+
 func (m *MenuRepository) CreateMenu(c context.Context, menu *entity.Menu) (err error) {
 	if err = m.db.WithContext(c).Create(menu).Error; err != nil {
 		zap.L().Error("创建菜单失败", zap.Error(err))
