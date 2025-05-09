@@ -5,14 +5,6 @@ import (
 	"gorm.io/gorm"
 )
 
-type Session interface {
-	Begin(ctx context.Context) (Session, error)
-	Transaction(ctx context.Context, f func(context.Context) error) error
-	Rollback() error
-	Commit() error
-	Context() context.Context
-}
-
 type GormSession struct {
 	db  *gorm.DB
 	ctx context.Context
@@ -23,29 +15,6 @@ func NewGormSession(db *gorm.DB) *GormSession {
 		db:  db,
 		ctx: context.Background(),
 	}
-}
-
-func (s *GormSession) Begin(ctx context.Context) (Session, error) {
-	tx := DB(ctx, s.db).Begin()
-	if tx.Error != nil {
-		return nil, tx.Error
-	}
-	return &GormSession{
-		ctx: context.WithValue(ctx, dbKey{}, tx),
-		db:  tx,
-	}, nil
-}
-
-func (s *GormSession) Rollback() error {
-	return s.db.Rollback().Error
-}
-
-func (s *GormSession) Commit() error {
-	return s.db.Commit().Error
-}
-
-func (s *GormSession) Context() context.Context {
-	return s.ctx
 }
 
 type dbKey struct{}

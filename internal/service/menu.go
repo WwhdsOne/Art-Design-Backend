@@ -42,12 +42,12 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*resp.Menu, err erro
 	menuMap := make(map[int64]*resp.Menu)
 	for _, menuDo := range menuList {
 		var menuResp resp.Menu
+		err = copier.Copy(&menuResp, &menuDo)
 		// 如果是不是按钮类型，则初始化 AuthList 和 Children
 		if menuDo.Type != 3 {
 			menuResp.Meta.AuthList = make([]string, 0)
 			menuResp.Children = make([]resp.Menu, 0)
 		}
-		err = copier.Copy(&menuResp, &menuDo)
 		if err != nil {
 			return
 		}
@@ -57,7 +57,6 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*resp.Menu, err erro
 	// 遍历所有菜单，构建树形结构
 	for _, dbMenu := range menuList {
 		frontendMenu := menuMap[dbMenu.ID]
-
 		// 跳过按钮类型（按钮的 AuthCode 会挂到父菜单上）
 		if dbMenu.Type == 3 { // 按钮类型
 			if parent, exists := menuMap[dbMenu.ParentID]; exists {
@@ -77,6 +76,5 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*resp.Menu, err erro
 			}
 		}
 	}
-
 	return
 }

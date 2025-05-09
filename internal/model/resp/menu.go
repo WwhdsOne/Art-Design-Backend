@@ -1,14 +1,14 @@
 package resp
 
 type Menu struct {
-	ID        int64  `json:"id,string"`
-	Name      string `json:"name"`
-	Path      string `json:"path"`
-	Component string `json:"component"`
-	ParentID  int64  `json:"parentID"`
-	Meta      `json:"meta"`
-	Sort      int    `json:"sort"`
-	Children  []Menu `json:"children"`
+	ID        int64         `json:"id,string"`
+	Name      string        `json:"name"`
+	Path      string        `json:"path"`
+	Component string        `json:"component"`
+	ParentID  int64         `json:"parentID"`
+	*Meta     `json:"meta"` // 不用指针则无法将修改映射到本体
+	Sort      int           `json:"sort"`
+	Children  []Menu        `json:"children"`
 }
 
 type Meta struct {
