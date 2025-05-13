@@ -28,8 +28,8 @@ type PaginationResp[T any] struct {
 	Total int `json:"total"`
 }
 
-func BuildPageResp[T any](data []T, total int64, pageReq PaginationReq) PaginationResp[T] {
-	return PaginationResp[T]{
+func BuildPageResp[T any](data []T, total int64, pageReq PaginationReq) *PaginationResp[T] {
+	return &PaginationResp[T]{
 		Page:  pageReq.Page,
 		Size:  pageReq.Size,
 		Total: int(total),

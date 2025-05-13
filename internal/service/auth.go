@@ -9,6 +9,7 @@ import (
 	"Art-Design-Backend/pkg/loginUtils"
 	"Art-Design-Backend/pkg/redisx"
 	"Art-Design-Backend/pkg/transaction"
+	"Art-Design-Backend/pkg/utils"
 	"context"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -118,28 +119,14 @@ func (s *AuthService) LogoutToken(c *gin.Context) (err error) {
 }
 
 // Register 注册
-func (s *AuthService) Register(c *gin.Context, userReq *request.User) (err error) {
+func (s *AuthService) Register(c *gin.Context, userReq *request.RegisterUser) (err error) {
 	var user entity.User
 	err = copier.Copy(&user, &userReq)
 	// 处理密码（非指针字段）
 	password, _ := bcrypt.GenerateFromPassword([]byte(userReq.Password), bcrypt.DefaultCost)
 	user.Password = string(password)
-	// 处理Email（指针字段）
-	if userReq.Email != "" {
-		emailHash, _ := bcrypt.GenerateFromPassword([]byte(userReq.Email), bcrypt.DefaultCost)
-		emailStr := string(emailHash)
-		user.Email = &emailStr // 注意这里是指针赋值
-	} else {
-		user.Email = nil // 空字符串设为nil
-	}
-	// 处理Phone（指针字段）
-	if userReq.Phone != "" {
-		phoneHash, _ := bcrypt.GenerateFromPassword([]byte(userReq.Phone), bcrypt.DefaultCost)
-		phoneStr := string(phoneHash)
-		user.Phone = &phoneStr // 注意这里是指针赋值
-	} else {
-		user.Phone = nil // 空字符串设为nil
-	}
+	// 随机设置头像
+	user.Avatar = constant.DefaultAvatar[utils.RandomNumber.Intn(len(constant.DefaultAvatar))]
 	// 判重
 	if err = s.UserRepo.CheckUserDuplicate(&user); err != nil {
 		return err

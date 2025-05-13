@@ -25,6 +25,7 @@ func wireApp() *config.HttpServer {
 		config.NewGin,
 		config.NewJWT,
 		transaction.NewGormSession,
+		config.NewOSSClient,
 		// 这里解释一下没有serviceProvider的原因:
 		// 	service总是只被对应的controller使用，但是repo可能被多个service使用
 		//  所以controllerProvider中直接就创建了service，没有单独的serviceProvider

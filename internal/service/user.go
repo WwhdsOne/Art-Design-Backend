@@ -1,9 +1,13 @@
 package service
 
 import (
+	"Art-Design-Backend/internal/model/base"
 	"Art-Design-Backend/internal/model/entity"
+	"Art-Design-Backend/internal/model/query"
+	"Art-Design-Backend/internal/model/request"
 	"Art-Design-Backend/internal/model/resp"
 	"Art-Design-Backend/internal/repository"
+	"Art-Design-Backend/pkg/aliyun"
 	"Art-Design-Backend/pkg/loginUtils"
 	"Art-Design-Backend/pkg/redisx"
 	"Art-Design-Backend/pkg/transaction"
@@ -11,11 +15,14 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
 	"go.uber.org/zap"
+	"golang.org/x/crypto/bcrypt"
+	"mime/multipart"
 )
 
 type UserService struct {
 	UserRepo    *repository.UserRepository // 用户Repo
 	RoleRepo    *repository.RoleRepository // 角色Repo
+	OssClient   *aliyun.OssClient          // 阿里云OSS
 	GormSession *transaction.GormSession   // gorm事务管理
 	Redis       *redisx.RedisWrapper       // redis
 }
@@ -44,6 +51,109 @@ func (u *UserService) GetUserById(c *gin.Context) (res resp.User, err error) {
 		zap.L().Error("复制属性失败")
 		return
 	}
+	return
+}
+
+func (u *UserService) GetUserPage(c *gin.Context, userQuery *query.User) (userPageRes *base.PaginationResp[resp.User], err error) {
+	userPage, total, err := u.UserRepo.GetUserPage(c, userQuery)
+	if err != nil {
+		return
+	}
+	var pageData []resp.User
+	roleCache := make(map[int64][]entity.Role) // 使用用户ID作为key，角色列表作为value
+
+	for _, user := range userPage {
+		var roleList []entity.Role
+
+		// 先从缓存中查找是否已经查询过该用户的角色
+		if cachedRoles, exist := roleCache[user.ID]; exist {
+			roleList = cachedRoles
+		} else {
+			// 如果缓存中没有，则从数据库中查询
+			if roleList, err = u.RoleRepo.GetRoleListByUserID(c, user.ID); err != nil {
+				return
+			}
+			// 将查询结果存入缓存
+			roleCache[user.ID] = roleList
+		}
+
+		user.Roles = roleList
+
+		var pageDataResp resp.User
+		if err = copier.Copy(&pageDataResp, &user); err != nil {
+			zap.L().Error("复制属性失败")
+			return
+		}
+
+		pageData = append(pageData, pageDataResp)
+	}
+
+	userPageRes = base.BuildPageResp[resp.User](pageData, total, userQuery.PaginationReq)
+
+	return
+}
+
+func (u *UserService) UpdateUserBaseInfo(c *gin.Context, userReq *request.User) (err error) {
+	var userDo entity.User
+	if err = copier.Copy(&userDo, userReq); err != nil {
+		zap.L().Error("复制属性失败")
+		return
+	}
+	if userReq.Email != "" {
+		userDo.Email = &userReq.Email
+	}
+	if userReq.Phone != "" {
+		userDo.Phone = &userReq.Phone
+	}
+	if err = u.UserRepo.CheckUserDuplicate(&userDo); err != nil {
+		return
+	}
+	if err = u.UserRepo.UpdateUser(c, &userDo); err != nil {
+		return
+	}
+	return
+}
+
+func (u *UserService) UpdateUserPassword(c *gin.Context, userReq *request.ChangePassword) (err error) {
+	var userDo entity.User
+	if err = copier.Copy(&userDo, userReq); err != nil {
+		zap.L().Error("复制属性失败")
+		return
+	}
+	user, err := u.UserRepo.GetUserById(c, userDo.ID)
+	if err != nil {
+		return
+	}
+	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(userReq.OldPassword))
+	if err != nil {
+		err = fmt.Errorf("旧密码错误")
+		return
+	}
+	if userReq.NewPassword != userReq.ConfirmPassword {
+		err = fmt.Errorf("两次输入的密码不一致")
+		return
+	}
+	pwd, _ := bcrypt.GenerateFromPassword([]byte(userReq.NewPassword), bcrypt.DefaultCost)
+	userDo.Password = string(pwd)
+	if err = u.UserRepo.UpdateUser(c, &userDo); err != nil {
+		return
+	}
+	return
+}
+
+func (u *UserService) UploadAvatar(c *gin.Context, filename string, src multipart.File) (fileUrl string, err error) {
+	url, err := u.OssClient.UploadAvatar(c, filename, src)
+	if err != nil {
+		zap.L().Error("上传头像失败", zap.Error(err))
+		return
+	}
+	var userDo entity.User
+	userDo.ID = loginUtils.GetUserID(c)
+	userDo.Avatar = url
+	if err = u.UserRepo.UpdateUser(c, &userDo); err != nil {
+		return
+	}
+	fileUrl = url
 	return
 }
 

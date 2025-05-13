@@ -14,6 +14,7 @@ type Config struct {
 	Redis  Redis  `yaml:"redis"`
 	JWT    JWT    `yaml:"jwt"`
 	Zap    Zap    `yaml:"zap"`
+	OSS    OSS    `yaml:"oss"`
 }
 
 func NewConfig() (cfg *Config) {

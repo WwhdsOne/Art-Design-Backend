@@ -2,7 +2,7 @@ package repository
 
 import (
 	"Art-Design-Backend/internal/model/entity"
-	"Art-Design-Backend/pkg/constant"
+	"Art-Design-Backend/internal/model/query"
 	"Art-Design-Backend/pkg/errorTypes"
 	"Art-Design-Backend/pkg/transaction"
 	"context"
@@ -18,7 +18,7 @@ type UserRepository struct {
 
 func NewUserRepository(db *gorm.DB) *UserRepository {
 	return &UserRepository{
-		db: db.Table(constant.UserTableName),
+		db: db,
 	}
 }
 
@@ -37,7 +37,7 @@ func (u *UserRepository) CheckUserDuplicate(user *entity.User) (err error) {
 	}
 
 	// 构建动态查询条件
-	var query strings.Builder
+	var queryConditions strings.Builder
 	args := make([]interface{}, 0)
 	conditions := make([]string, 0)
 
@@ -63,11 +63,11 @@ func (u *UserRepository) CheckUserDuplicate(user *entity.User) (err error) {
 	}
 
 	// 构建完整查询
-	query.WriteString("SELECT ")
-	query.WriteString(strings.Join(conditions, ","))
+	queryConditions.WriteString("SELECT ")
+	queryConditions.WriteString(strings.Join(conditions, ","))
 
 	// 执行查询
-	u.db.Raw(query.String(), args...).Scan(&result)
+	u.db.Raw(queryConditions.String(), args...).Scan(&result)
 
 	// 检查结果
 	switch {
@@ -113,4 +113,56 @@ func (u *UserRepository) CreateUser(c context.Context, user *entity.User) (err e
 		return errorTypes.NewGormError("新增用户失败")
 	}
 	return err
+}
+
+func (u *UserRepository) UpdateUser(c context.Context, user *entity.User) (err error) {
+	if err = transaction.DB(c, u.db).Updates(user).Error; err != nil {
+		zap.L().Error("更新用户失败")
+		return errorTypes.NewGormError("更新用户失败")
+	}
+	return err
+}
+
+func (u *UserRepository) GetUserPage(c context.Context, user *query.User) (userPage []*entity.User, total int64, err error) {
+	db := transaction.DB(c, u.db)
+
+	// 构建通用查询条件
+	queryConditions := db.Model(&entity.User{})
+
+	if user.RealName != "" {
+		queryConditions = queryConditions.Where("real_name LIKE ?", "%"+user.RealName+"%")
+	}
+	if user.Username != "" {
+		queryConditions = queryConditions.Where("username LIKE ?", "%"+user.Username+"%")
+	}
+	if user.Email != "" {
+		queryConditions = queryConditions.Where("email LIKE ?", "%"+user.Email+"%")
+	}
+	if user.Phone != "" {
+		queryConditions = queryConditions.Where("phone LIKE ?", "%"+user.Phone+"%")
+	}
+
+	if user.Gender != 0 {
+		queryConditions = queryConditions.Where("gender = ?", user.Gender)
+	}
+
+	if user.Status != 0 {
+		queryConditions = queryConditions.Where("status = ?", user.Status)
+	}
+
+	// 查询总数
+	if err = queryConditions.Count(&total).Error; err != nil {
+		zap.L().Error("获取用户分页失败")
+		err = errorTypes.NewGormError("获取用户分页失败")
+		return
+	}
+
+	// 查询分页数据（可根据需要添加 Limit / Offset 支持）
+	if err = queryConditions.Scopes(user.Paginate()).Find(&userPage).Error; err != nil {
+		zap.L().Error("获取用户分页数据失败")
+		err = errorTypes.NewGormError("获取用户分页数据失败")
+		return
+	}
+
+	return
 }

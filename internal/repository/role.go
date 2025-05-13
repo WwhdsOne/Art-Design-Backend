@@ -125,7 +125,7 @@ func (r *RoleRepository) AssignRoleToUser(c context.Context, userID int64, roleI
 		return
 	}
 	if len(roleIDList) > 0 {
-		userRoleList := make([]entity.UserRoles, len(roleIDList))
+		userRoleList := make([]entity.UserRoles, 0, len(roleIDList))
 		for _, roleID := range roleIDList {
 			userRoleList = append(userRoleList, entity.UserRoles{
 				UserID: userID,

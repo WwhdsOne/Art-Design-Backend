@@ -73,7 +73,7 @@ func (a *AuthController) refreshToken(c *gin.Context) {
 
 // register 处理用户注册请求
 func (a *AuthController) register(c *gin.Context) {
-	var userReq request.User
+	var userReq request.RegisterUser
 	err := c.ShouldBindJSON(&userReq)
 	if err != nil {
 		c.Error(err)
