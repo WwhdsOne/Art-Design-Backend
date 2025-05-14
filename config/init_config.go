@@ -29,6 +29,6 @@ func NewConfig() (cfg *Config) {
 	if err != nil {
 		log.Fatalf("error: %v", err)
 	}
-	fmt.Printf("配置如下 : %v\n", cfg)
+	fmt.Printf("配置如下 : %+v\n", cfg)
 	return
 }

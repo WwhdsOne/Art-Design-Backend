@@ -94,9 +94,9 @@ func handleValidationErrors(c *gin.Context, ginErr *gin.Error) bool {
 	return false
 }
 
-// handleGormErrors 处理Gorm错误
-func handleGormErrors(c *gin.Context, ginErr *gin.Error) bool {
-	var gormErr *myerrors.GormError
+// handleDBErrors 处理Gorm错误
+func handleDBErrors(c *gin.Context, ginErr *gin.Error) bool {
+	var gormErr *myerrors.DBError
 	if errors.As(ginErr.Err, &gormErr) {
 		response.FailWithMessage(gormErr.Message, c)
 		return true
@@ -132,7 +132,7 @@ func (m *Middlewares) ErrorHandlerMiddleware() gin.HandlerFunc {
 				}
 
 				// 处理Gorm错误
-				if handleGormErrors(c, ginErr) {
+				if handleDBErrors(c, ginErr) {
 					c.Abort()
 					return
 				}

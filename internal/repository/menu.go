@@ -22,7 +22,7 @@ func NewMenuRepository(db *gorm.DB) *MenuRepository {
 func (m *MenuRepository) GetMenuList(c context.Context) (menuList []*entity.Menu, err error) {
 	if err = DB(c, m.db).Find(menuList).Error; err != nil {
 		zap.L().Error("获取菜单失败", zap.Error(err))
-		return nil, errors.NewGormError("获取菜单失败")
+		return nil, errors.NewDBError("获取菜单失败")
 	}
 	return
 }
@@ -34,7 +34,7 @@ func (m *MenuRepository) GetMenuListByRoleIDList(c context.Context, roleIdList [
 		Where("role_menus.role_id IN ?", roleIdList).
 		Find(&menuList).Error; err != nil {
 		zap.L().Error("获取菜单失败", zap.Error(err))
-		return nil, errors.NewGormError("获取菜单失败")
+		return nil, errors.NewDBError("获取菜单失败")
 	}
 	return menuList, nil
 }
@@ -42,7 +42,7 @@ func (m *MenuRepository) GetMenuListByRoleIDList(c context.Context, roleIdList [
 func (m *MenuRepository) CreateMenu(c context.Context, menu *entity.Menu) (err error) {
 	if err = DB(c, m.db).Create(menu).Error; err != nil {
 		zap.L().Error("创建菜单失败", zap.Error(err))
-		return errors.NewGormError("创建菜单失败")
+		return errors.NewDBError("创建菜单失败")
 	}
 	return
 }

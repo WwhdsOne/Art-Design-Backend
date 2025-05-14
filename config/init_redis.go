@@ -10,18 +10,17 @@ import (
 )
 
 type Redis struct {
-	Addr             string `yaml:"addr"`              // 地址
+	Host             string `yaml:"host"`              // 地址
 	Port             string `yaml:"port"`              // 端口
 	Password         string `yaml:"password"`          // 密码（如果没有密码则为空）
 	DB               int    `yaml:"db"`                // 数据库编号
-	PreKey           string `yaml:"preKey"`            // 前缀
 	OperationTimeout string `yaml:"operation-timeout"` // 操作超时时间
 }
 
 func NewRedis(cfg *Config) *redisx.RedisWrapper {
 	r := cfg.Redis
 	client := redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%s", r.Addr, r.Port),
+		Addr:     fmt.Sprintf("%s:%s", r.Host, r.Port),
 		Password: r.Password,
 		DB:       r.DB,
 	})
