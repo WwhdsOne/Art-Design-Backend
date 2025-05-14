@@ -4,7 +4,7 @@ import (
 	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/internal/model/query"
 	"Art-Design-Backend/pkg/constant"
-	"Art-Design-Backend/pkg/errorTypes"
+	"Art-Design-Backend/pkg/errors"
 	"context"
 	"fmt"
 	"go.uber.org/zap"
@@ -72,11 +72,11 @@ func (u *UserRepository) CheckUserDuplicate(user *entity.User) (err error) {
 	// 检查结果
 	switch {
 	case result.UsernameExists:
-		err = errorTypes.NewGormError("用户名重复")
+		err = errors.NewGormError("用户名重复")
 	case result.EmailExists:
-		err = errorTypes.NewGormError("邮箱重复")
+		err = errors.NewGormError("邮箱重复")
 	case result.PhoneExists:
-		err = errorTypes.NewGormError("手机号重复")
+		err = errors.NewGormError("手机号重复")
 	}
 	return
 }
@@ -87,7 +87,7 @@ func (u *UserRepository) GetLoginUserByUsername(c context.Context, username stri
 		Where("username = ?", username).
 		First(&user).Error; err != nil {
 		zap.L().Error("根据用户名查询用户失败")
-		err = errorTypes.NewGormError("用户不存在")
+		err = errors.NewGormError("用户不存在")
 		return
 	}
 	return
@@ -99,7 +99,7 @@ func (u *UserRepository) GetUserById(c context.Context, id int64) (user *entity.
 		Where("status = 1").
 		First(&user).Error; err != nil {
 		zap.L().Error("根据用户id查询用户失败")
-		err = errorTypes.NewGormError("用户不存在")
+		err = errors.NewGormError("用户不存在")
 		return
 	}
 	return
@@ -109,7 +109,7 @@ func (u *UserRepository) CreateUser(c context.Context, user *entity.User) (err e
 	if err = DB(c, u.db).
 		Create(user).Error; err != nil {
 		zap.L().Error("新增用户失败")
-		return errorTypes.NewGormError("新增用户失败")
+		return errors.NewGormError("新增用户失败")
 	}
 	return err
 }
@@ -117,7 +117,7 @@ func (u *UserRepository) CreateUser(c context.Context, user *entity.User) (err e
 func (u *UserRepository) UpdateUser(c context.Context, user *entity.User) (err error) {
 	if err = DB(c, u.db).Updates(user).Error; err != nil {
 		zap.L().Error("更新用户失败")
-		return errorTypes.NewGormError("更新用户失败")
+		return errors.NewGormError("更新用户失败")
 	}
 	return err
 }
@@ -152,14 +152,14 @@ func (u *UserRepository) GetUserPage(c context.Context, user *query.User) (userP
 	// 查询总数
 	if err = queryConditions.Count(&total).Error; err != nil {
 		zap.L().Error("获取用户分页失败")
-		err = errorTypes.NewGormError("获取用户分页失败")
+		err = errors.NewGormError("获取用户分页失败")
 		return
 	}
 
 	// 查询分页数据（可根据需要添加 Limit / Offset 支持）
 	if err = queryConditions.Scopes(user.Paginate()).Find(&userPage).Error; err != nil {
 		zap.L().Error("获取用户分页数据失败")
-		err = errorTypes.NewGormError("获取用户分页数据失败")
+		err = errors.NewGormError("获取用户分页数据失败")
 		return
 	}
 

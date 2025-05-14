@@ -1,7 +1,7 @@
 package base
 
 import (
-	"Art-Design-Backend/pkg/loginUtils"
+	"Art-Design-Backend/pkg/authutils"
 	"gorm.io/gorm"
 	"time"
 )
@@ -16,14 +16,14 @@ type BaseModel struct {
 }
 
 func (b *BaseModel) BeforeCreate(db *gorm.DB) (err error) {
-	operatorID := loginUtils.GetUserID(db.Statement.Context)
+	operatorID := authutils.GetUserID(db.Statement.Context)
 	b.CreateBy = operatorID
 	b.UpdateBy = operatorID
 	return
 }
 
 func (b *BaseModel) BeforeUpdate(db *gorm.DB) (err error) {
-	operatorID := loginUtils.GetUserID(db.Statement.Context)
+	operatorID := authutils.GetUserID(db.Statement.Context)
 	b.UpdateBy = operatorID
 	return
 }

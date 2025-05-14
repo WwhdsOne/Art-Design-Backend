@@ -2,7 +2,7 @@ package middleware
 
 import (
 	"Art-Design-Backend/internal/model/entity"
-	"Art-Design-Backend/pkg/loginUtils"
+	"Art-Design-Backend/pkg/authutils"
 	"bytes"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -27,7 +27,7 @@ func (m *Middlewares) OperationLoggerMiddleware() gin.HandlerFunc {
 		c.Next()
 
 		// 获取用户信息 (示例代码，实际可通过 Token 或上下文获取)
-		userID := loginUtils.GetUserID(c)
+		userID := authutils.GetUserID(c)
 
 		// 收集响应信息
 		statusCode := c.Writer.Status()

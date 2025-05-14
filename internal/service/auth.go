@@ -4,9 +4,9 @@ import (
 	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/internal/model/request"
 	"Art-Design-Backend/internal/repository"
+	"Art-Design-Backend/pkg/authutils"
 	"Art-Design-Backend/pkg/constant"
 	"Art-Design-Backend/pkg/jwt"
-	"Art-Design-Backend/pkg/loginUtils"
 	"Art-Design-Backend/pkg/redisx"
 	"Art-Design-Backend/pkg/utils"
 	"context"
@@ -66,7 +66,7 @@ func (s *AuthService) RefreshToken(c *gin.Context) (tokenStr string, err error) 
 		return
 	}
 	// 根据原有的用户 Claims 创建一个新的 token
-	claims := loginUtils.GetClaims(c)
+	claims := authutils.GetClaims(c)
 	return s.createToken(claims.BaseClaims)
 }
 
@@ -106,7 +106,7 @@ func (s *AuthService) createToken(baseClaims jwt.BaseClaims) (tokenStr string, e
 // LogoutToken 注销 token
 func (s *AuthService) LogoutToken(c *gin.Context) (err error) {
 	// 从请求头中获取 token
-	tokenStr := loginUtils.GetToken(c)
+	tokenStr := authutils.GetToken(c)
 	// 解析传入的令牌以获取用户信息
 	claims, err := s.Jwt.ParseToken(tokenStr)
 	if err != nil {
@@ -132,7 +132,7 @@ func (s *AuthService) Register(c *gin.Context, userReq *request.RegisterUser) (e
 	password, _ := bcrypt.GenerateFromPassword([]byte(userReq.Password), bcrypt.DefaultCost)
 	user.Password = string(password)
 	// 随机设置头像
-	user.Avatar = constant.DefaultAvatar[utils.RandomNumber.Intn(len(constant.DefaultAvatar))]
+	user.Avatar = constant.DefaultAvatar[utils.GenerateRandomNumber(0, len(constant.DefaultAvatar))]
 	// 判重
 	if err = s.UserRepo.CheckUserDuplicate(&user); err != nil {
 		return err

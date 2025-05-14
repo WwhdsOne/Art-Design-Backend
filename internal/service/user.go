@@ -8,7 +8,7 @@ import (
 	"Art-Design-Backend/internal/model/resp"
 	"Art-Design-Backend/internal/repository"
 	"Art-Design-Backend/pkg/aliyun"
-	"Art-Design-Backend/pkg/loginUtils"
+	"Art-Design-Backend/pkg/authutils"
 	"Art-Design-Backend/pkg/redisx"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -28,7 +28,7 @@ type UserService struct {
 
 func (u *UserService) GetUserById(c *gin.Context) (res resp.User, err error) {
 	var user *entity.User
-	id := loginUtils.GetUserID(c)
+	id := authutils.GetUserID(c)
 	if id == -1 {
 		err = fmt.Errorf("当前用户未登录")
 		return
@@ -147,7 +147,7 @@ func (u *UserService) UploadAvatar(c *gin.Context, filename string, src multipar
 		return
 	}
 	var userDo entity.User
-	userDo.ID = loginUtils.GetUserID(c)
+	userDo.ID = authutils.GetUserID(c)
 	userDo.Avatar = url
 	if err = u.UserRepo.UpdateUser(c, &userDo); err != nil {
 		return

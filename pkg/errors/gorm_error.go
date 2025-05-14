@@ -1,4 +1,4 @@
-package errorTypes
+package errors
 
 type GormError struct {
 	Message string

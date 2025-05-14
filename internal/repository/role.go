@@ -3,7 +3,7 @@ package repository
 import (
 	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/pkg/constant"
-	"Art-Design-Backend/pkg/errorTypes"
+	"Art-Design-Backend/pkg/errors"
 	"context"
 	"fmt"
 	"go.uber.org/zap"
@@ -66,9 +66,9 @@ func (r *RoleRepository) CheckRoleDuplicate(c context.Context, role *entity.Role
 	// 检查结果
 	switch {
 	case result.NameExists:
-		return errorTypes.NewGormError("角色名称已存在")
+		return errors.NewGormError("角色名称已存在")
 	case result.CodeExists:
-		return errorTypes.NewGormError("角色编码已存在")
+		return errors.NewGormError("角色编码已存在")
 	}
 
 	return
@@ -76,7 +76,7 @@ func (r *RoleRepository) CheckRoleDuplicate(c context.Context, role *entity.Role
 func (r *RoleRepository) CreateRole(c context.Context, role *entity.Role) (err error) {
 	if err = r.db.WithContext(c).Create(role).Error; err != nil {
 		zap.L().Error("创建角色失败", zap.Error(err))
-		return errorTypes.NewGormError("创建角色失败")
+		return errors.NewGormError("创建角色失败")
 	}
 	return
 }
@@ -91,7 +91,7 @@ func (r *RoleRepository) GetRoleListByUserID(c context.Context, userID int64) (r
 		Where("status = 1").
 		Find(&roleList).Error; err != nil {
 		zap.L().Error("查询用户角色列表失败", zap.Error(err))
-		err = errorTypes.NewGormError("查询用户角色列表失败")
+		err = errors.NewGormError("查询用户角色列表失败")
 		return
 	}
 	return
@@ -106,7 +106,7 @@ func (r *RoleRepository) GetRoleIDListByUserID(c context.Context, userID int64) 
 		Where("status = 1").
 		Find(&roleIDList).Error; err != nil {
 		zap.L().Error("查询角色ID列表失败")
-		err = errorTypes.NewGormError("查询角色ID列表失败")
+		err = errors.NewGormError("查询角色ID列表失败")
 		return
 	}
 
@@ -120,7 +120,7 @@ func (r *RoleRepository) AssignRoleToUser(c context.Context, userID int64, roleI
 		Where("user_id = ?", userID).
 		Delete(nil).Error; err != nil {
 		zap.L().Error("删除原有关联失败")
-		err = errorTypes.NewGormError("删除原有关联失败")
+		err = errors.NewGormError("删除原有关联失败")
 		return
 	}
 	if len(roleIDList) > 0 {
@@ -136,7 +136,7 @@ func (r *RoleRepository) AssignRoleToUser(c context.Context, userID int64, roleI
 			Table("user_roles").
 			Create(userRoleList).Error; err != nil {
 			zap.L().Error("创建新的关联失败")
-			err = errorTypes.NewGormError("创建新的关联失败")
+			err = errors.NewGormError("创建新的关联失败")
 		}
 	}
 	return

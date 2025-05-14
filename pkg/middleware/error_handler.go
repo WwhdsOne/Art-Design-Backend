@@ -2,7 +2,7 @@ package middleware
 
 import (
 	"Art-Design-Backend/internal/model/entity"
-	"Art-Design-Backend/pkg/errorTypes"
+	myerrors "Art-Design-Backend/pkg/errors"
 	"Art-Design-Backend/pkg/response"
 	"errors"
 	"fmt"
@@ -96,7 +96,7 @@ func handleValidationErrors(c *gin.Context, ginErr *gin.Error) bool {
 
 // handleGormErrors 处理Gorm错误
 func handleGormErrors(c *gin.Context, ginErr *gin.Error) bool {
-	var gormErr *errorTypes.GormError
+	var gormErr *myerrors.GormError
 	if errors.As(ginErr.Err, &gormErr) {
 		response.FailWithMessage(gormErr.Message, c)
 		return true

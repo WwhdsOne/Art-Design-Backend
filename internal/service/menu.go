@@ -5,7 +5,7 @@ import (
 	"Art-Design-Backend/internal/model/request"
 	"Art-Design-Backend/internal/model/resp"
 	"Art-Design-Backend/internal/repository"
-	"Art-Design-Backend/pkg/loginUtils"
+	"Art-Design-Backend/pkg/authutils"
 	"Art-Design-Backend/pkg/redisx"
 	"context"
 	"github.com/jinzhu/copier"
@@ -36,7 +36,7 @@ func (m *MenuService) CreateMenu(c context.Context, menu *request.Menu) (err err
 }
 
 func (m *MenuService) GetMenuList(c context.Context) (res []*resp.Menu, err error) {
-	roleIds := loginUtils.GetUserRoleIDs(c)
+	roleIds := authutils.GetUserRoleIDs(c)
 	menuList, err := m.MenuRepo.GetMenuListByRoleIDList(c, roleIds)
 	// 先用 map 存储所有菜单，方便查找
 	menuMap := make(map[int64]*resp.Menu)

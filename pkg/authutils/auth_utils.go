@@ -1,4 +1,4 @@
-package loginUtils
+package authutils
 
 import (
 	"Art-Design-Backend/pkg/jwt"
