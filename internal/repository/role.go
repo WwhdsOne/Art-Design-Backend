@@ -4,7 +4,6 @@ import (
 	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/pkg/constant"
 	"Art-Design-Backend/pkg/errorTypes"
-	"Art-Design-Backend/pkg/transaction"
 	"context"
 	"fmt"
 	"go.uber.org/zap"
@@ -84,7 +83,7 @@ func (r *RoleRepository) CreateRole(c context.Context, role *entity.Role) (err e
 
 func (r *RoleRepository) GetRoleListByUserID(c context.Context, userID int64) (roleList []entity.Role, err error) {
 	// 使用JOIN查询关联角色
-	if err = r.db.WithContext(c).
+	if err = DB(c, r.db).
 		Table(constant.RoleTableName).
 		Select("role.*").
 		Joins("JOIN user_roles ON user_roles.role_id = role.id").
@@ -99,7 +98,7 @@ func (r *RoleRepository) GetRoleListByUserID(c context.Context, userID int64) (r
 }
 
 func (r *RoleRepository) GetRoleIDListByUserID(c context.Context, userID int64) (roleIDList []int64, err error) {
-	if err = r.db.WithContext(c).
+	if err = DB(c, r.db).
 		Table(constant.RoleTableName).
 		Select("id").
 		Joins("JOIN user_roles ON user_roles.role_id = role.id").
@@ -116,7 +115,7 @@ func (r *RoleRepository) GetRoleIDListByUserID(c context.Context, userID int64) 
 
 func (r *RoleRepository) AssignRoleToUser(c context.Context, userID int64, roleIDList []int64) (err error) {
 	// 删除原有关联
-	if err = transaction.DB(c, r.db).
+	if err = DB(c, r.db).
 		Table("user_roles").
 		Where("user_id = ?", userID).
 		Delete(nil).Error; err != nil {
@@ -133,7 +132,7 @@ func (r *RoleRepository) AssignRoleToUser(c context.Context, userID int64, roleI
 			})
 		}
 		// 创建新的关联
-		if err = transaction.DB(c, r.db).
+		if err = DB(c, r.db).
 			Table("user_roles").
 			Create(userRoleList).Error; err != nil {
 			zap.L().Error("创建新的关联失败")

@@ -1,19 +1,17 @@
-package transaction
+package repository
 
 import (
 	"context"
 	"gorm.io/gorm"
 )
 
-type GormSession struct {
-	db  *gorm.DB
-	ctx context.Context
+type GormTransactionManager struct {
+	db *gorm.DB
 }
 
-func NewGormSession(db *gorm.DB) *GormSession {
-	return &GormSession{
-		db:  db,
-		ctx: context.Background(),
+func NewGormTransactionManager(db *gorm.DB) *GormTransactionManager {
+	return &GormTransactionManager{
+		db: db,
 	}
 }
 
@@ -27,7 +25,7 @@ func DB(ctx context.Context, fallback *gorm.DB) *gorm.DB {
 	return db.(*gorm.DB).WithContext(ctx)
 }
 
-func (s *GormSession) Transaction(ctx context.Context, f func(context.Context) error) error {
+func (s *GormTransactionManager) Transaction(ctx context.Context, f func(context.Context) error) error {
 	tx := DB(ctx, s.db).Begin()
 	if tx.Error != nil {
 		return tx.Error

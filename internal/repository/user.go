@@ -3,8 +3,8 @@ package repository
 import (
 	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/internal/model/query"
+	"Art-Design-Backend/pkg/constant"
 	"Art-Design-Backend/pkg/errorTypes"
-	"Art-Design-Backend/pkg/transaction"
 	"context"
 	"fmt"
 	"go.uber.org/zap"
@@ -85,7 +85,6 @@ func (u *UserRepository) GetLoginUserByUsername(c context.Context, username stri
 	if err = u.db.WithContext(c).
 		Select("id", "password").
 		Where("username = ?", username).
-		Where("status = 1").
 		First(&user).Error; err != nil {
 		zap.L().Error("根据用户名查询用户失败")
 		err = errorTypes.NewGormError("用户不存在")
@@ -95,7 +94,7 @@ func (u *UserRepository) GetLoginUserByUsername(c context.Context, username stri
 }
 
 func (u *UserRepository) GetUserById(c context.Context, id int64) (user *entity.User, err error) {
-	if err = u.db.WithContext(c).
+	if err = DB(c, u.db).
 		Where("id = ?", id).
 		Where("status = 1").
 		First(&user).Error; err != nil {
@@ -107,7 +106,7 @@ func (u *UserRepository) GetUserById(c context.Context, id int64) (user *entity.
 }
 
 func (u *UserRepository) CreateUser(c context.Context, user *entity.User) (err error) {
-	if err = transaction.DB(c, u.db).
+	if err = DB(c, u.db).
 		Create(user).Error; err != nil {
 		zap.L().Error("新增用户失败")
 		return errorTypes.NewGormError("新增用户失败")
@@ -116,7 +115,7 @@ func (u *UserRepository) CreateUser(c context.Context, user *entity.User) (err e
 }
 
 func (u *UserRepository) UpdateUser(c context.Context, user *entity.User) (err error) {
-	if err = transaction.DB(c, u.db).Updates(user).Error; err != nil {
+	if err = DB(c, u.db).Updates(user).Error; err != nil {
 		zap.L().Error("更新用户失败")
 		return errorTypes.NewGormError("更新用户失败")
 	}
@@ -124,10 +123,10 @@ func (u *UserRepository) UpdateUser(c context.Context, user *entity.User) (err e
 }
 
 func (u *UserRepository) GetUserPage(c context.Context, user *query.User) (userPage []*entity.User, total int64, err error) {
-	db := transaction.DB(c, u.db)
+	db := DB(c, u.db)
 
 	// 构建通用查询条件
-	queryConditions := db.Model(&entity.User{})
+	queryConditions := db.Table(constant.UserTableName)
 
 	if user.RealName != "" {
 		queryConditions = queryConditions.Where("real_name LIKE ?", "%"+user.RealName+"%")

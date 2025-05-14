@@ -8,7 +8,6 @@ import (
 	"Art-Design-Backend/pkg/jwt"
 	"Art-Design-Backend/pkg/loginUtils"
 	"Art-Design-Backend/pkg/redisx"
-	"Art-Design-Backend/pkg/transaction"
 	"Art-Design-Backend/pkg/utils"
 	"context"
 	"fmt"
@@ -19,17 +18,24 @@ import (
 )
 
 type AuthService struct {
-	UserRepo    *repository.UserRepository // 用户Repo
-	RoleRepo    *repository.RoleRepository // 角色Repo
-	GormSession *transaction.GormSession   // gorm事务管理
-	Redis       *redisx.RedisWrapper       // redis
-	Jwt         *jwt.JWT                   // jwt相关
+	UserRepo *repository.UserRepository         // 用户Repo
+	RoleRepo *repository.RoleRepository         // 角色Repo
+	GormTX   *repository.GormTransactionManager // gorm事务管理
+	Redis    *redisx.RedisWrapper               // redis
+	Jwt      *jwt.JWT                           // jwt相关
 }
 
 // Login 登录
 func (s *AuthService) Login(c *gin.Context, u *request.Login) (tokenStr string, err error) {
 	// 只验证启用状态的用户
 	user, err := s.UserRepo.GetLoginUserByUsername(c, u.Username)
+	if err != nil {
+		return
+	}
+	if user.Status != 1 {
+		err = fmt.Errorf("用户未启用")
+		return
+	}
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(u.Password))
 	if err != nil {
 		// todo后续修改为统一鉴权错误
@@ -132,7 +138,7 @@ func (s *AuthService) Register(c *gin.Context, userReq *request.RegisterUser) (e
 		return err
 	}
 	// 启用事务插入用户表和用户角色关联表
-	err = s.GormSession.Transaction(c, func(ctx context.Context) (err error) {
+	err = s.GormTX.Transaction(c, func(ctx context.Context) (err error) {
 		if err = s.UserRepo.CreateUser(ctx, &user); err != nil {
 			return
 		}

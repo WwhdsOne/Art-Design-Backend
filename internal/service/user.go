@@ -10,7 +10,6 @@ import (
 	"Art-Design-Backend/pkg/aliyun"
 	"Art-Design-Backend/pkg/loginUtils"
 	"Art-Design-Backend/pkg/redisx"
-	"Art-Design-Backend/pkg/transaction"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
@@ -20,11 +19,11 @@ import (
 )
 
 type UserService struct {
-	UserRepo    *repository.UserRepository // 用户Repo
-	RoleRepo    *repository.RoleRepository // 角色Repo
-	OssClient   *aliyun.OssClient          // 阿里云OSS
-	GormSession *transaction.GormSession   // gorm事务管理
-	Redis       *redisx.RedisWrapper       // redis
+	UserRepo  *repository.UserRepository         // 用户Repo
+	RoleRepo  *repository.RoleRepository         // 角色Repo
+	GormTX    *repository.GormTransactionManager // gorm事务管理
+	OssClient *aliyun.OssClient                  // 阿里云OSS
+	Redis     *redisx.RedisWrapper               // redis
 }
 
 func (u *UserService) GetUserById(c *gin.Context) (res resp.User, err error) {

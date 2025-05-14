@@ -8,31 +8,18 @@ type PaginationReq struct {
 }
 
 func (r *PaginationReq) Paginate() func(db *gorm.DB) *gorm.DB {
+	// 分页
 	return func(db *gorm.DB) *gorm.DB {
+		// 默认第一页
 		if r.Page <= 0 {
 			r.Page = 1
 		}
+		// 默认每页10条
 		switch {
 		case r.Size <= 0:
 			r.Size = 10
 		}
 		offset := (r.Page - 1) * r.Size
 		return db.Offset(offset).Limit(r.Size)
-	}
-}
-
-type PaginationResp[T any] struct {
-	Size  int `json:"size"`
-	Page  int `json:"page"`
-	Data  []T `json:"data"`
-	Total int `json:"total"`
-}
-
-func BuildPageResp[T any](data []T, total int64, pageReq PaginationReq) *PaginationResp[T] {
-	return &PaginationResp[T]{
-		Page:  pageReq.Page,
-		Size:  pageReq.Size,
-		Total: int(total),
-		Data:  data,
 	}
 }
