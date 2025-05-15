@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"Art-Design-Backend/pkg/response"
+	"Art-Design-Backend/pkg/result"
 	"errors"
 	"github.com/gin-gonic/gin"
 	"strconv"
@@ -34,7 +34,7 @@ func ParseID(c *gin.Context) (int64, error) {
 	}
 	id, err := strconv.ParseInt(idParam, 10, 64)
 	if err != nil {
-		response.FailWithMessage("ID 解析错误", c)
+		result.FailWithMessage("ID 解析错误", c)
 	}
 	return id, nil
 }

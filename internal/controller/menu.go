@@ -4,7 +4,7 @@ import (
 	"Art-Design-Backend/internal/model/request"
 	"Art-Design-Backend/internal/service"
 	"Art-Design-Backend/pkg/middleware"
-	"Art-Design-Backend/pkg/response"
+	"Art-Design-Backend/pkg/result"
 	"github.com/gin-gonic/gin"
 )
 
@@ -16,7 +16,8 @@ func NewMenuController(engine *gin.Engine, middleware *middleware.Middlewares, s
 	menuCtrl := &MenuController{
 		menuService: service,
 	}
-	r := engine.Group("/api").Group("/menu").Use(middleware.AuthMiddleware())
+	r := engine.Group("/api").Group("/menu")
+	r.Use(middleware.AuthMiddleware())
 	{
 		// 私有路由组（需要 JWT 认证）
 		r.GET("/list", menuCtrl.getMenuList)
@@ -31,7 +32,7 @@ func (m *MenuController) getMenuList(c *gin.Context) {
 		c.Error(err)
 		return
 	}
-	response.OkWithData(res, c)
+	result.OkWithData(res, c)
 }
 
 func (m *MenuController) createMenu(c *gin.Context) {
@@ -45,5 +46,5 @@ func (m *MenuController) createMenu(c *gin.Context) {
 		c.Error(err)
 		return
 	}
-	response.OkWithMessage("添加成功", c)
+	result.OkWithMessage("添加成功", c)
 }

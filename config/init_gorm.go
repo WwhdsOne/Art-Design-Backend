@@ -33,7 +33,7 @@ func AutoMigrate(db *gorm.DB) {
 	//// 3. 角色
 	//db.AutoMigrate(&entity.Role{})
 	//// 4. 菜单
-	db.AutoMigrate(&entity.Menu{})
+	//db.AutoMigrate(&entity.Menu{})
 }
 
 // snowflakeIDPlugin GORM插件实现

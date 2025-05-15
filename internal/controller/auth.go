@@ -4,7 +4,7 @@ import (
 	"Art-Design-Backend/internal/model/request"
 	"Art-Design-Backend/internal/service"
 	"Art-Design-Backend/pkg/middleware"
-	"Art-Design-Backend/pkg/response"
+	"Art-Design-Backend/pkg/result"
 	"github.com/gin-gonic/gin"
 )
 
@@ -47,7 +47,7 @@ func (a *AuthController) login(c *gin.Context) {
 		return
 	}
 	// 返回生成的token
-	response.OkWithData(token, c)
+	result.OkWithData(token, c)
 }
 
 // logout 处理用户注销请求
@@ -55,10 +55,10 @@ func (a *AuthController) logout(c *gin.Context) {
 	// 调用 jwt 包中的 LogoutToken 函数注销 token
 	err := a.authService.LogoutToken(c)
 	if err != nil {
-		response.FailWithMessage("注销失败", c)
+		result.FailWithMessage("注销失败", c)
 		return
 	}
-	response.OkWithMessage("注销成功", c)
+	result.OkWithMessage("注销成功", c)
 }
 
 // refreshToken 处理用户刷新 token 请求
@@ -68,7 +68,7 @@ func (a *AuthController) refreshToken(c *gin.Context) {
 		c.Error(err)
 		return
 	}
-	response.OkWithData(token, c)
+	result.OkWithData(token, c)
 }
 
 // register 处理用户注册请求
@@ -85,5 +85,5 @@ func (a *AuthController) register(c *gin.Context) {
 		c.Error(err)
 		return
 	}
-	response.OkWithMessage("注册成功", c)
+	result.OkWithMessage("注册成功", c)
 }

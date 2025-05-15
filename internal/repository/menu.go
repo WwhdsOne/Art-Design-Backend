@@ -46,3 +46,14 @@ func (m *MenuRepository) CreateMenu(c context.Context, menu *entity.Menu) (err e
 	}
 	return
 }
+
+func (m *MenuRepository) DeleteRoleMenuRelations(c context.Context, roleID int64) (err error) {
+	if err = DB(c, m.db).
+		Where("role_id = ?", roleID).
+		Table(constant.RoleMenusTableName).
+		Delete(nil).Error; err != nil {
+		zap.L().Error("删除菜单失败", zap.Error(err))
+		return errors.NewDBError("删除菜单失败")
+	}
+	return
+}

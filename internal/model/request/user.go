@@ -5,7 +5,7 @@ import (
 )
 
 type User struct {
-	ID           base.LongStringID `json:"ID" label:"ID" binding:"required"`
+	ID           base.LongStringID `json:"id" label:"ID" binding:"required"`
 	RealName     string            `json:"realname" label:"真实姓名" binding:"max=50"`
 	Nickname     string            `json:"nickname" label:"昵称" binding:"required,min=5,max=24"`
 	Gender       int8              `json:"gender" label:"性别" binding:"oneof=1 2"`

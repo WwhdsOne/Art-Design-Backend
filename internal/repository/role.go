@@ -2,6 +2,7 @@ package repository
 
 import (
 	"Art-Design-Backend/internal/model/entity"
+	"Art-Design-Backend/internal/model/query"
 	"Art-Design-Backend/pkg/constant"
 	"Art-Design-Backend/pkg/errors"
 	"context"
@@ -34,7 +35,7 @@ func (r *RoleRepository) CheckRoleDuplicate(c context.Context, role *entity.Role
 	}
 
 	// 构建动态查询条件
-	var query strings.Builder
+	var queryCondition strings.Builder
 	args := make([]interface{}, 0)
 	conditions := make([]string, 0)
 
@@ -55,11 +56,11 @@ func (r *RoleRepository) CheckRoleDuplicate(c context.Context, role *entity.Role
 	}
 
 	// 构建完整查询
-	query.WriteString("SELECT ")
-	query.WriteString(strings.Join(conditions, ","))
+	queryCondition.WriteString("SELECT ")
+	queryCondition.WriteString(strings.Join(conditions, ","))
 
 	// 执行查询
-	if err = r.db.WithContext(c).Raw(query.String(), args...).Scan(&result).Error; err != nil {
+	if err = r.db.WithContext(c).Raw(queryCondition.String(), args...).Scan(&result).Error; err != nil {
 		return err
 	}
 
@@ -74,7 +75,7 @@ func (r *RoleRepository) CheckRoleDuplicate(c context.Context, role *entity.Role
 	return
 }
 func (r *RoleRepository) CreateRole(c context.Context, role *entity.Role) (err error) {
-	if err = r.db.WithContext(c).Create(role).Error; err != nil {
+	if err = DB(c, r.db).Create(role).Error; err != nil {
 		zap.L().Error("创建角色失败", zap.Error(err))
 		return errors.NewDBError("创建角色失败")
 	}
@@ -138,6 +139,50 @@ func (r *RoleRepository) AssignRoleToUser(c context.Context, userID int64, roleI
 			zap.L().Error("创建新的关联失败")
 			err = errors.NewDBError("创建新的关联失败")
 		}
+	}
+	return
+}
+
+func (r *RoleRepository) GetRolePage(c context.Context, role *query.Role) (rolePage []*entity.Role, total int64, err error) {
+	db := DB(c, r.db)
+
+	// 构建通用查询条件
+	queryConditions := db.Table(constant.RoleTableName)
+
+	if role.Name != "" {
+		queryConditions = queryConditions.Where("name LIKE ?", "%"+role.Name+"%")
+	}
+
+	// 查询总数
+	if err = queryConditions.Count(&total).Error; err != nil {
+		zap.L().Error("获取角色分页失败")
+		err = errors.NewDBError("获取角色分页失败")
+		return
+	}
+
+	// 查询分页数据
+	if err = queryConditions.Scopes(role.Paginate()).Find(&rolePage).Error; err != nil {
+		zap.L().Error("获取角色分页数据失败")
+		err = errors.NewDBError("获取角色分页数据失败")
+		return
+	}
+	return
+}
+
+func (r *RoleRepository) UpdateRole(c context.Context, role *entity.Role) (err error) {
+	if err = DB(c, r.db).Updates(role).Error; err != nil {
+		zap.L().Error("更新角色失败")
+		err = errors.NewDBError("更新角色失败")
+		return
+	}
+	return
+}
+
+func (r *RoleRepository) DeleteRoleByID(c context.Context, roleID int64) (err error) {
+	if err = DB(c, r.db).Delete(&entity.Role{}, roleID).Error; err != nil {
+		zap.L().Error("删除角色失败")
+		err = errors.NewDBError("删除角色失败")
+		return
 	}
 	return
 }

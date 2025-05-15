@@ -4,7 +4,7 @@ import (
 	"Art-Design-Backend/pkg/authutils"
 	"Art-Design-Backend/pkg/constant"
 	"Art-Design-Backend/pkg/jwt"
-	"Art-Design-Backend/pkg/response"
+	"Art-Design-Backend/pkg/result"
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -22,7 +22,7 @@ func (m *Middlewares) AuthMiddleware() gin.HandlerFunc {
 			zap.L().Info(fmt.Sprintf("Auth Token: %s", token))
 		} else {
 			zap.L().Error(fmt.Sprintf("Key %s does not exist", token))
-			response.NoAuth("当前未登录", c)
+			result.NoAuth("当前未登录", c)
 			c.Abort()
 			return
 		}
@@ -32,7 +32,7 @@ func (m *Middlewares) AuthMiddleware() gin.HandlerFunc {
 			// 需要刷新token
 			// 登出请求不需要刷新token
 			if jwt.IsWithinRefreshWindow(claims) && c.FullPath() != "/api/auth/logout" {
-				response.ShouldRefresh(c)
+				result.ShouldRefresh(c)
 				c.Abort()
 				return
 			}
@@ -42,7 +42,7 @@ func (m *Middlewares) AuthMiddleware() gin.HandlerFunc {
 		}
 		// token 过期
 		if errors.Is(err, jwt.TokenExpired) {
-			response.NoAuth("授权已过期", c)
+			result.NoAuth("授权已过期", c)
 			c.Abort()
 			return
 		}
@@ -50,7 +50,7 @@ func (m *Middlewares) AuthMiddleware() gin.HandlerFunc {
 		if errors.Is(err, jwt.TokenNotValidYet) ||
 			errors.Is(err, jwt.TokenMalformed) ||
 			errors.Is(err, jwt.TokenInvalid) {
-			response.NoAuth("token无效", c)
+			result.NoAuth("token无效", c)
 			c.Abort()
 			return
 		}

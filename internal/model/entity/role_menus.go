@@ -1,5 +1,7 @@
 package entity
 
+import "Art-Design-Backend/pkg/constant"
+
 // RoleMenus 角色-菜单关联表
 type RoleMenus struct {
 	RoleID int64
@@ -7,5 +9,5 @@ type RoleMenus struct {
 }
 
 func (r *RoleMenus) TableName() string {
-	return "role_menus"
+	return constant.RoleMenusTableName
 }

@@ -3,7 +3,7 @@ package request
 import "Art-Design-Backend/internal/model/base"
 
 type Menu struct {
-	ID        base.LongStringID `json:"ID"`
+	ID        base.LongStringID `json:"id"`
 	Type      int8              `json:"type" binding:"required"`
 	Name      string            `json:"name"`
 	Path      string            `json:"path"`

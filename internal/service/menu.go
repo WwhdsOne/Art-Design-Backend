@@ -3,7 +3,7 @@ package service
 import (
 	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/internal/model/request"
-	"Art-Design-Backend/internal/model/resp"
+	"Art-Design-Backend/internal/model/response"
 	"Art-Design-Backend/internal/repository"
 	"Art-Design-Backend/pkg/authutils"
 	"Art-Design-Backend/pkg/redisx"
@@ -35,18 +35,18 @@ func (m *MenuService) CreateMenu(c context.Context, menu *request.Menu) (err err
 	return
 }
 
-func (m *MenuService) GetMenuList(c context.Context) (res []*resp.Menu, err error) {
+func (m *MenuService) GetMenuList(c context.Context) (res []*response.Menu, err error) {
 	roleIds := authutils.GetUserRoleIDs(c)
 	menuList, err := m.MenuRepo.GetMenuListByRoleIDList(c, roleIds)
 	// 先用 map 存储所有菜单，方便查找
-	menuMap := make(map[int64]*resp.Menu)
+	menuMap := make(map[int64]*response.Menu)
 	for _, menuDo := range menuList {
-		var menuResp resp.Menu
+		var menuResp response.Menu
 		err = copier.Copy(&menuResp, &menuDo)
 		// 如果是不是按钮类型，则初始化 AuthList 和 Children
 		if menuDo.Type != 3 {
-			menuResp.Meta.AuthList = make([]string, 0)
-			menuResp.Children = make([]resp.Menu, 0)
+			menuResp.Meta.AuthList = make([]response.AuthMark, 0)
+			menuResp.Children = make([]response.Menu, 0)
 		}
 		if err != nil {
 			return
@@ -61,7 +61,11 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*resp.Menu, err erro
 		if dbMenu.Type == 3 { // 按钮类型
 			if parent, exists := menuMap[dbMenu.ParentID]; exists {
 				// 将按钮的 AuthCode 添加到父菜单的 AuthList
-				parent.Meta.AuthList = append(parent.Meta.AuthList, dbMenu.Meta.AuthCode)
+				parent.Meta.AuthList = append(parent.Meta.AuthList, response.AuthMark{
+					ID:   dbMenu.ID,
+					Name: dbMenu.Title,
+					Code: dbMenu.AuthCode,
+				})
 			}
 			continue
 		}

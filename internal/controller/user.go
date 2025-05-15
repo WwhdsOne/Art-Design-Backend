@@ -5,28 +5,10 @@ import (
 	"Art-Design-Backend/internal/model/request"
 	"Art-Design-Backend/internal/service"
 	"Art-Design-Backend/pkg/middleware"
-	"Art-Design-Backend/pkg/response"
+	"Art-Design-Backend/pkg/result"
 	"fmt"
 	"github.com/gin-gonic/gin"
 )
-
-//
-//import (
-//	"Art-Design-Backend/model/request"
-//	"Art-Design-Backend/pkg/auth"
-//	"Art-Design-Backend/pkg/response"
-//	"Art-Design-Backend/pkg/utils"
-//	"Art-Design-Backend/service"
-//	"github.com/gin-gonic/gin"
-//)
-//
-//func InitUserRouter(r *gin.RouterGroup) {
-//	userRouter := r.Group("/user")
-//	//userRouter.DELETE("/delete/:ids", deleteUser)
-//	//userRouter.PUT("/update/:id", updateUser)
-//	//userRouter.POST("/page", userPage)
-//	userRouter.GET("/info", getUserInfo)
-//}
 
 type UserController struct {
 	userService *service.UserService // 创建一个AuthService实例
@@ -36,7 +18,8 @@ func NewUserController(engine *gin.Engine, middleware *middleware.Middlewares, s
 	userCtrl := &UserController{
 		userService: service,
 	}
-	r := engine.Group("/api").Group("/user").Use(middleware.AuthMiddleware())
+	r := engine.Group("/api").Group("/user")
+	r.Use(middleware.AuthMiddleware())
 	{
 		// 私有路由组（需要 JWT 认证）
 		r.GET("/info", userCtrl.getUserInfo)
@@ -54,7 +37,7 @@ func (u *UserController) getUserInfo(c *gin.Context) {
 		c.Error(err)
 		return
 	}
-	response.OkWithData(user, c)
+	result.OkWithData(user, c)
 }
 
 func (u *UserController) getUserPage(c *gin.Context) {
@@ -63,12 +46,12 @@ func (u *UserController) getUserPage(c *gin.Context) {
 		c.Error(err)
 		return
 	}
-	user, err := u.userService.GetUserPage(c, &userQuery)
+	userPageData, err := u.userService.GetUserPage(c, &userQuery)
 	if err != nil {
 		c.Error(err)
 		return
 	}
-	response.OkWithData(user, c)
+	result.OkWithData(userPageData, c)
 }
 
 //	func deleteUser(c *gin.Context) {
@@ -97,7 +80,7 @@ func (u *UserController) updateUserBaseInfo(c *gin.Context) {
 		c.Error(err)
 		return
 	}
-	response.OkWithMessage("更新用户成功", c)
+	result.OkWithMessage("更新用户成功", c)
 }
 
 func (u *UserController) updateUserPassword(c *gin.Context) {
@@ -113,7 +96,7 @@ func (u *UserController) updateUserPassword(c *gin.Context) {
 		c.Error(err)
 		return
 	}
-	response.OkWithMessage("更新密码成功", c)
+	result.OkWithMessage("更新密码成功", c)
 }
 
 func (u *UserController) uploadAvatar(c *gin.Context) {
@@ -121,32 +104,32 @@ func (u *UserController) uploadAvatar(c *gin.Context) {
 	file, err := c.FormFile("file")
 	if err != nil {
 		fmt.Println(err)
-		response.FailWithMessage("请选择要上传的文件", c)
+		result.FailWithMessage("请选择要上传的文件", c)
 		return
 	}
 
 	// 打开上传的文件流
 	src, err := file.Open()
 	if err != nil {
-		response.FailWithMessage("无法打开上传的文件", c)
+		result.FailWithMessage("无法打开上传的文件", c)
 		return
 	}
 	defer src.Close()
 
 	// 检查文件大小是否超过 2MB
 	if file.Size > 2<<20 { // 2 MB
-		response.FailWithMessage("文件大小不能超过 2MB", c)
+		result.FailWithMessage("文件大小不能超过 2MB", c)
 		return
 	}
 
 	// 调用 service 层处理上传逻辑
 	avatarURL, err := u.userService.UploadAvatar(c, file.Filename, src)
 	if err != nil {
-		response.FailWithMessage("头像上传失败: "+err.Error(), c)
+		result.FailWithMessage("头像上传失败: "+err.Error(), c)
 		return
 	}
 
-	response.OkWithData(avatarURL, c)
+	result.OkWithData(avatarURL, c)
 }
 
 //

@@ -3,7 +3,7 @@ package middleware
 import (
 	"Art-Design-Backend/internal/model/entity"
 	myerrors "Art-Design-Backend/pkg/errors"
-	"Art-Design-Backend/pkg/response"
+	"Art-Design-Backend/pkg/result"
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -88,7 +88,7 @@ func handleValidationErrors(c *gin.Context, ginErr *gin.Error) bool {
 		default:
 			message = fmt.Sprintf("不符合校验规则(%s)", e.Tag())
 		}
-		response.FailWithMessage(fmt.Sprintf("%s%s", fieldName, message), c)
+		result.FailWithMessage(fmt.Sprintf("%s%s", fieldName, message), c)
 		return true
 	}
 	return false
@@ -98,7 +98,7 @@ func handleValidationErrors(c *gin.Context, ginErr *gin.Error) bool {
 func handleDBErrors(c *gin.Context, ginErr *gin.Error) bool {
 	var gormErr *myerrors.DBError
 	if errors.As(ginErr.Err, &gormErr) {
-		response.FailWithMessage(gormErr.Message, c)
+		result.FailWithMessage(gormErr.Message, c)
 		return true
 	}
 	return false
@@ -107,7 +107,7 @@ func handleDBErrors(c *gin.Context, ginErr *gin.Error) bool {
 // handleGenericErrors 处理除验证错误和Gorm错误之外的所有其他错误
 func handleGenericErrors(c *gin.Context, ginErr *gin.Error) bool {
 	// 返回通用错误消息
-	response.FailWithMessage(ginErr.Err.Error(), c)
+	result.FailWithMessage(ginErr.Err.Error(), c)
 	return true
 }
 

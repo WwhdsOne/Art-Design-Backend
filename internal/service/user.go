@@ -5,7 +5,7 @@ import (
 	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/internal/model/query"
 	"Art-Design-Backend/internal/model/request"
-	"Art-Design-Backend/internal/model/resp"
+	"Art-Design-Backend/internal/model/response"
 	"Art-Design-Backend/internal/repository"
 	"Art-Design-Backend/pkg/aliyun"
 	"Art-Design-Backend/pkg/authutils"
@@ -26,7 +26,7 @@ type UserService struct {
 	Redis     *redisx.RedisWrapper               // redis
 }
 
-func (u *UserService) GetUserById(c *gin.Context) (res resp.User, err error) {
+func (u *UserService) GetUserById(c *gin.Context) (res response.User, err error) {
 	var user *entity.User
 	id := authutils.GetUserID(c)
 	if id == -1 {
@@ -53,12 +53,12 @@ func (u *UserService) GetUserById(c *gin.Context) (res resp.User, err error) {
 	return
 }
 
-func (u *UserService) GetUserPage(c *gin.Context, userQuery *query.User) (userPageRes *base.PaginationResp[resp.User], err error) {
+func (u *UserService) GetUserPage(c *gin.Context, userQuery *query.User) (userPageRes *base.PaginationResp[response.User], err error) {
 	userPage, total, err := u.UserRepo.GetUserPage(c, userQuery)
 	if err != nil {
 		return
 	}
-	var pageData []resp.User
+	var pageData []response.User
 	roleCache := make(map[int64][]entity.Role) // 使用用户ID作为key，角色列表作为value
 
 	for _, user := range userPage {
@@ -78,7 +78,7 @@ func (u *UserService) GetUserPage(c *gin.Context, userQuery *query.User) (userPa
 
 		user.Roles = roleList
 
-		var pageDataResp resp.User
+		var pageDataResp response.User
 		if err = copier.Copy(&pageDataResp, &user); err != nil {
 			zap.L().Error("复制属性失败")
 			return
@@ -87,7 +87,7 @@ func (u *UserService) GetUserPage(c *gin.Context, userQuery *query.User) (userPa
 		pageData = append(pageData, pageDataResp)
 	}
 
-	userPageRes = base.BuildPageResp[resp.User](pageData, total, userQuery.PaginationReq)
+	userPageRes = base.BuildPageResp[response.User](pageData, total, userQuery.PaginationReq)
 
 	return
 }

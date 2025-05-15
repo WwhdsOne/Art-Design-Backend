@@ -83,7 +83,7 @@ func (u *UserRepository) CheckUserDuplicate(user *entity.User) (err error) {
 
 func (u *UserRepository) GetLoginUserByUsername(c context.Context, username string) (user *entity.User, err error) {
 	if err = u.db.WithContext(c).
-		Select("id", "password").
+		Select("id", "password", "status").
 		Where("username = ?", username).
 		First(&user).Error; err != nil {
 		zap.L().Error("根据用户名查询用户失败")
@@ -106,8 +106,7 @@ func (u *UserRepository) GetUserById(c context.Context, id int64) (user *entity.
 }
 
 func (u *UserRepository) CreateUser(c context.Context, user *entity.User) (err error) {
-	if err = DB(c, u.db).
-		Create(user).Error; err != nil {
+	if err = DB(c, u.db).Create(user).Error; err != nil {
 		zap.L().Error("新增用户失败")
 		return errors.NewDBError("新增用户失败")
 	}
