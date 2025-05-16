@@ -3,6 +3,7 @@ package redisx
 import (
 	"context"
 	"go.uber.org/zap"
+	"sync/atomic"
 	"time"
 )
 
@@ -19,11 +20,13 @@ func (r *RedisWrapper) Set(id, value string, duration time.Duration) (err error)
 
 // Get 方法用于获取 Redis 键对应的值
 func (r *RedisWrapper) Get(key string) (val string) {
+	atomic.AddUint64(&r.totalCount, 1)
 	timeout, cancelFunc := context.WithTimeout(context.Background(), r.OperationTimeout)
 	defer cancelFunc()
 	val, err := r.Client.Get(timeout, key).Result()
 	if err != nil {
 		if err.Error() == "redis: nil" {
+			atomic.AddUint64(&r.hitCount, 1)
 			// 这里省略 return，默认返回 val 的零值 ""
 		} else {
 			zap.L().Error(err.Error())

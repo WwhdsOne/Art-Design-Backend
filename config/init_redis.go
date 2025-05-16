@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
+	"time"
 )
 
 type Redis struct {
@@ -29,8 +30,10 @@ func NewRedis(cfg *Config) *redisx.RedisWrapper {
 	if err != nil {
 		zap.L().Fatal("Redis 连接失败")
 	}
-	return &redisx.RedisWrapper{
+	redisWrapper := &redisx.RedisWrapper{
 		Client:           client,
 		OperationTimeout: utils.ParseDuration(r.OperationTimeout),
 	}
+	redisWrapper.StartHitRateLogger(30 * time.Second)
+	return redisWrapper
 }

@@ -44,7 +44,7 @@ func (r *RoleMenusRepository) invalidateMenuCacheByRoleID(roleID int64) (err err
 	cacheKeys := r.redis.SMembers(depKey)
 
 	// 构造删除列表：包括依赖集合本身 和 依赖集合中记录的所有菜单缓存 key
-	delKeys := make([]string, 0)
+	delKeys := make([]string, 0, len(cacheKeys)+1)
 	delKeys = append(delKeys, depKey)       // 删除依赖表（防止过期错误等影响新依赖写入）
 	delKeys = append(delKeys, cacheKeys...) // 删除所有受影响的用户菜单缓存
 

@@ -9,4 +9,7 @@ import (
 type RedisWrapper struct {
 	Client           *redis.Client
 	OperationTimeout time.Duration // 默认操作超时时间
+
+	hitCount   uint64 // 命中次数
+	totalCount uint64 // 总次数
 }

@@ -8,6 +8,7 @@ import (
 func (r *RedisWrapper) SMembers(key string) (val []string) {
 	timeout, cancelFunc := context.WithTimeout(context.Background(), r.OperationTimeout)
 	defer cancelFunc()
+	// 映射表默认永久存在
 	val, err := r.Client.SMembers(timeout, key).Result()
 	if err != nil {
 		if err.Error() == "redis: nil" {
