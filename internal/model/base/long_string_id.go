@@ -1,9 +1,8 @@
 package base
 
 import (
-	"encoding/json"
 	"fmt"
-	"github.com/bytedance/sonic"
+	jsoniter "github.com/json-iterator/go"
 	"strconv"
 )
 
@@ -14,7 +13,7 @@ type LongStringID int64
 func (id *LongStringID) UnmarshalJSON(data []byte) error {
 	// 尝试将 JSON 数据解析为字符串
 	var strValue string
-	if err := json.Unmarshal(data, &strValue); err != nil {
+	if err := jsoniter.Unmarshal(data, &strValue); err != nil {
 		return err
 	}
 
@@ -36,7 +35,7 @@ type LongStringIDs []int64
 func (c *LongStringIDs) UnmarshalJSON(data []byte) error {
 	// 定义一个临时变量，用于解析 JSON 中的字符串数组
 	var temp []string
-	if err := sonic.Unmarshal(data, &temp); err != nil {
+	if err := jsoniter.Unmarshal(data, &temp); err != nil {
 		return err
 	}
 
