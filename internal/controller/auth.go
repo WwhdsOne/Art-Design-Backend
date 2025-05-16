@@ -36,14 +36,14 @@ func (a *AuthController) login(c *gin.Context) {
 	err := c.ShouldBindJSON(&loginReq)
 	// 如果绑定过程中出现错误，返回错误响应并结束函数执行
 	if err != nil {
-		c.Error(err)
+		_ = c.Error(err)
 		c.Set(gin.BindKey, loginReq)
 		return
 	}
 	// 调用service.Login函数尝试验证用户登录信息
 	token, err := a.authService.Login(c, &loginReq)
 	if err != nil {
-		c.Error(err)
+		_ = c.Error(err)
 		return
 	}
 	// 返回生成的token
@@ -65,7 +65,7 @@ func (a *AuthController) logout(c *gin.Context) {
 func (a *AuthController) refreshToken(c *gin.Context) {
 	token, err := a.authService.RefreshToken(c)
 	if err != nil {
-		c.Error(err)
+		_ = c.Error(err)
 		return
 	}
 	result.OkWithData(token, c)
@@ -76,13 +76,13 @@ func (a *AuthController) register(c *gin.Context) {
 	var userReq request.RegisterUser
 	err := c.ShouldBindJSON(&userReq)
 	if err != nil {
-		c.Error(err)
+		_ = c.Error(err)
 		c.Set(gin.BindKey, userReq)
 		return
 	}
 	err = a.authService.Register(c, &userReq)
 	if err != nil {
-		c.Error(err)
+		_ = c.Error(err)
 		return
 	}
 	result.OkWithMessage("注册成功", c)

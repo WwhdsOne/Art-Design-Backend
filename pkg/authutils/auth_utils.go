@@ -20,7 +20,6 @@ func GetUserRoleIDs(c context.Context) (roleIds []int64) {
 	if value != nil {
 		return value.(*jwt.CustomClaims).BaseClaims.RoleIDs
 	}
-	// 不存在操作用户则返回id为-1
 	return
 }
 

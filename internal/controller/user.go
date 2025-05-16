@@ -34,7 +34,7 @@ func NewUserController(engine *gin.Engine, middleware *middleware.Middlewares, s
 func (u *UserController) getUserInfo(c *gin.Context) {
 	user, err := u.userService.GetUserById(c)
 	if err != nil {
-		c.Error(err)
+		_ = c.Error(err)
 		return
 	}
 	result.OkWithData(user, c)
@@ -43,41 +43,28 @@ func (u *UserController) getUserInfo(c *gin.Context) {
 func (u *UserController) getUserPage(c *gin.Context) {
 	var userQuery query.User
 	if err := c.ShouldBindJSON(&userQuery); err != nil {
-		c.Error(err)
+		_ = c.Error(err)
 		return
 	}
 	userPageData, err := u.userService.GetUserPage(c, &userQuery)
 	if err != nil {
-		c.Error(err)
+		_ = c.Error(err)
 		return
 	}
 	result.OkWithData(userPageData, c)
 }
 
-//	func deleteUser(c *gin.Context) {
-//		ids, err := utils.ParseIDs(c)
-//		if err != nil {
-//			response.FailWithMessage("参数错误", c)
-//			return
-//		}
-//		err = service.DeleteUser(ids, auth.GetUserID(c))
-//		if err != nil {
-//			response.FailWithMessage("用户删除失败", c)
-//			return
-//		}
-//		response.OkWithMessage("删除用户成功", c)
-//	}
 func (u *UserController) updateUserBaseInfo(c *gin.Context) {
 	var userReq request.User
 	err := c.ShouldBindJSON(&userReq)
 	if err != nil {
-		c.Error(err)
+		_ = c.Error(err)
 		c.Set(gin.BindKey, userReq)
 		return
 	}
 	err = u.userService.UpdateUserBaseInfo(c, &userReq)
 	if err != nil {
-		c.Error(err)
+		_ = c.Error(err)
 		return
 	}
 	result.OkWithMessage("更新用户成功", c)
@@ -87,13 +74,13 @@ func (u *UserController) updateUserPassword(c *gin.Context) {
 	var changePwd request.ChangePassword
 	err := c.ShouldBindJSON(&changePwd)
 	if err != nil {
-		c.Error(err)
+		_ = c.Error(err)
 		c.Set(gin.BindKey, changePwd)
 		return
 	}
 	err = u.userService.UpdateUserPassword(c, &changePwd)
 	if err != nil {
-		c.Error(err)
+		_ = c.Error(err)
 		return
 	}
 	result.OkWithMessage("更新密码成功", c)
@@ -131,20 +118,3 @@ func (u *UserController) uploadAvatar(c *gin.Context) {
 
 	result.OkWithData(avatarURL, c)
 }
-
-//
-////	func userPage(c *gin.Context) {
-////		var user query.User
-////		err := c.ShouldBindJSON(&user)
-////		if err != nil {
-////			response.FailWithMessage("分页参数填写错误", c)
-////			return
-////		}
-////		users, total, err := service.UserPage(&user)
-////		if err != nil {
-////			response.FailWithMessage("分页查询失败", c)
-////			return
-////		}
-////		pageResp := base.BuildPageResp[resp.User](users, total, user.PaginationReq)
-////		response.OkWithData(pageResp, c)
-////	}

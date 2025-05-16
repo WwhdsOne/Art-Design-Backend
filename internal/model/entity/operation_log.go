@@ -1,7 +1,7 @@
 package entity
 
 import (
-	"Art-Design-Backend/pkg/constant"
+	"Art-Design-Backend/pkg/constant/tablename"
 	"time"
 )
 
@@ -17,5 +17,5 @@ type OperationLog struct {
 }
 
 func (o *OperationLog) TableName() string {
-	return constant.OperationTableName
+	return tablename.OperationTableName
 }

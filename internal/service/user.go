@@ -9,21 +9,26 @@ import (
 	"Art-Design-Backend/internal/repository"
 	"Art-Design-Backend/pkg/aliyun"
 	"Art-Design-Backend/pkg/authutils"
+	"Art-Design-Backend/pkg/constant/rediskey"
 	"Art-Design-Backend/pkg/redisx"
+	"context"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
+	jsoniter "github.com/json-iterator/go"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 	"mime/multipart"
+	"time"
 )
 
 type UserService struct {
-	UserRepo  *repository.UserRepository         // 用户Repo
-	RoleRepo  *repository.RoleRepository         // 角色Repo
-	GormTX    *repository.GormTransactionManager // gorm事务管理
-	OssClient *aliyun.OssClient                  // 阿里云OSS
-	Redis     *redisx.RedisWrapper               // redis
+	UserRepo      *repository.UserRepository         // 用户Repo
+	RoleRepo      *repository.RoleRepository         // 角色Repo
+	UserRolesRepo *repository.UserRolesRepository    // 用户角色Repo
+	GormTX        *repository.GormTransactionManager // gorm事务管理
+	OssClient     *aliyun.OssClient                  // 阿里云OSS
+	Redis         *redisx.RedisWrapper               // redis
 }
 
 func (u *UserService) GetUserById(c *gin.Context) (res response.User, err error) {
@@ -33,13 +38,12 @@ func (u *UserService) GetUserById(c *gin.Context) (res response.User, err error)
 		err = fmt.Errorf("当前用户未登录")
 		return
 	}
+	// 获取用户信息
 	if user, err = u.UserRepo.GetUserById(c, id); err != nil {
 		return
 	}
-	roleList, err := u.RoleRepo.GetRoleListByUserID(c, user.ID)
-	if err != nil {
-		return
-	}
+	// 获取用户角色列表
+	roleList, err := u.getUserRoleListFromCache(c, user.ID)
 	if len(roleList) == 0 {
 		err = fmt.Errorf("当前用户未分配角色")
 		return
@@ -47,48 +51,69 @@ func (u *UserService) GetUserById(c *gin.Context) (res response.User, err error)
 	user.Roles = roleList
 	err = copier.Copy(&res, &user)
 	if err != nil {
-		zap.L().Error("复制属性失败")
+		zap.L().Error("复制属性失败", zap.Error(err))
 		return
 	}
 	return
 }
 
-func (u *UserService) GetUserPage(c *gin.Context, userQuery *query.User) (userPageRes *base.PaginationResp[response.User], err error) {
-	userPage, total, err := u.UserRepo.GetUserPage(c, userQuery)
+// getUserRoleListFromCache 尝试从 Redis 获取用户角色列表，获取不到就查数据库并写入缓存
+func (u *UserService) getUserRoleListFromCache(c context.Context, userID int64) (roleList []entity.Role, error error) {
+	key := fmt.Sprintf(rediskey.UserRoleList+"%d", userID)
+	// 先查 Redis
+	cacheStr := u.Redis.Get(key)
+	if cacheStr != "" {
+		if err := jsoniter.Unmarshal([]byte(cacheStr), &roleList); err == nil {
+			return
+		}
+		// 解析失败也继续走数据库，避免缓存污染
+	}
+	// 缓存没有命中，从数据库查
+	// 获取用户角色ID列表
+	roleIDList, err := u.UserRolesRepo.GetRoleIDListByUserID(c, userID)
 	if err != nil {
 		return
 	}
-	var pageData []response.User
-	roleCache := make(map[int64][]entity.Role) // 使用用户ID作为key，角色列表作为value
+	// 根据上一步获取的用户角色ID获取角色列表
+	roleList, err = u.RoleRepo.GetRoleListByRoleIDList(c, roleIDList)
+	if err != nil {
+		return
+	}
+	// 存入 Redis（最长缓存 5 分钟）
+	cacheBytes, _ := jsoniter.Marshal(roleList)
+	err = u.Redis.Set(key, string(cacheBytes), 5*time.Minute)
+	if err != nil {
+		zap.L().Error("用户角色对应关系写入缓存失败", zap.Int64("userID", userID))
+		return
+	}
+	return
+}
 
-	for _, user := range userPage {
-		var roleList []entity.Role
+func (u *UserService) GetUserPage(c *gin.Context, query *query.User) (resp *base.PaginationResp[response.User], err error) {
+	users, total, err := u.UserRepo.GetUserPage(c, query)
+	if err != nil {
+		return
+	}
 
-		// 先从缓存中查找是否已经查询过该用户的角色
-		if cachedRoles, exist := roleCache[user.ID]; exist {
-			roleList = cachedRoles
-		} else {
-			// 如果缓存中没有，则从数据库中查询
-			if roleList, err = u.RoleRepo.GetRoleListByUserID(c, user.ID); err != nil {
-				return
-			}
-			// 将查询结果存入缓存
-			roleCache[user.ID] = roleList
+	userResponses := make([]response.User, 0, len(users))
+	for _, user := range users {
+		var roles []entity.Role
+
+		// 从 Redis 缓存中获取用户角色
+		if roles, err = u.getUserRoleListFromCache(c, user.ID); err != nil {
+			return
 		}
+		user.Roles = roles
 
-		user.Roles = roleList
-
-		var pageDataResp response.User
-		if err = copier.Copy(&pageDataResp, &user); err != nil {
+		var userResp response.User
+		if err = copier.Copy(&userResp, &user); err != nil {
 			zap.L().Error("复制属性失败")
 			return
 		}
-
-		pageData = append(pageData, pageDataResp)
+		userResponses = append(userResponses, userResp)
 	}
 
-	userPageRes = base.BuildPageResp[response.User](pageData, total, userQuery.PaginationReq)
-
+	resp = base.BuildPageResp[response.User](userResponses, total, query.PaginationReq)
 	return
 }
 
@@ -156,7 +181,6 @@ func (u *UserService) UploadAvatar(c *gin.Context, filename string, src multipar
 	return
 }
 
-//
 //func DeleteUser(ids []int64, deleteBy int64) error {
 //	// 开启事务
 //	tx := global.DB.Begin()
@@ -188,88 +212,4 @@ func (u *UserService) UploadAvatar(c *gin.Context, filename string, src multipar
 //
 //	return nil
 //}
-//
-//func UpdateUser(c *gin.Context, userReq *request.User, id int64) error {
-//	//赋值给user
-//	user := entity.User{
-//		Username: userReq.Username,
-//		Nickname: userReq.Nickname,
-//	}
-//	//判断密码是否为空
-//	if user.Password != "" {
-//		password, _ := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
-//		user.Password = string(password)
-//	}
-//	var count int64
-//	//判断重复
-//	if err := global.DB.
-//		WithContext(c).
-//		Model(&entity.User{}).
-//		Where("username = ? AND id != ?", user.Username, id).
-//		Count(&count).Error; err != nil {
-//		zap.L().Error("查询用户名失败", zap.Error(err))
-//		return err
-//	}
-//	if count > 0 {
-//		zap.L().Error("用户名已存在")
-//		return errors.New("用户名已存在")
-//	}
-//	if err := global.DB.WithContext(c).Where("id = ?", id).Updates(user).Error; err != nil {
-//		// 处理错误
-//		zap.L().Error("更新用户失败")
-//		return err
-//	}
-//	return nil
-//}
-//
-////func GetUserById(id int64) (userResp resp.User, err error) {
-////	var user entity.User
-////	err = global.DB.Where("id = ?", id).First(&user).Error
-////	if err != nil {
-////		// 处理错误，例如可以返回 nil 或者记录错误日志
-////		zap.L().Info("获取用户失败")
-////		return
-////	}
-////	//组装数据
-////	userResp = doToResp(user)
-////	return
-////}
-////
-////func UserPage(u *query.User) ([]resp.User, int64, error) {
-////	var users []entity.User
-////	// 获取总记录数
-////	var total int64
-////	q := global.DB.Model(&entity.User{})
-////	// 获取符合条件的总记录数
-////	err := q.Count(&total).Error
-////	if err != nil {
-////		// 处理错误，例如可以返回 nil 或者记录错误日志
-////		zap.L().Error("获取用户列表失败")
-////		return nil, 0, err
-////	}
-////	// 执行分页查询
-////	global.DB.
-////		Scopes(u.PaginationReq.Paginate()). // 组装分页条件
-////		Find(&users)
-////	//组装数据
-////	var userResponses []resp.User
-////	for _, user := range users {
-////		//组装数据
-////		userResponse := doToResp(user)
-////		// 查询用户的创建人创建时间
-////		var nickName string
-////		// 查询用户的昵称
-////		err = global.DB.Model(&entity.User{}).
-////			Select("nickname").
-////			Where("id = ?", userResponse.CreateBy).
-////			Scan(&nickName).Error
-////		if err != nil {
-////			return nil, 0, err
-////		}
-////		userResponse.CreateUserName = nickName
-////		userResponses = append(userResponses, userResponse)
-////	}
-////
-////	return userResponses, total, nil
-////}
 //

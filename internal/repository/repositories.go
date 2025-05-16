@@ -7,4 +7,6 @@ var RepositoriesProvider = wire.NewSet(
 	NewMenuRepository,
 	NewRoleRepository,
 	NewGormTransactionManager,
+	NewRoleMenusRepository,
+	NewUserRolesRepository,
 )

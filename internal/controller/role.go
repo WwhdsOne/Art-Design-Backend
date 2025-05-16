@@ -32,12 +32,13 @@ func NewRoleController(engine *gin.Engine, middleware *middleware.Middlewares, s
 func (r *RoleController) createRole(c *gin.Context) {
 	var role request.Role
 	if err := c.ShouldBindJSON(&role); err != nil {
-		c.Error(err)
+		_ = c.Error(err)
+		c.Set(gin.BindKey, role)
 		return
 	}
 	err := r.roleService.CreateRole(c, &role)
 	if err != nil {
-		c.Error(err)
+		_ = c.Error(err)
 		return
 	}
 	result.OkWithMessage("添加成功", c)
@@ -46,12 +47,12 @@ func (r *RoleController) createRole(c *gin.Context) {
 func (r *RoleController) gerRolePage(c *gin.Context) {
 	var roleQuery query.Role
 	if err := c.ShouldBindJSON(&roleQuery); err != nil {
-		c.Error(err)
+		_ = c.Error(err)
 		return
 	}
 	rolePageData, err := r.roleService.GetRolePage(c, &roleQuery)
 	if err != nil {
-		c.Error(err)
+		_ = c.Error(err)
 		return
 	}
 	result.OkWithData(rolePageData, c)
@@ -60,12 +61,13 @@ func (r *RoleController) gerRolePage(c *gin.Context) {
 func (r *RoleController) updateRole(c *gin.Context) {
 	var role request.Role
 	if err := c.ShouldBindJSON(&role); err != nil {
-		c.Error(err)
+		_ = c.Error(err)
+		c.Set(gin.BindKey, role)
 		return
 	}
 	err := r.roleService.UpdateRole(c, &role)
 	if err != nil {
-		c.Error(err)
+		_ = c.Error(err)
 		return
 	}
 	result.OkWithMessage("修改成功", c)
@@ -74,12 +76,12 @@ func (r *RoleController) updateRole(c *gin.Context) {
 func (r *RoleController) deleteRole(c *gin.Context) {
 	roleID, err := utils.ParseID(c)
 	if err != nil {
-		c.Error(err)
+		_ = c.Error(err)
 		return
 	}
 	err = r.roleService.DeleteRoleByID(c, roleID)
 	if err != nil {
-		c.Error(err)
+		_ = c.Error(err)
 		return
 	}
 	result.OkWithMessage("删除成功", c)

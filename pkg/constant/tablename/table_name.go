@@ -1,4 +1,4 @@
-package constant
+package tablename
 
 var (
 	UserTableName      = "user"
@@ -6,4 +6,5 @@ var (
 	MenuTableName      = "menu"
 	RoleTableName      = "role"
 	RoleMenusTableName = "role_menus"
+	UserRolesTableName = "user_roles"
 )

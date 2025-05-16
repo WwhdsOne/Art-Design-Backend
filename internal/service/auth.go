@@ -6,6 +6,7 @@ import (
 	"Art-Design-Backend/internal/repository"
 	"Art-Design-Backend/pkg/authutils"
 	"Art-Design-Backend/pkg/constant"
+	"Art-Design-Backend/pkg/constant/rediskey"
 	"Art-Design-Backend/pkg/jwt"
 	"Art-Design-Backend/pkg/redisx"
 	"Art-Design-Backend/pkg/utils"
@@ -18,11 +19,12 @@ import (
 )
 
 type AuthService struct {
-	UserRepo *repository.UserRepository         // 用户Repo
-	RoleRepo *repository.RoleRepository         // 角色Repo
-	GormTX   *repository.GormTransactionManager // gorm事务管理
-	Redis    *redisx.RedisWrapper               // redis
-	Jwt      *jwt.JWT                           // jwt相关
+	UserRepo      *repository.UserRepository         // 用户Repo
+	RoleRepo      *repository.RoleRepository         // 角色Repo
+	UserRolesRepo *repository.UserRolesRepository    // 用户角色关联Repo
+	GormTX        *repository.GormTransactionManager // gorm事务管理
+	Redis         *redisx.RedisWrapper               // redis
+	Jwt           *jwt.JWT                           // jwt相关
 }
 
 // Login 登录
@@ -42,7 +44,11 @@ func (s *AuthService) Login(c *gin.Context, u *request.Login) (tokenStr string, 
 		err = fmt.Errorf("用户名或密码错误")
 		return
 	}
-	roleIdList, err := s.RoleRepo.GetRoleIDListByUserID(c, user.ID)
+	roleIdList, err := s.UserRolesRepo.GetRoleIDListByUserID(c, user.ID)
+	if err != nil {
+		return
+	}
+	roleIdList, err = s.RoleRepo.FilterValidRoleIDs(c, roleIdList)
 	if err != nil {
 		return
 	}
@@ -58,7 +64,7 @@ func (s *AuthService) RefreshToken(c *gin.Context) (tokenStr string, err error) 
 	// 路径参数中获取用户 id
 	idStr := c.Param("id")
 	// 确保该用户在登录状态
-	val := s.Redis.Get(constant.SESSION + idStr)
+	val := s.Redis.Get(rediskey.SESSION + idStr)
 	if val == "" {
 		// 如果不存在，则返回错误
 		// todo后续改为auth专用错误
@@ -82,11 +88,11 @@ func (s *AuthService) createToken(baseClaims jwt.BaseClaims) (tokenStr string, e
 	id := strconv.FormatInt(baseClaims.UserID, 10)
 
 	// 检查 Redis 中是否已存在该用户的会话
-	existToken := s.Redis.Get(constant.SESSION + id)
+	existToken := s.Redis.Get(rediskey.SESSION + id)
 	if existToken != "" {
 		// 如果存在，则删除现有的会话相关键
-		delKeys := []string{constant.LOGIN + existToken, constant.SESSION + id}
-		err = s.Redis.PipelineDelete(delKeys)
+		delKeys := []string{rediskey.LOGIN + existToken, rediskey.SESSION + id}
+		err = s.Redis.PipelineDel(delKeys)
 		if err != nil {
 			return
 		}
@@ -94,8 +100,8 @@ func (s *AuthService) createToken(baseClaims jwt.BaseClaims) (tokenStr string, e
 
 	// 准备新会话和登录状态键值对
 	keyVal := [][2]string{
-		{constant.LOGIN + tokenStr, id},
-		{constant.SESSION + id, tokenStr},
+		{rediskey.LOGIN + tokenStr, id},
+		{rediskey.SESSION + id, tokenStr},
 	}
 
 	// 使用管道设置新的键值对到 Redis，并设置过期时间
@@ -117,10 +123,10 @@ func (s *AuthService) LogoutToken(c *gin.Context) (err error) {
 	id := strconv.FormatInt(claims.BaseClaims.UserID, 10)
 
 	// 准备需要删除的 Redis 键
-	delKeys := []string{constant.SESSION + id, constant.LOGIN + tokenStr}
+	delKeys := []string{rediskey.SESSION + id, rediskey.LOGIN + tokenStr}
 
 	// 使用管道删除 Redis 中的会话和登录状态键
-	err = s.Redis.PipelineDelete(delKeys)
+	err = s.Redis.PipelineDel(delKeys)
 	return
 }
 
@@ -144,7 +150,7 @@ func (s *AuthService) Register(c *gin.Context, userReq *request.RegisterUser) (e
 		}
 		// id是新用户的主键ID
 		// todo后续可能会换成动态获取
-		if err = s.RoleRepo.AssignRoleToUser(ctx, user.ID, []int64{42838646763553030}); err != nil {
+		if err = s.UserRolesRepo.AssignRoleToUser(ctx, user.ID, []int64{42838646763553030}); err != nil {
 			return
 		}
 		return

@@ -2,7 +2,7 @@ package middleware
 
 import (
 	"Art-Design-Backend/pkg/authutils"
-	"Art-Design-Backend/pkg/constant"
+	"Art-Design-Backend/pkg/constant/rediskey"
 	"Art-Design-Backend/pkg/jwt"
 	"Art-Design-Backend/pkg/result"
 	"errors"
@@ -17,7 +17,7 @@ func (m *Middlewares) AuthMiddleware() gin.HandlerFunc {
 		// 这里前端需要把token存储到cookie或者本地localStorage中
 		// 不过需要跟后端协商过期时间 可以约定刷新令牌或者重新登录
 		token := authutils.GetToken(c)
-		id := m.Redis.Get(constant.LOGIN + token)
+		id := m.Redis.Get(rediskey.LOGIN + token)
 		if id != "" {
 			zap.L().Info(fmt.Sprintf("Auth Token: %s", token))
 		} else {

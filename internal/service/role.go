@@ -15,10 +15,11 @@ import (
 )
 
 type RoleService struct {
-	RoleRepo *repository.RoleRepository         // 用户Repo
-	MenuRepo *repository.MenuRepository         // 菜单Repo
-	GormTX   *repository.GormTransactionManager // 事务
-	Redis    *redisx.RedisWrapper               // redis
+	RoleRepo      *repository.RoleRepository         // 用户Repo
+	MenuRepo      *repository.MenuRepository         // 菜单Repo
+	RoleMenusRepo *repository.RoleMenusRepository    // 角色菜单Repo
+	GormTX        *repository.GormTransactionManager // 事务
+	Redis         *redisx.RedisWrapper               // redis
 }
 
 func (r *RoleService) CreateRole(c context.Context, role *request.Role) (err error) {
@@ -78,7 +79,7 @@ func (r *RoleService) DeleteRoleByID(c *gin.Context, roleID int64) (err error) {
 		if err = r.RoleRepo.DeleteRoleByID(ctx, roleID); err != nil {
 			return err
 		}
-		if err = r.MenuRepo.DeleteRoleMenuRelations(ctx, roleID); err != nil {
+		if err = r.RoleMenusRepo.DeleteByRoleID(ctx, roleID); err != nil {
 			return err
 		}
 		return nil

@@ -2,7 +2,7 @@ package entity
 
 import (
 	"Art-Design-Backend/internal/model/base"
-	"Art-Design-Backend/pkg/constant"
+	"Art-Design-Backend/pkg/constant/tablename"
 )
 
 // User 结构体定义了用户的基本信息
@@ -25,5 +25,5 @@ type User struct {
 }
 
 func (u *User) TableName() string {
-	return constant.UserTableName
+	return tablename.UserTableName
 }

@@ -29,7 +29,7 @@ func NewMenuController(engine *gin.Engine, middleware *middleware.Middlewares, s
 func (m *MenuController) getMenuList(c *gin.Context) {
 	res, err := m.menuService.GetMenuList(c)
 	if err != nil {
-		c.Error(err)
+		_ = c.Error(err)
 		return
 	}
 	result.OkWithData(res, c)
@@ -38,12 +38,13 @@ func (m *MenuController) getMenuList(c *gin.Context) {
 func (m *MenuController) createMenu(c *gin.Context) {
 	var menu request.Menu
 	if err := c.ShouldBindJSON(&menu); err != nil {
-		c.Error(err)
+		_ = c.Error(err)
+		c.Set(gin.BindKey, menu)
 		return
 	}
 	err := m.menuService.CreateMenu(c, &menu)
 	if err != nil {
-		c.Error(err)
+		_ = c.Error(err)
 		return
 	}
 	result.OkWithMessage("添加成功", c)

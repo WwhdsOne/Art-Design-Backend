@@ -21,8 +21,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f h1:lO4WD4F/rVNCu3HqELle0jiPLLBs70cWOduZpkS1E78=
 github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f/go.mod h1:cuUVRXasLTGF7a8hSLbxyZXjz+1KgoB3wDUb6vlszIc=
-github.com/dromara/carbon/v2 v2.6.4 h1:cpIansyiEIEed3OlEIqo1IXj86qu0x6pf/E2keL2wYo=
-github.com/dromara/carbon/v2 v2.6.4/go.mod h1:Baj3A1uBBctJmpZWJd6/+WWnmIuY2pobR6IOpB6xigc=
+github.com/dromara/carbon/v2 v2.6.5 h1:OC1k8zGBpSnRoPjezlWeajx+3nCMq7xhZqAS4WWrKmE=
+github.com/dromara/carbon/v2 v2.6.5/go.mod h1:7GXqCUplwN1s1b4whGk2zX4+g4CMCoDIZzmjlyt0vLY=
 github.com/gabriel-vasile/mimetype v1.4.9 h1:5k+WDwEsD9eTLL8Tz3L0VnmVh9QxGjRmjBvAG7U/oYY=
 github.com/gabriel-vasile/mimetype v1.4.9/go.mod h1:WnSQhFKJuBlRyLiKohA/2DtIlPFAbguNaG7QCHcyGok=
 github.com/gin-contrib/gzip v1.2.3 h1:dAhT722RuEG330ce2agAs75z7yB+NKvX/ZM1r8w0u2U=

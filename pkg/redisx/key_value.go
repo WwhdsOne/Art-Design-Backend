@@ -2,16 +2,9 @@ package redisx
 
 import (
 	"context"
-	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"time"
 )
-
-// RedisWrapper 结构体用于封装 Redis 客户端和默认操作超时时间
-type RedisWrapper struct {
-	Client           *redis.Client
-	OperationTimeout time.Duration // 默认操作超时时间
-}
 
 // Set 方法用于设置 Redis 键值对
 func (r *RedisWrapper) Set(id, value string, duration time.Duration) (err error) {
@@ -39,8 +32,8 @@ func (r *RedisWrapper) Get(key string) (val string) {
 	return
 }
 
-// Delete 方法用于删除 Redis 键
-func (r *RedisWrapper) Delete(key string) (err error) {
+// Del 方法用于删除 Redis 键
+func (r *RedisWrapper) Del(key string) (err error) {
 	timeout, cancelFunc := context.WithTimeout(context.Background(), r.OperationTimeout)
 	defer cancelFunc()
 	err = r.Client.Del(timeout, key).Err()
@@ -65,8 +58,8 @@ func (r *RedisWrapper) PipelineSet(keyVal [][2]string, duration time.Duration) (
 	return
 }
 
-// PipelineDelete 方法用于批量删除 Redis 键
-func (r *RedisWrapper) PipelineDelete(key []string) (err error) {
+// PipelineDel 方法用于批量删除 Redis 键
+func (r *RedisWrapper) PipelineDel(key []string) (err error) {
 	timeout, cancelFunc := context.WithTimeout(context.Background(), r.OperationTimeout)
 	defer cancelFunc()
 	tx := r.Client.Pipeline()

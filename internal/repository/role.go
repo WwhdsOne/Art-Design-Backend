@@ -3,7 +3,6 @@ package repository
 import (
 	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/internal/model/query"
-	"Art-Design-Backend/pkg/constant"
 	"Art-Design-Backend/pkg/errors"
 	"context"
 	"fmt"
@@ -82,13 +81,9 @@ func (r *RoleRepository) CreateRole(c context.Context, role *entity.Role) (err e
 	return
 }
 
-func (r *RoleRepository) GetRoleListByUserID(c context.Context, userID int64) (roleList []entity.Role, err error) {
-	// 使用JOIN查询关联角色
+func (r *RoleRepository) GetRoleListByRoleIDList(c context.Context, roleIDList []int64) (roleList []entity.Role, err error) {
 	if err = DB(c, r.db).
-		Table(constant.RoleTableName).
-		Select("role.*").
-		Joins("JOIN user_roles ON user_roles.role_id = role.id").
-		Where("user_roles.user_id = ?", userID).
+		Where("id IN ?", roleIDList).
 		Where("status = 1").
 		Find(&roleList).Error; err != nil {
 		zap.L().Error("查询用户角色列表失败", zap.Error(err))
@@ -98,56 +93,11 @@ func (r *RoleRepository) GetRoleListByUserID(c context.Context, userID int64) (r
 	return
 }
 
-func (r *RoleRepository) GetRoleIDListByUserID(c context.Context, userID int64) (roleIDList []int64, err error) {
-	if err = DB(c, r.db).
-		Table(constant.RoleTableName).
-		Select("id").
-		Joins("JOIN user_roles ON user_roles.role_id = role.id").
-		Where("user_roles.user_id = ?", userID).
-		Where("status = 1").
-		Find(&roleIDList).Error; err != nil {
-		zap.L().Error("查询角色ID列表失败")
-		err = errors.NewDBError("查询角色ID列表失败")
-		return
-	}
-
-	return
-}
-
-func (r *RoleRepository) AssignRoleToUser(c context.Context, userID int64, roleIDList []int64) (err error) {
-	// 删除原有关联
-	if err = DB(c, r.db).
-		Table("user_roles").
-		Where("user_id = ?", userID).
-		Delete(nil).Error; err != nil {
-		zap.L().Error("删除原有关联失败")
-		err = errors.NewDBError("删除原有关联失败")
-		return
-	}
-	if len(roleIDList) > 0 {
-		userRoleList := make([]entity.UserRoles, 0, len(roleIDList))
-		for _, roleID := range roleIDList {
-			userRoleList = append(userRoleList, entity.UserRoles{
-				UserID: userID,
-				RoleID: roleID,
-			})
-		}
-		// 创建新的关联
-		if err = DB(c, r.db).
-			Table("user_roles").
-			Create(userRoleList).Error; err != nil {
-			zap.L().Error("创建新的关联失败")
-			err = errors.NewDBError("创建新的关联失败")
-		}
-	}
-	return
-}
-
 func (r *RoleRepository) GetRolePage(c context.Context, role *query.Role) (rolePage []*entity.Role, total int64, err error) {
 	db := DB(c, r.db)
 
 	// 构建通用查询条件
-	queryConditions := db.Table(constant.RoleTableName)
+	queryConditions := db.Model(&entity.Role{})
 
 	if role.Name != "" {
 		queryConditions = queryConditions.Where("name LIKE ?", "%"+role.Name+"%")
@@ -179,10 +129,24 @@ func (r *RoleRepository) UpdateRole(c context.Context, role *entity.Role) (err e
 }
 
 func (r *RoleRepository) DeleteRoleByID(c context.Context, roleID int64) (err error) {
-	if err = DB(c, r.db).Delete(&entity.Role{}, roleID).Error; err != nil {
+	if err = DB(c, r.db).Where("id = ?", roleID).Delete(nil).Error; err != nil {
 		zap.L().Error("删除角色失败")
 		err = errors.NewDBError("删除角色失败")
 		return
 	}
+	return
+}
+
+func (r *RoleRepository) FilterValidRoleIDs(ctx context.Context, roleIDs []int64) (validIDList []int64, err error) {
+	err = DB(ctx, r.db).
+		Model(&entity.Role{}).
+		Where("id IN ? AND status = ?", roleIDs, 1). // 1 = 启用状态
+		Pluck("id", &validIDList).Error
+	if err != nil {
+		zap.L().Error("查询有效角色失败", zap.Error(err))
+		err = errors.NewDBError("查询有效角色失败")
+		return
+	}
+
 	return
 }

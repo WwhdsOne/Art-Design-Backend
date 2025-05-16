@@ -3,7 +3,6 @@ package repository
 import (
 	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/internal/model/query"
-	"Art-Design-Backend/pkg/constant"
 	"Art-Design-Backend/pkg/errors"
 	"context"
 	"fmt"
@@ -82,7 +81,7 @@ func (u *UserRepository) CheckUserDuplicate(user *entity.User) (err error) {
 }
 
 func (u *UserRepository) GetLoginUserByUsername(c context.Context, username string) (user *entity.User, err error) {
-	if err = u.db.WithContext(c).
+	if err = DB(c, u.db).
 		Select("id", "password", "status").
 		Where("username = ?", username).
 		First(&user).Error; err != nil {
@@ -96,7 +95,6 @@ func (u *UserRepository) GetLoginUserByUsername(c context.Context, username stri
 func (u *UserRepository) GetUserById(c context.Context, id int64) (user *entity.User, err error) {
 	if err = DB(c, u.db).
 		Where("id = ?", id).
-		Where("status = 1").
 		First(&user).Error; err != nil {
 		zap.L().Error("根据用户id查询用户失败")
 		err = errors.NewDBError("用户不存在")
@@ -125,7 +123,7 @@ func (u *UserRepository) GetUserPage(c context.Context, user *query.User) (userP
 	db := DB(c, u.db)
 
 	// 构建通用查询条件
-	queryConditions := db.Table(constant.UserTableName)
+	queryConditions := db.Model(&entity.User{})
 
 	if user.RealName != "" {
 		queryConditions = queryConditions.Where("real_name LIKE ?", "%"+user.RealName+"%")

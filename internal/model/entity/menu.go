@@ -2,7 +2,7 @@ package entity
 
 import (
 	"Art-Design-Backend/internal/model/base"
-	"Art-Design-Backend/pkg/constant"
+	"Art-Design-Backend/pkg/constant/tablename"
 )
 
 type Menu struct {
@@ -33,5 +33,5 @@ type Meta struct {
 
 // TableName 设置表名
 func (m *Menu) TableName() string {
-	return constant.MenuTableName
+	return tablename.MenuTableName
 }

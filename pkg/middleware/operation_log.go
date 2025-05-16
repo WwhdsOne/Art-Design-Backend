@@ -45,7 +45,7 @@ func (m *Middlewares) OperationLoggerMiddleware() gin.HandlerFunc {
 		cCp := c.Copy()
 		// 保存日志到数据库
 		go func() { // 异步保存，避免阻塞请求
-			if err := m.Db.WithContext(cCp).Create(&log).Error; err != nil {
+			if err := m.Db.WithContext(cCp).Create(log).Error; err != nil {
 				// 打印日志或记录到其他地方
 				zap.L().Error("Failed to save operation log\n")
 				// 打印具体错误

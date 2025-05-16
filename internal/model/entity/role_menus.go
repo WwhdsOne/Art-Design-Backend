@@ -1,6 +1,8 @@
 package entity
 
-import "Art-Design-Backend/pkg/constant"
+import (
+	"Art-Design-Backend/pkg/constant/tablename"
+)
 
 // RoleMenus 角色-菜单关联表
 type RoleMenus struct {
@@ -9,5 +11,5 @@ type RoleMenus struct {
 }
 
 func (r *RoleMenus) TableName() string {
-	return constant.RoleMenusTableName
+	return tablename.RoleMenusTableName
 }
