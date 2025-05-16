@@ -24,7 +24,6 @@ func Result(code int, data interface{}, msg string, c *gin.Context) {
 		Message: msg,
 		Data:    data,
 	})
-
 }
 
 func Ok(c *gin.Context) {

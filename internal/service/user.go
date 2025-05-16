@@ -13,9 +13,9 @@ import (
 	"Art-Design-Backend/pkg/redisx"
 	"context"
 	"fmt"
+	"github.com/bytedance/sonic"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
-	jsoniter "github.com/json-iterator/go"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 	"mime/multipart"
@@ -63,7 +63,7 @@ func (u *UserService) getUserRoleListFromCache(c context.Context, userID int64) 
 	// 先查 Redis
 	cacheStr := u.Redis.Get(key)
 	if cacheStr != "" {
-		if err := jsoniter.Unmarshal([]byte(cacheStr), &roleList); err == nil {
+		if err := sonic.Unmarshal([]byte(cacheStr), &roleList); err == nil {
 			return
 		}
 		// 解析失败也继续走数据库，避免缓存污染
@@ -80,7 +80,7 @@ func (u *UserService) getUserRoleListFromCache(c context.Context, userID int64) 
 		return
 	}
 	// 存入 Redis（最长缓存 5 分钟）
-	cacheBytes, _ := jsoniter.Marshal(roleList)
+	cacheBytes, _ := sonic.Marshal(roleList)
 	err = u.Redis.Set(key, string(cacheBytes), 5*time.Minute)
 	if err != nil {
 		zap.L().Error("用户角色对应关系写入缓存失败", zap.Int64("userID", userID))

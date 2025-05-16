@@ -27,7 +27,6 @@ func (r *RedisWrapper) Get(key string) (val string) {
 	if err != nil {
 		if err.Error() == "redis: nil" {
 			atomic.AddUint64(&r.hitCount, 1)
-			// 这里省略 return，默认返回 val 的零值 ""
 		} else {
 			zap.L().Error(err.Error())
 		}

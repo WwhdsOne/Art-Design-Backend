@@ -10,8 +10,8 @@ import (
 	"Art-Design-Backend/pkg/redisx"
 	"context"
 	"fmt"
+	"github.com/bytedance/sonic"
 	"github.com/jinzhu/copier"
-	jsoniter "github.com/json-iterator/go"
 	"go.uber.org/zap"
 	"sort"
 	"strings"
@@ -71,7 +71,7 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*response.Menu, err 
 	cacheKey := buildMenuCacheKey(validRoleIDList)
 	cacheData := m.Redis.Get(cacheKey)
 	if cacheData != "" {
-		err = jsoniter.Unmarshal([]byte(cacheData), &res)
+		err = sonic.Unmarshal([]byte(cacheData), &res)
 		if err == nil {
 			return
 		}
@@ -124,7 +124,7 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*response.Menu, err 
 		}
 	}
 	// 写入缓存
-	cacheBytes, _ := jsoniter.Marshal(res)
+	cacheBytes, _ := sonic.Marshal(res)
 	err = m.Redis.Set(cacheKey, string(cacheBytes), time.Hour)
 	if err != nil {
 		zap.L().Error("菜单列表写入缓存失败", zap.Error(err))

@@ -1,7 +1,6 @@
 package base
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/bytedance/sonic"
 	"strconv"
@@ -14,7 +13,7 @@ type LongStringID int64
 func (id *LongStringID) UnmarshalJSON(data []byte) error {
 	// 尝试将 JSON 数据解析为字符串
 	var strValue string
-	if err := json.Unmarshal(data, &strValue); err != nil {
+	if err := sonic.Unmarshal(data, &strValue); err != nil {
 		return err
 	}
 

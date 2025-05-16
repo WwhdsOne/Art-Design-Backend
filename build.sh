@@ -7,16 +7,16 @@ BUILD_TIME=$(date '+%Y-%m-%d_%H:%M:%S')
 
 # 构建参数
 LD_FLAGS="-w -s -X main.version=${VERSION} -X main.buildTime=${BUILD_TIME}"
-TAGS="jsoniter"
+TAGS="sonic,avx"
 
 # 执行构建
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -trimpath \
     -buildvcs=false \
     -ldflags "${LD_FLAGS}" \
-    -tags "${TAGS}" \
+    -tags "${TAGS},netgo,osusergo" \
     -o "${APP_NAME}" \
-    ./cmd/app # main.go文件目录
+    ./cmd/app
 
 # 使用UPX压缩
 upx --lzma --best "${APP_NAME}"

@@ -1,6 +1,6 @@
 module Art-Design-Backend
 
-go 1.24.2
+go 1.24.3
 
 tool github.com/google/wire/cmd/wire
 
@@ -16,7 +16,6 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/google/wire v0.6.0
 	github.com/jinzhu/copier v0.4.0
-	github.com/json-iterator/go v1.1.12
 	github.com/redis/go-redis/v9 v9.8.0
 	github.com/sony/sonyflake v1.2.1
 	go.uber.org/zap v1.27.0
@@ -41,6 +40,7 @@ require (
 	github.com/google/subcommands v1.2.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
+	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
