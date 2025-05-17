@@ -1,3 +1,4 @@
+go get -u -t ./... && go mod tidy
 # 生成wire依赖注入
 go tool github.com/google/wire/cmd/wire ./...
 # 配置
