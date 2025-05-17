@@ -29,6 +29,17 @@ func (m *MenuRepository) GetMenuListByIDList(c context.Context, menuIDList []int
 	return
 }
 
+func (m *MenuRepository) GetReducedMenuList(c context.Context) (menuList []*entity.Menu, err error) {
+	if err = DB(c, m.db).
+		Select("id", "title", "parent_id", "type").
+		Find(&menuList).Error; err != nil {
+		zap.L().Error("获取菜单失败", zap.Error(err))
+		err = errors.NewDBError("获取菜单失败")
+		return
+	}
+	return
+}
+
 func (m *MenuRepository) CreateMenu(c context.Context, menu *entity.Menu) (err error) {
 	if err = DB(c, m.db).Create(menu).Error; err != nil {
 		zap.L().Error("创建菜单失败", zap.Error(err))

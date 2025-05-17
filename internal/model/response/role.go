@@ -9,5 +9,5 @@ type Role struct {
 	Code        string          `json:"code"`
 	Description string          `json:"description"`
 	Status      int8            `json:"status"`
-	CreatedAt   carbon.DateTime `json:"createdAt"`
+	CreatedAt   carbon.DateTime `json:"created_at"`
 }

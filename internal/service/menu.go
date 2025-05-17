@@ -88,14 +88,16 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*response.Menu, err 
 	for _, menuDo := range menuList {
 		var menuResp response.Menu
 		err = copier.Copy(&menuResp, &menuDo)
+		if err != nil {
+			zap.L().Error("菜单属性复制失败", zap.Error(err))
+			return
+		}
 		// 如果是不是按钮类型，则初始化 AuthList 和 Children
 		if menuDo.Type != 3 {
 			menuResp.Meta.AuthList = make([]response.AuthMark, 0)
 			menuResp.Children = make([]response.Menu, 0)
 		}
-		if err != nil {
-			return
-		}
+
 		menuMap[menuDo.ID] = &menuResp
 	}
 	// 遍历所有菜单，构建树形结构
@@ -124,7 +126,7 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*response.Menu, err 
 		}
 	}
 	// 写入缓存
-	cacheBytes, _ := sonic.Marshal(res)
+	cacheBytes, _ := sonic.Marshal(&res)
 	err = m.Redis.Set(cacheKey, string(cacheBytes), time.Hour)
 	if err != nil {
 		zap.L().Error("菜单列表写入缓存失败", zap.Error(err))

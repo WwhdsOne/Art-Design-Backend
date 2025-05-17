@@ -84,8 +84,8 @@ func (u *UserRepository) GetLoginUserByUsername(c context.Context, username stri
 	if err = DB(c, u.db).
 		Select("id", "password", "status").
 		Where("username = ?", username).
-		First(user).Error; err != nil {
-		zap.L().Error("根据用户名查询用户失败")
+		First(&user).Error; err != nil {
+		zap.L().Error("根据用户名查询用户失败", zap.Error(err))
 		err = errors.NewDBError("用户不存在")
 		return
 	}
@@ -95,8 +95,8 @@ func (u *UserRepository) GetLoginUserByUsername(c context.Context, username stri
 func (u *UserRepository) GetUserById(c context.Context, id int64) (user *entity.User, err error) {
 	if err = DB(c, u.db).
 		Where("id = ?", id).
-		First(user).Error; err != nil {
-		zap.L().Error("根据用户id查询用户失败")
+		First(&user).Error; err != nil {
+		zap.L().Error("根据用户id查询用户失败", zap.Error(err))
 		err = errors.NewDBError("用户不存在")
 		return
 	}

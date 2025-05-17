@@ -50,3 +50,18 @@ func (c *LongStringIDs) UnmarshalJSON(data []byte) error {
 	}
 	return nil
 }
+
+// MarshalJSON 实现 LongStringID 序列化为 JSON 字符串
+func (id *LongStringID) MarshalJSON() ([]byte, error) {
+	str := strconv.FormatInt(int64(*id), 10)
+	return sonic.Marshal(str)
+}
+
+// MarshalJSON 实现 LongStringIDs 序列化为 JSON 字符串数组
+func (c *LongStringIDs) MarshalJSON() ([]byte, error) {
+	strIDs := make([]string, len(*c))
+	for i, id := range *c {
+		strIDs[i] = strconv.FormatInt(id, 10)
+	}
+	return sonic.Marshal(strIDs)
+}

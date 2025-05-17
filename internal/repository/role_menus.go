@@ -69,6 +69,18 @@ func (r *RoleMenusRepository) GetMenuIDListByRoleIDList(c context.Context, roleI
 	return
 }
 
+func (r *RoleMenusRepository) GetMenuIDListByRoleID(c context.Context, roleID int64) (menuIDList []int64, err error) {
+	if err = DB(c, r.db).
+		Model(&entity.RoleMenus{}).
+		Where("role_id = ?", roleID).
+		Pluck("menu_id", &menuIDList).Error; err != nil {
+		zap.L().Error("获取角色菜单关联信息失败", zap.Error(err))
+		err = errors.NewDBError("获取角色菜单关联信息失败")
+		return
+	}
+	return
+}
+
 func (r *RoleMenusRepository) DeleteByRoleID(c context.Context, roleID int64) (err error) {
 	if err = DB(c, r.db).
 		Where("role_id = ?", roleID).
@@ -79,6 +91,23 @@ func (r *RoleMenusRepository) DeleteByRoleID(c context.Context, roleID int64) (e
 	if err = r.invalidateMenuCacheByRoleID(roleID); err != nil {
 		zap.L().Error("删除角色菜单关联缓存失败", zap.Error(err))
 		return errors.NewDBError("删除角色菜单关联缓存失败")
+	}
+	return
+}
+
+// CreateRoleMenus 创建角色菜单关联
+// 由于创建只会在删除后进行，所以创建函数不调整缓存
+func (r *RoleMenusRepository) CreateRoleMenus(c context.Context, roleID int64, menuIDList []int64) (err error) {
+	roleMenus := make([]entity.RoleMenus, 0, len(menuIDList))
+	for _, menuID := range menuIDList {
+		roleMenus = append(roleMenus, entity.RoleMenus{
+			RoleID: roleID,
+			MenuID: menuID,
+		})
+	}
+	if err = DB(c, r.db).Create(&roleMenus).Error; err != nil {
+		zap.L().Error("创建角色菜单关联失败", zap.Error(err))
+		return errors.NewDBError("创建角色菜单关联失败")
 	}
 	return
 }

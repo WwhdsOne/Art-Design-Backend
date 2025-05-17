@@ -25,6 +25,8 @@ func NewRoleController(engine *gin.Engine, middleware *middleware.Middlewares, s
 		r.POST("/update", menuCtrl.updateRole)
 		r.POST("/page", menuCtrl.gerRolePage)
 		r.POST("/delete/:id", menuCtrl.deleteRole)
+		r.POST("/getRoleMenu/:id", menuCtrl.getRoleMenuBinding)
+		r.POST("/updateRoleMenuBinding", menuCtrl.updateRoleMenuBinding)
 	}
 	return menuCtrl
 }
@@ -85,4 +87,33 @@ func (r *RoleController) deleteRole(c *gin.Context) {
 		return
 	}
 	result.OkWithMessage("删除成功", c)
+}
+
+func (r *RoleController) getRoleMenuBinding(c *gin.Context) {
+	roleID, err := utils.ParseID(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	roleMenus, err := r.roleService.GetRoleMenuBinding(c, roleID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithData(roleMenus, c)
+}
+
+func (r *RoleController) updateRoleMenuBinding(c *gin.Context) {
+	var roleMenuBinding request.RoleMenuBinding
+	if err := c.ShouldBindJSON(&roleMenuBinding); err != nil {
+		_ = c.Error(err)
+		c.Set(gin.BindKey, roleMenuBinding)
+		return
+	}
+	err := r.roleService.UpdateRoleMenuBinding(c, &roleMenuBinding)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithMessage("修改成功", c)
 }

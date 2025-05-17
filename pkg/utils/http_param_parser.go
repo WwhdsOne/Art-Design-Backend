@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"Art-Design-Backend/pkg/result"
 	"errors"
 	"github.com/gin-gonic/gin"
 	"strconv"
@@ -9,32 +8,34 @@ import (
 )
 
 // ParseIDs 解析逗号分隔的 ID 字符串，返回一个 int64 切片
-func ParseIDs(c *gin.Context) ([]int64, error) {
+func ParseIDs(c *gin.Context) (ids []int64, err error) {
 	idsParam, _ := c.Params.Get("ids")
 	if idsParam == "" {
 		return nil, errors.New("IDs 为空")
 	}
 	idStrings := strings.Split(idsParam, ",")
-	var ids []int64
 	for _, idStr := range idStrings {
-		id, err := strconv.ParseInt(idStr, 10, 64)
+		var id int64
+		id, err = strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			return nil, errors.New("ID 解析错误")
+			err = errors.New("ID 解析错误")
+			return
 		}
 		ids = append(ids, id)
 	}
-
-	return ids, nil
+	return
 }
 
-func ParseID(c *gin.Context) (int64, error) {
+func ParseID(c *gin.Context) (id int64, err error) {
 	idParam, exist := c.Params.Get("id")
 	if exist != true {
-		return 0, errors.New("ID 不存在")
+		err = errors.New("ID 不存在")
+		return
 	}
-	id, err := strconv.ParseInt(idParam, 10, 64)
+	id, err = strconv.ParseInt(idParam, 10, 64)
 	if err != nil {
-		result.FailWithMessage("ID 解析错误", c)
+		err = errors.New("ID 解析错误")
+		return
 	}
-	return id, nil
+	return
 }
