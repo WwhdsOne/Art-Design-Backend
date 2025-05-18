@@ -44,7 +44,7 @@ func (u *UserService) GetUserById(c *gin.Context) (res response.User, err error)
 		return
 	}
 	// 获取用户角色列表
-	roleList, err := u.getUserRoleListFromCache(c, user.ID)
+	roleList, err := u.getUserRoleListByUserID(c, user.ID)
 	if len(roleList) == 0 {
 		err = fmt.Errorf("当前用户未分配角色")
 		return
@@ -58,8 +58,8 @@ func (u *UserService) GetUserById(c *gin.Context) (res response.User, err error)
 	return
 }
 
-// getUserRoleListFromCache 尝试从 Redis 获取用户角色列表，获取不到就查数据库并写入缓存
-func (u *UserService) getUserRoleListFromCache(c context.Context, userID int64) (roleList []entity.Role, error error) {
+// getUserRoleListByUserID 尝试从 Redis 获取用户角色列表，获取不到就查数据库并写入缓存
+func (u *UserService) getUserRoleListByUserID(c context.Context, userID int64) (roleList []entity.Role, error error) {
 	key := fmt.Sprintf(rediskey.UserRoleList+"%d", userID)
 	// 先查 Redis
 	cacheStr, err := u.Redis.Get(key)
@@ -110,7 +110,7 @@ func (u *UserService) GetUserPage(c *gin.Context, query *query.User) (resp *base
 		var roles []entity.Role
 
 		// 从 Redis 缓存中获取用户角色
-		if roles, err = u.getUserRoleListFromCache(c, user.ID); err != nil {
+		if roles, err = u.getUserRoleListByUserID(c, user.ID); err != nil {
 			return
 		}
 		user.Roles = roles
