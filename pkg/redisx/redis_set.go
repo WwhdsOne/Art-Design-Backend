@@ -20,6 +20,8 @@ func (r *RedisWrapper) SMembers(key string) (val []string) {
 	return
 }
 
+// SAdd 添加元素
+// 永久存在
 func (r *RedisWrapper) SAdd(key string, vals ...interface{}) (err error) {
 	timeout, cancelFunc := context.WithTimeout(context.Background(), r.OperationTimeout)
 	defer cancelFunc()

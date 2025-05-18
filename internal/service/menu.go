@@ -9,13 +9,14 @@ import (
 	"Art-Design-Backend/pkg/constant/rediskey"
 	"Art-Design-Backend/pkg/redisx"
 	"context"
+	"errors"
 	"fmt"
 	"github.com/bytedance/sonic"
 	"github.com/jinzhu/copier"
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"sort"
 	"strings"
-	"time"
 )
 
 type MenuService struct {
@@ -69,12 +70,23 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*response.Menu, err 
 	}
 	// 尝试获取缓存
 	cacheKey := buildMenuCacheKey(validRoleIDList)
-	cacheData := m.Redis.Get(cacheKey)
-	if cacheData != "" {
-		err = sonic.Unmarshal([]byte(cacheData), &res)
-		if err == nil {
+	cacheData, err := m.Redis.Get(cacheKey)
+	// 缓存命中，返回
+	if err == nil {
+		if err = sonic.Unmarshal([]byte(cacheData), &res); err != nil {
+			zap.L().Error("菜单列表缓存解析失败", zap.String("key", cacheKey), zap.Error(err))
+			// 缓存解析失败，从数据库重新读取，防止数据污染
+		} else {
+			// 缓存命中且解析成功，返回
 			return
 		}
+	}
+	// 缓存未命中，从数据库读取
+	if errors.Is(err, redis.Nil) {
+		zap.L().Debug("Redis 获取菜单缓存未命中", zap.String("key", cacheKey), zap.Error(err))
+	} else {
+		zap.L().Error("Redis 获取缓存失败", zap.String("key", cacheKey), zap.Error(err))
+		return
 	}
 	// 查询角色关联菜单数据
 	menuIDList, err := m.RoleMenusRepo.GetMenuIDListByRoleIDList(c, validRoleIDList)
@@ -127,9 +139,10 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*response.Menu, err 
 	}
 	// 写入缓存
 	cacheBytes, _ := sonic.Marshal(&res)
-	err = m.Redis.Set(cacheKey, string(cacheBytes), time.Hour)
+	err = m.Redis.Set(cacheKey, string(cacheBytes), rediskey.MenuListRoleTTL)
 	if err != nil {
 		zap.L().Error("菜单列表写入缓存失败", zap.Error(err))
+		return
 	}
 	// 写入映射表
 	for _, rid := range validRoleIDList {
@@ -137,6 +150,7 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*response.Menu, err 
 		err = m.Redis.SAdd(depKey, cacheKey)
 		if err != nil {
 			zap.L().Error("菜单列表写入映射表失败", zap.Error(err))
+			return
 		}
 	}
 	return

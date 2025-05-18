@@ -12,14 +12,15 @@ import (
 	"Art-Design-Backend/pkg/constant/rediskey"
 	"Art-Design-Backend/pkg/redisx"
 	"context"
+	"errors"
 	"fmt"
 	"github.com/bytedance/sonic"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 	"mime/multipart"
-	"time"
 )
 
 type UserService struct {
@@ -61,14 +62,23 @@ func (u *UserService) GetUserById(c *gin.Context) (res response.User, err error)
 func (u *UserService) getUserRoleListFromCache(c context.Context, userID int64) (roleList []entity.Role, error error) {
 	key := fmt.Sprintf(rediskey.UserRoleList+"%d", userID)
 	// 先查 Redis
-	cacheStr := u.Redis.Get(key)
-	if cacheStr != "" {
-		if err := sonic.Unmarshal([]byte(cacheStr), &roleList); err == nil {
+	cacheStr, err := u.Redis.Get(key)
+	// 缓存未命中或出错
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			zap.L().Debug("获取用户角色对应关系缓存未命中", zap.Int64("userID", userID))
+		} else {
+			zap.L().Error("获取用户角色对应关系缓存失败", zap.Error(err))
 			return
 		}
-		// 解析失败也继续走数据库，避免缓存污染
 	}
-	// 缓存没有命中，从数据库查
+	// 缓存命中
+	// 如果缓存解析失败，则从数据库重新获取
+	if err = sonic.Unmarshal([]byte(cacheStr), &roleList); err != nil {
+		zap.L().Error("用户角色对应关系缓存解析失败", zap.Error(err))
+	} else {
+		return
+	}
 	// 获取用户角色ID列表
 	roleIDList, err := u.UserRolesRepo.GetRoleIDListByUserID(c, userID)
 	if err != nil {
@@ -79,9 +89,9 @@ func (u *UserService) getUserRoleListFromCache(c context.Context, userID int64) 
 	if err != nil {
 		return
 	}
-	// 存入 Redis（最长缓存 5 分钟）
+	// 存入 Redis
 	cacheBytes, _ := sonic.Marshal(roleList)
-	err = u.Redis.Set(key, string(cacheBytes), 5*time.Minute)
+	err = u.Redis.Set(key, string(cacheBytes), rediskey.UserRoleListTTL)
 	if err != nil {
 		zap.L().Error("用户角色对应关系写入缓存失败", zap.Int64("userID", userID))
 		return

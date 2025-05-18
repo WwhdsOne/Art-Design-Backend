@@ -6,53 +6,62 @@ import (
 	"Art-Design-Backend/pkg/jwt"
 	"Art-Design-Backend/pkg/result"
 	"errors"
-	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 )
 
 func (m *Middlewares) AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// 我们这里jwt鉴权取头部信息 x-token 登录时回返回token信息
-		// 这里前端需要把token存储到cookie或者本地localStorage中
-		// 不过需要跟后端协商过期时间 可以约定刷新令牌或者重新登录
 		token := authutils.GetToken(c)
-		id := m.Redis.Get(rediskey.LOGIN + token)
-		if id != "" {
-			zap.L().Info(fmt.Sprintf("Auth Token: %s", token))
-		} else {
-			zap.L().Error(fmt.Sprintf("Key %s does not exist", token))
-			result.NoAuth("当前未登录", c)
+		if token == "" {
+			result.NoAuth("缺少Token", c)
 			c.Abort()
 			return
 		}
-		// parseToken 解析token包含的信息
-		claims, err := m.Jwt.ParseToken(token)
-		if err == nil {
-			// 需要刷新token
-			// 登出请求不需要刷新token
-			if jwt.IsWithinRefreshWindow(claims) && c.FullPath() != "/api/auth/logout" {
-				result.ShouldRefresh(c)
-				c.Abort()
-				return
+
+		// 校验登录状态（Redis中是否存在token对应会话）
+		_, err := m.Redis.Get(rediskey.LOGIN + token)
+		if err != nil {
+			if errors.Is(err, redis.Nil) {
+				zap.L().Info("用户未登录", zap.String("token", token))
+				result.NoAuth("当前未登录", c)
+			} else {
+				zap.L().Error("Redis 获取 Session 错误", zap.String("token", token), zap.Error(err))
+				result.FailWithMessage("获取 Session 失败", c)
 			}
-			c.Set("claims", claims)
-			c.Next()
-			return
-		}
-		// token 过期
-		if errors.Is(err, jwt.TokenExpired) {
-			result.NoAuth("授权已过期", c)
 			c.Abort()
 			return
 		}
-		// token格式无效或者错误
-		if errors.Is(err, jwt.TokenNotValidYet) ||
-			errors.Is(err, jwt.TokenMalformed) ||
-			errors.Is(err, jwt.TokenInvalid) {
-			result.NoAuth("token无效", c)
+		zap.L().Info("Auth Token 验证成功", zap.String("token", token))
+
+		// 解析 Token
+		claims, err := m.Jwt.ParseToken(token)
+		if err != nil {
+			switch {
+			case errors.Is(err, jwt.TokenExpired):
+				result.NoAuth("授权已过期", c)
+			case errors.Is(err, jwt.TokenNotValidYet),
+				errors.Is(err, jwt.TokenMalformed),
+				errors.Is(err, jwt.TokenInvalid):
+				result.NoAuth("token无效", c)
+			default:
+				zap.L().Error("Token 解析失败", zap.String("token", token), zap.Error(err))
+				result.FailWithMessage("Token 解析失败", c)
+			}
 			c.Abort()
 			return
 		}
+
+		// 判断是否需要刷新token（排除登出接口）
+		if jwt.IsWithinRefreshWindow(claims) && c.FullPath() != "/api/auth/logout" {
+			result.ShouldRefresh(c)
+			c.Abort()
+			return
+		}
+
+		// 设置解析后的 claims，继续后续处理
+		c.Set("claims", claims)
+		c.Next()
 	}
 }

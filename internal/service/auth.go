@@ -11,9 +11,12 @@ import (
 	"Art-Design-Backend/pkg/redisx"
 	"Art-Design-Backend/pkg/utils"
 	"context"
+	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
+	"github.com/redis/go-redis/v9"
+	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 	"strconv"
 )
@@ -64,11 +67,17 @@ func (s *AuthService) RefreshToken(c *gin.Context) (tokenStr string, err error) 
 	// 路径参数中获取用户 id
 	idStr := c.Param("id")
 	// 确保该用户在登录状态
-	val := s.Redis.Get(rediskey.SESSION + idStr)
-	if val == "" {
-		// 如果不存在，则返回错误
-		// todo后续改为auth专用错误
-		err = fmt.Errorf("用户未在登录状态")
+	sessionKey := rediskey.SESSION + idStr
+	_, err = s.Redis.Get(sessionKey)
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			// 用户未登录
+			err = errors.New("用户未在登录状态")
+			zap.L().Warn("用户未登录", zap.String("user_id", idStr))
+			return
+		}
+		// Redis 出错
+		zap.L().Error("Redis 获取 Session 失败", zap.String("key", sessionKey), zap.Error(err))
 		return
 	}
 	// 根据原有的用户 Claims 创建一个新的 token
@@ -87,25 +96,50 @@ func (s *AuthService) createToken(baseClaims jwt.BaseClaims) (tokenStr string, e
 	// 将用户 ID 转换为字符串形式
 	id := strconv.FormatInt(baseClaims.UserID, 10)
 
-	// 检查 Redis 中是否已存在该用户的会话
-	existToken := s.Redis.Get(rediskey.SESSION + id)
-	if existToken != "" {
-		// 如果存在，则删除现有的会话相关键
-		delKeys := []string{rediskey.LOGIN + existToken, rediskey.SESSION + id}
-		err = s.Redis.PipelineDel(delKeys)
-		if err != nil {
+	// 获取 Session
+	sessionKey := rediskey.SESSION + id
+
+	// 检查旧会话是否存在
+	existToken, err := s.Redis.Get(sessionKey)
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			// 缓存未命中，正常情况，Debug 级别日志
+			// 后续需要创建新的会话
+			zap.L().Debug("Redis 获取旧 Session 未命中", zap.String("key", sessionKey), zap.Error(err))
+		} else {
+			zap.L().Error("Redis 获取 Session 缓存失败", zap.String("key", sessionKey), zap.Error(err))
 			return
 		}
 	}
 
+	// 尝试删除
+	delKeys := []string{
+		rediskey.LOGIN + existToken,
+		sessionKey,
+	}
+	if err = s.Redis.PipelineDel(delKeys); err != nil {
+		zap.L().Error("删除旧Session失败", zap.Strings("keys", delKeys), zap.Error(err))
+		return
+	}
+
 	// 准备新会话和登录状态键值对
-	keyVal := [][2]string{
+	keyVals := [][2]string{
 		{rediskey.LOGIN + tokenStr, id},
 		{rediskey.SESSION + id, tokenStr},
 	}
 
-	// 使用管道设置新的键值对到 Redis，并设置过期时间
-	err = s.Redis.PipelineSet(keyVal, s.Jwt.ExpiresTime)
+	// 把键提取出来用于日志打印
+	keys := []string{
+		rediskey.LOGIN + tokenStr,
+		rediskey.SESSION + id,
+	}
+
+	err = s.Redis.PipelineSet(keyVals, s.Jwt.ExpiresTime)
+	if err != nil {
+		zap.L().Error("设置Session失败", zap.Strings("keys", keys), zap.Error(err))
+		return
+	}
+
 	return
 }
 
@@ -127,6 +161,10 @@ func (s *AuthService) LogoutToken(c *gin.Context) (err error) {
 
 	// 使用管道删除 Redis 中的会话和登录状态键
 	err = s.Redis.PipelineDel(delKeys)
+	if err != nil {
+		zap.L().Error(err.Error())
+		return
+	}
 	return
 }
 
