@@ -84,6 +84,14 @@ func (r *RoleService) DeleteRoleByID(c *gin.Context, roleID int64) (err error) {
 		}
 		return nil
 	})
+	if err != nil {
+		return
+	}
+	go func() {
+		if cacheErr := r.RoleMenusRepo.InvalidateMenuCacheByRoleID(roleID); cacheErr != nil {
+			zap.L().Error("缓存删除失败（需补偿）", zap.Int64("roleID", roleID), zap.Error(cacheErr))
+		}
+	}()
 	return
 }
 
@@ -127,14 +135,25 @@ func (r *RoleService) GetRoleMenuBinding(c *gin.Context, roleID int64) (res *res
 }
 
 func (r *RoleService) UpdateRoleMenuBinding(c *gin.Context, req *request.RoleMenuBinding) (err error) {
-	err = r.GormTX.Transaction(c, func(ctx context.Context) (err error) {
+	err = r.GormTX.Transaction(c, func(ctx context.Context) error {
 		if err = r.RoleMenusRepo.DeleteByRoleID(ctx, int64(req.RoleId)); err != nil {
-			return
+			return err
 		}
 		if err = r.RoleMenusRepo.CreateRoleMenus(ctx, int64(req.RoleId), req.MenuIds); err != nil {
-			return
+			return err
 		}
-		return
+		return nil
 	})
-	return
+	if err != nil {
+		return err
+	}
+
+	// 缓存清理移出事务
+	go func() {
+		if cacheErr := r.RoleMenusRepo.InvalidateMenuCacheByRoleID(int64(req.RoleId)); cacheErr != nil {
+			zap.L().Error("缓存删除失败（需补偿）", zap.Int64("roleID", int64(req.RoleId)), zap.Error(cacheErr))
+		}
+	}()
+
+	return nil
 }

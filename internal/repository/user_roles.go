@@ -77,7 +77,6 @@ func (u *UserRolesRepository) AssignRoleToUser(c context.Context, userID int64, 
 			})
 		}
 		if err = DB(c, u.db).
-			Table("user_roles").
 			Create(userRoleList).Error; err != nil {
 			zap.L().Error("创建新的关联失败")
 			err = errors.NewDBError("创建新的关联失败")

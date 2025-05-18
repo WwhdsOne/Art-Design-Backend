@@ -23,22 +23,25 @@ func NewRoleMenusRepository(db *gorm.DB, redis *redisx.RedisWrapper) *RoleMenusR
 	}
 }
 
-// invalidateMenuCacheByRoleID 清除与指定角色关联的所有菜单缓存
+// InvalidateMenuCacheByRoleID 清除与指定角色关联的所有菜单缓存
 //
 // 缓存设计说明：
 // 1. 用户菜单缓存策略：
-//    - 每个用户的菜单缓存键格式: "MENU:LIST:ROLE:{roleID1}_{roleID2}_{...}"
-//      (例如：用户拥有角色1和2 → "MENU:LIST:ROLE:1_2"
-//       用户拥有角色1,2和3 → "MENU:LIST:ROLE:1_2_3")
+//   - 每个用户的菜单缓存键格式: "MENU:LIST:ROLE:{roleID1}_{roleID2}_{...}"
+//     (例如：用户拥有角色1和2 → "MENU:LIST:ROLE:1_2"
+//     用户拥有角色1,2和3 → "MENU:LIST:ROLE:1_2_3")
 //
 // 2. 反向依赖关系表：
-//    - 数据结构：Redis Set
-//    - 键格式:   "MENU:ROLE:DEPENDENCIES:{roleID}"
-//    - 值内容：  所有包含该roleID的用户菜单缓存键集合
-//    (例如："MENU:ROLE:DEPENDENCIES:1" 包含 ["MENU:LIST:ROLE:1_2", "MENU:LIST:ROLE:1_3"])
 //
-// 3. 缓存失效机制：
-//   当角色权限变更时：
+//   - 数据结构：Redis Set
+//
+//   - 键格式:   "MENU:ROLE:DEPENDENCIES:{roleID}"
+//
+//   - 值内容：  所有包含该roleID的用户菜单缓存键集合
+//     (例如："MENU:ROLE:DEPENDENCIES:1" 包含 ["MENU:LIST:ROLE:1_2", "MENU:LIST:ROLE:1_3"])
+//
+//     3. 缓存失效机制：
+//     当角色权限变更时：
 //     a) 根据 roleID 从 "MENU:ROLE:DEPENDENCIES:{roleID}" 获取所有关联缓存键
 //     b) 批量删除这些用户菜单缓存
 //     c) 最后清理该角色的依赖记录
@@ -51,8 +54,8 @@ func NewRoleMenusRepository(db *gorm.DB, redis *redisx.RedisWrapper) *RoleMenusR
 //     "MENU:ROLE:DEPENDENCIES:2" → ["MENU:LIST:ROLE:1_2"]
 //     "MENU:ROLE:DEPENDENCIES:3" → ["MENU:LIST:ROLE:1_3"]
 //   - 当角色1权限变更时，自动清除两个用户的菜单缓存，以及角色1的依赖缓存表。
-
-func (r *RoleMenusRepository) invalidateMenuCacheByRoleID(roleID int64) (err error) {
+//     todo后续使用时可能加入重试机制
+func (r *RoleMenusRepository) InvalidateMenuCacheByRoleID(roleID int64) (err error) {
 	// 获取记录角色所关联的菜单缓存 key 的依赖集合 key（Set 类型）
 	depKey := fmt.Sprintf(rediskey.MenuRoleDependencies+"%d", roleID)
 
@@ -103,10 +106,6 @@ func (r *RoleMenusRepository) DeleteByRoleID(c context.Context, roleID int64) (e
 		Delete(&entity.RoleMenus{}).Error; err != nil {
 		zap.L().Error("删除角色菜单关联失败", zap.Error(err))
 		return errors.NewDBError("删除角色菜单关联失败")
-	}
-	if err = r.invalidateMenuCacheByRoleID(roleID); err != nil {
-		zap.L().Error("删除角色菜单关联缓存失败", zap.Error(err))
-		return errors.NewDBError("删除角色菜单关联缓存失败")
 	}
 	return
 }

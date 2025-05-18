@@ -21,12 +21,17 @@ import (
 )
 
 type MenuService struct {
-	MenuRepo       *repository.MenuRepository      // 用户Repo
-	RoleRepo       *repository.RoleRepository      // 角色 Repo
-	RoleMenusRepo  *repository.RoleMenusRepository // 角色菜单关联 Repo
-	UserRolesRepo  *repository.UserRolesRepository // 用户角色关联 Repo
-	Redis          *redisx.RedisWrapper            // redis
-	menuListRWLock sync.RWMutex                    // 获取菜单列表读写锁
+	MenuRepo      *repository.MenuRepository      // 用户Repo
+	RoleRepo      *repository.RoleRepository      // 角色 Repo
+	RoleMenusRepo *repository.RoleMenusRepository // 角色菜单关联 Repo
+	UserRolesRepo *repository.UserRolesRepository // 用户角色关联 Repo
+	Redis         *redisx.RedisWrapper            // redis
+	menuListLocks sync.Map                        // 根据角色键的菜单列表锁
+}
+
+func (m *MenuService) getMenuLock(key string) *sync.RWMutex {
+	actual, _ := m.menuListLocks.LoadOrStore(key, &sync.RWMutex{})
+	return actual.(*sync.RWMutex)
 }
 
 func (m *MenuService) CreateMenu(c context.Context, menu *request.Menu) (err error) {
@@ -59,11 +64,13 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*response.Menu, err 
 	if err != nil {
 		return
 	}
+	// 获取用户实际拥有的有效角色ID列表
 	validRoleIDList, err = m.UserRolesRepo.FilterValidUserRoles(c, validRoleIDList)
 	if err != nil {
 		return
 	}
 
+	// 构建缓存 key
 	buildMenuCacheKey := func(roleIds []int64) string {
 		sort.Slice(roleIds, func(i, j int) bool {
 			return roleIds[i] < roleIds[j]
@@ -96,17 +103,18 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*response.Menu, err 
 
 	// 调用局部函数尝试读取缓存
 	cacheKey := buildMenuCacheKey(validRoleIDList)
-	// 通过读锁尝试获取缓存
-	m.menuListRWLock.RLock()
+	// 根据角色键获取锁
+	lock := m.getMenuLock(cacheKey)
+
+	lock.RLock()
 	if tryGetCache(cacheKey) || err != nil {
-		m.menuListRWLock.RUnlock()
+		lock.RUnlock()
 		return
 	}
-	m.menuListRWLock.RUnlock()
+	lock.RUnlock()
 
-	// 缓存仍未命中，进入写流程
-	m.menuListRWLock.Lock()
-	defer m.menuListRWLock.Unlock()
+	lock.Lock()
+	defer lock.Unlock()
 
 	// 再次尝试读取缓存（写前再检查，避免重复构建）
 	if tryGetCache(cacheKey) || err != nil {
