@@ -7,15 +7,15 @@ import (
 	"fmt"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
-	"time"
 )
 
 type Redis struct {
-	Host             string `yaml:"host"`              // 地址
-	Port             string `yaml:"port"`              // 端口
-	Password         string `yaml:"password"`          // 密码（如果没有密码则为空）
-	DB               int    `yaml:"db"`                // 数据库编号
-	OperationTimeout string `yaml:"operation-timeout"` // 操作超时时间
+	Host               string `yaml:"host"`                  // 地址
+	Port               string `yaml:"port"`                  // 端口
+	Password           string `yaml:"password"`              // 密码（如果没有密码则为空）
+	DB                 int    `yaml:"db"`                    // 数据库编号
+	OperationTimeout   string `yaml:"operation-timeout"`     // 操作超时时间
+	HitRateLogInterval string `yaml:"hit-rate-log-interval"` // 命中率日志间隔
 }
 
 func NewRedis(cfg *Config) *redisx.RedisWrapper {
@@ -34,6 +34,7 @@ func NewRedis(cfg *Config) *redisx.RedisWrapper {
 		Client:           client,
 		OperationTimeout: utils.ParseDuration(r.OperationTimeout),
 	}
-	redisWrapper.StartHitRateLogger(30 * time.Second)
+	// 启动命中率日志
+	redisWrapper.StartHitRateLogger(utils.ParseDuration(r.HitRateLogInterval))
 	return redisWrapper
 }

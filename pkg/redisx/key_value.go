@@ -20,6 +20,10 @@ func (r *RedisWrapper) Set(id, value string, duration time.Duration) (err error)
 
 // Get 方法用于获取 Redis 键对应的值
 func (r *RedisWrapper) Get(key string) (val string, err error) {
+	// 原子类不使用协程
+	// 原因:
+	// 1. 它本身是底层使用 CPU 原子指令实现的加法，线程安全且性能极高；
+	// 2. 操作非常快（纳秒级），远远比启动一个 goroutine 要高效。
 	atomic.AddUint64(&r.totalCount, 1)
 
 	ctx, cancelFunc := context.WithTimeout(context.Background(), r.OperationTimeout)

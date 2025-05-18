@@ -23,18 +23,34 @@ func NewRoleMenusRepository(db *gorm.DB, redis *redisx.RedisWrapper) *RoleMenusR
 	}
 }
 
-// invalidateMenuCacheByRoleID 清除与某个角色绑定的所有菜单缓存
-// 缓存策略说明：
+// invalidateMenuCacheByRoleID 清除与指定角色关联的所有菜单缓存
 //
-// 我们为每个用户构建菜单时，会将其所拥有的所有角色联合作为缓存 key（如：user:menus:{roleIDs}）进行缓存；
-// 为了能在角色权限变更时正确删除这些用户级缓存，需要维护一个角色 → 菜单缓存 key 的「反向依赖关系表」：
-//   - 该依赖表结构使用 Redis 的 Set 实现，Key: menu:deps:role:{roleID}，Value: 所有使用了该 roleID 的菜单缓存 key（即 user:menus:{roleIDs}）
-//   - 当角色的菜单更新时，我们只需要根据 menu:deps:role:{roleID} 中的成员，批量删除相关缓存即可，避免缓存污染
+// 缓存设计说明：
+// 1. 用户菜单缓存策略：
+//    - 每个用户的菜单缓存键格式: "MENU:LIST:ROLE:{roleID1}_{roleID2}_{...}"
+//      (例如：用户拥有角色1和2 → "MENU:LIST:ROLE:1_2"
+//       用户拥有角色1,2和3 → "MENU:LIST:ROLE:1_2_3")
 //
-// 示例：
-//   假设用户 A 有角色 [1, 2]，其缓存 key 为 user:menus:[1,2]
-//   那么 menu:deps:role:1 和 menu:deps:role:2 中都应包含 user:menus:[1,2]
-//   当角色 1 或 2 被修改菜单后，都可以触发删除该缓存，保障数据一致性
+// 2. 反向依赖关系表：
+//    - 数据结构：Redis Set
+//    - 键格式:   "MENU:ROLE:DEPENDENCIES:{roleID}"
+//    - 值内容：  所有包含该roleID的用户菜单缓存键集合
+//    (例如："MENU:ROLE:DEPENDENCIES:1" 包含 ["MENU:LIST:ROLE:1_2", "MENU:LIST:ROLE:1_3"])
+//
+// 3. 缓存失效机制：
+//   当角色权限变更时：
+//     a) 根据 roleID 从 "MENU:ROLE:DEPENDENCIES:{roleID}" 获取所有关联缓存键
+//     b) 批量删除这些用户菜单缓存
+//     c) 最后清理该角色的依赖记录
+//
+// 示例流程：
+//   - 用户A(角色1,2) → 缓存键: "MENU:LIST:ROLE:1_2"
+//   - 用户B(角色1,3) → 缓存键: "MENU:LIST:ROLE:1_3"
+//   - Redis中会建立：
+//     "MENU:ROLE:DEPENDENCIES:1" → ["MENU:LIST:ROLE:1_2", "MENU:LIST:ROLE:1_3"]
+//     "MENU:ROLE:DEPENDENCIES:2" → ["MENU:LIST:ROLE:1_2"]
+//     "MENU:ROLE:DEPENDENCIES:3" → ["MENU:LIST:ROLE:1_3"]
+//   - 当角色1权限变更时，自动清除两个用户的菜单缓存，以及角色1的依赖缓存表。
 
 func (r *RoleMenusRepository) invalidateMenuCacheByRoleID(roleID int64) (err error) {
 	// 获取记录角色所关联的菜单缓存 key 的依赖集合 key（Set 类型）

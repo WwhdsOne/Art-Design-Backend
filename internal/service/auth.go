@@ -136,7 +136,7 @@ func (s *AuthService) createToken(baseClaims jwt.BaseClaims) (tokenStr string, e
 
 	err = s.Redis.PipelineSet(keyVals, s.Jwt.ExpiresTime)
 	if err != nil {
-		zap.L().Error("设置Session失败", zap.Strings("keys", keys), zap.Error(err))
+		zap.L().Error("设置新Session失败", zap.Strings("keys", keys), zap.Error(err))
 		return
 	}
 
@@ -157,7 +157,10 @@ func (s *AuthService) LogoutToken(c *gin.Context) (err error) {
 	id := strconv.FormatInt(claims.BaseClaims.UserID, 10)
 
 	// 准备需要删除的 Redis 键
-	delKeys := []string{rediskey.SESSION + id, rediskey.LOGIN + tokenStr}
+	delKeys := []string{
+		rediskey.SESSION + id,
+		rediskey.LOGIN + tokenStr,
+	}
 
 	// 使用管道删除 Redis 中的会话和登录状态键
 	err = s.Redis.PipelineDel(delKeys)

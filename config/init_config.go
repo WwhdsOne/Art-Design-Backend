@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"github.com/bytedance/sonic"
 	"gopkg.in/yaml.v3"
 	"log"
 	"os"
@@ -29,6 +30,7 @@ func NewConfig() (cfg *Config) {
 	if err != nil {
 		log.Fatalf("error: %v", err)
 	}
-	fmt.Printf("配置如下 : %+v\n", cfg)
+	cfgJson, _ := sonic.Marshal(cfg)
+	fmt.Printf("配置如下 : \n%s\n", cfgJson)
 	return
 }

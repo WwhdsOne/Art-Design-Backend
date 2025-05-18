@@ -17,14 +17,16 @@ import (
 	"go.uber.org/zap"
 	"sort"
 	"strings"
+	"sync"
 )
 
 type MenuService struct {
-	MenuRepo      *repository.MenuRepository      // 用户Repo
-	RoleRepo      *repository.RoleRepository      // 角色 Repo
-	RoleMenusRepo *repository.RoleMenusRepository // 角色菜单关联 Repo
-	UserRolesRepo *repository.UserRolesRepository // 用户角色关联 Repo
-	Redis         *redisx.RedisWrapper            // redis
+	MenuRepo       *repository.MenuRepository      // 用户Repo
+	RoleRepo       *repository.RoleRepository      // 角色 Repo
+	RoleMenusRepo  *repository.RoleMenusRepository // 角色菜单关联 Repo
+	UserRolesRepo  *repository.UserRolesRepository // 用户角色关联 Repo
+	Redis          *redisx.RedisWrapper            // redis
+	menuListRWLock sync.RWMutex                    // 获取菜单列表读写锁
 }
 
 func (m *MenuService) CreateMenu(c context.Context, menu *request.Menu) (err error) {
@@ -51,14 +53,18 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*response.Menu, err 
 	if len(roleIds) == 0 {
 		return
 	}
-	// 过滤无效角色ID
+
+	// 获取有效角色 ID
 	validRoleIDList, err := m.RoleRepo.FilterValidRoleIDs(c, roleIds)
-	// 过滤并非当前请求用户的角色ID
-	// 因为有可能存在用户某个角色已经被删除了，但是jwt内仍然保存着已经被解绑的角色ID
-	validRoleIDList, err = m.UserRolesRepo.FilterValidUserRoles(c, roleIds)
-	// 构建缓存键函数
+	if err != nil {
+		return
+	}
+	validRoleIDList, err = m.UserRolesRepo.FilterValidUserRoles(c, validRoleIDList)
+	if err != nil {
+		return
+	}
+
 	buildMenuCacheKey := func(roleIds []int64) string {
-		// 从小到大排序
 		sort.Slice(roleIds, func(i, j int) bool {
 			return roleIds[i] < roleIds[j]
 		})
@@ -68,24 +74,42 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*response.Menu, err 
 		}
 		return rediskey.MenuListRole + strings.Join(ids, "_")
 	}
-	// 尝试获取缓存
-	cacheKey := buildMenuCacheKey(validRoleIDList)
-	cacheData, err := m.Redis.Get(cacheKey)
-	// 缓存命中，返回
-	if err == nil {
-		if err = sonic.Unmarshal([]byte(cacheData), &res); err != nil {
-			zap.L().Error("菜单列表缓存解析失败", zap.String("key", cacheKey), zap.Error(err))
-			// 缓存解析失败，从数据库重新读取，防止数据污染
-		} else {
-			// 缓存命中且解析成功，返回
-			return
+
+	// 提取成局部函数：尝试读取缓存
+	tryGetCache := func(key string) bool {
+		cacheData, cacheErr := m.Redis.Get(key)
+		if cacheErr == nil {
+			if unmarshalErr := sonic.Unmarshal([]byte(cacheData), &res); unmarshalErr != nil {
+				zap.L().Error("菜单列表缓存解析失败", zap.String("key", key), zap.Error(unmarshalErr))
+				return false
+			}
+			return true
 		}
+		if errors.Is(cacheErr, redis.Nil) {
+			zap.L().Debug("Redis 获取菜单缓存未命中", zap.String("key", key))
+		} else {
+			zap.L().Error("Redis 获取缓存失败", zap.String("key", key), zap.Error(cacheErr))
+			err = cacheErr
+		}
+		return false
 	}
-	// 缓存未命中，从数据库读取
-	if errors.Is(err, redis.Nil) {
-		zap.L().Debug("Redis 获取菜单缓存未命中", zap.String("key", cacheKey), zap.Error(err))
-	} else {
-		zap.L().Error("Redis 获取缓存失败", zap.String("key", cacheKey), zap.Error(err))
+
+	// 调用局部函数尝试读取缓存
+	cacheKey := buildMenuCacheKey(validRoleIDList)
+	// 通过读锁尝试获取缓存
+	m.menuListRWLock.RLock()
+	if tryGetCache(cacheKey) || err != nil {
+		m.menuListRWLock.RUnlock()
+		return
+	}
+	m.menuListRWLock.RUnlock()
+
+	// 缓存仍未命中，进入写流程
+	m.menuListRWLock.Lock()
+	defer m.menuListRWLock.Unlock()
+
+	// 再次尝试读取缓存（写前再检查，避免重复构建）
+	if tryGetCache(cacheKey) || err != nil {
 		return
 	}
 	// 查询角色关联菜单数据
@@ -109,7 +133,6 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*response.Menu, err 
 			menuResp.Meta.AuthList = make([]response.AuthMark, 0)
 			menuResp.Children = make([]response.Menu, 0)
 		}
-
 		menuMap[menuDo.ID] = &menuResp
 	}
 	// 遍历所有菜单，构建树形结构
@@ -138,6 +161,7 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*response.Menu, err 
 		}
 	}
 	// 写入缓存
+	// 即使空切片也写入缓存，保证缓存的健壮性
 	cacheBytes, _ := sonic.Marshal(&res)
 	err = m.Redis.Set(cacheKey, string(cacheBytes), rediskey.MenuListRoleTTL)
 	if err != nil {
