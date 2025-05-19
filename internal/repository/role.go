@@ -138,9 +138,9 @@ func (r *RoleRepository) GetRoleListByRoleIDList(c context.Context, roleIDList [
 
 		// 将从数据库查到的结果写入 Redis
 		for _, role := range dbRoles {
-			key := strconv.FormatInt(role.ID, 10)
+			roleID := strconv.FormatInt(role.ID, 10)
 			roleJson, _ := sonic.MarshalString(role)
-			err = r.redis.Set(rediskey.RoleInfo+key, roleJson, rediskey.RoleInfoTTL)
+			err = r.redis.Set(rediskey.RoleInfo+roleID, roleJson, rediskey.RoleInfoTTL)
 			// 失败
 			if err != nil {
 				err = errors.NewCacheError("角色缓存写入失败")

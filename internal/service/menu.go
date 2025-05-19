@@ -54,39 +54,53 @@ func (m *MenuService) CreateMenu(c context.Context, menu *request.Menu) (err err
 	return
 }
 
-// GetMenuList 由于每次都是先是获取用户信息，再根据用户角色获取菜单列表
+// GetMenuList 获取当前用户菜单列表
+// 1. 先通过 Redis 缓存获取用户角色列表
+// 2. 若未命中，则从数据库获取角色 ID 列表和角色信息，并构造角色菜单缓存键
+// 3. 尝试读取菜单缓存数据（使用读写锁），若未命中则从数据库获取菜单信息
+// 4. 构建菜单树结构（嵌套子菜单、挂载按钮权限）
+// 5. 将菜单结果写入缓存，并更新角色缓存映射表
 func (m *MenuService) GetMenuList(c context.Context) (res []*response.Menu, err error) {
-	// 获取用户角色ID
-	userRoleKey := fmt.Sprintf(rediskey.UserRoleList+"%d", authutils.GetUserID(c))
+	// Step 1. 获取当前用户 ID
+	userID := authutils.GetUserID(c)
+
+	// Step 2. 构建用户角色缓存 key
+	userRoleKey := fmt.Sprintf(rediskey.UserRoleList+"%d", userID)
+
+	// Step 3. 尝试从 Redis 获取角色信息
 	val, err := m.Redis.Get(userRoleKey)
-	// 获取当前用户角色ID
-	var roleList []entity.Role
+
+	var roleIds []int64
+
+	// Step 4. 缓存未命中或出错
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
-			var roleIDList []int64
-			roleIDList, err = m.UserRolesRepo.GetRoleIDListByUserID(c, authutils.GetUserID(c))
+			// Step 4.1 从数据库获取角色 ID
+			roleIds, err = m.UserRolesRepo.GetRoleIDListByUserID(c, userID)
 			if err != nil {
 				zap.L().Error("获取用户角色ID列表失败", zap.Error(err))
 				return
 			}
-			roleList, err = m.RoleRepo.GetRoleListByRoleIDList(c, roleIDList)
-			if err != nil {
-				zap.L().Error("获取角色列表失败", zap.Error(err))
-				return
-			}
-			zap.L().Debug("获取用户角色对应关系缓存未命中", zap.Int64("userID", authutils.GetUserID(c)))
+			zap.L().Debug("获取用户角色对应关系缓存未命中", zap.Int64("userID", userID))
 		} else {
+			// Step 4.2 Redis 查询出错（非未命中），返回缓存错误提示
 			zap.L().Error("获取用户角色对应关系缓存失败", zap.Error(err))
 			err = myerror.NewCacheError("缓存获取失败,请刷新页面")
 			return
 		}
+	} else {
+		var roleList []entity.Role
+		// Step 5. 缓存命中，反序列化用户角色列表
+		_ = sonic.Unmarshal([]byte(val), &roleList)
+
+		// Step 6. 提取角色 ID 列表
+		roleIds = make([]int64, 0, len(roleList))
+		for _, role := range roleList {
+			roleIds = append(roleIds, role.ID)
+		}
 	}
-	_ = sonic.Unmarshal([]byte(val), &roleList)
-	roleIds := make([]int64, 0, len(roleList))
-	for _, role := range roleList {
-		roleIds = append(roleIds, role.ID)
-	}
-	// 构建缓存 key
+
+	// Step 7. 构建菜单缓存 key
 	buildMenuCacheKey := func(roleIds []int64) string {
 		sort.Slice(roleIds, func(i, j int) bool {
 			return roleIds[i] < roleIds[j]
@@ -97,7 +111,8 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*response.Menu, err 
 		}
 		return rediskey.MenuListRole + strings.Join(ids, "_")
 	}
-	// 提取成局部函数：尝试读取缓存
+
+	// Step 8. 定义函数：尝试从缓存获取菜单数据
 	tryGetCache := func(key string) bool {
 		cacheData, cacheErr := m.Redis.Get(key)
 		if cacheErr == nil {
@@ -105,7 +120,7 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*response.Menu, err 
 				zap.L().Error("菜单列表缓存解析失败", zap.String("key", key), zap.Error(unmarshalErr))
 				return false
 			}
-			return true
+			return true // 缓存命中
 		}
 		if errors.Is(cacheErr, redis.Nil) {
 			zap.L().Debug("Redis 获取菜单缓存未命中", zap.String("key", key))
@@ -116,11 +131,13 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*response.Menu, err 
 		return false
 	}
 
-	// 调用局部函数尝试读取缓存
+	// Step 9. 生成菜单缓存 key
 	cacheKey := buildMenuCacheKey(roleIds)
-	// 根据角色键获取锁
+
+	// Step 10. 获取菜单缓存锁（根据角色组合）
 	lock := m.getMenuLock(cacheKey)
 
+	// Step 11. 加读锁尝试读取缓存
 	lock.RLock()
 	if tryGetCache(cacheKey) || err != nil {
 		lock.RUnlock()
@@ -128,21 +145,28 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*response.Menu, err 
 	}
 	lock.RUnlock()
 
+	// Step 12. 加写锁准备写缓存（双检锁）
 	lock.Lock()
 	defer lock.Unlock()
 
-	// 再次尝试读取缓存（写前再检查，避免重复构建）
+	// Step 13. 写前再次检查缓存（双检锁模式）
 	if tryGetCache(cacheKey) || err != nil {
 		return
 	}
-	// 查询角色关联菜单数据
+
+	// Step 14. 查询当前角色对应的菜单 ID 列表
 	menuIDList, err := m.RoleMenusRepo.GetMenuIDListByRoleIDList(c, roleIds)
 	if err != nil {
 		return
 	}
-	// 获取数据库数据
+
+	// Step 15. 根据菜单 ID 列表获取菜单实体
 	menuList, err := m.MenuRepo.GetMenuListByIDList(c, menuIDList)
-	// 先用 map 存储所有菜单，方便查找
+	if err != nil {
+		return
+	}
+
+	// Step 16. 构建菜单树结构（map 方便后续挂载）
 	menuMap := make(map[int64]*response.Menu)
 	for _, menuDo := range menuList {
 		var menuResp response.Menu
@@ -151,20 +175,18 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*response.Menu, err 
 			zap.L().Error("菜单属性复制失败", zap.Error(err))
 			return
 		}
-		// 如果是不是按钮类型，则初始化 AuthList 和 Children
-		if menuDo.Type != 3 {
+		if menuDo.Type != 3 { // 非按钮类型
 			menuResp.Meta.AuthList = make([]response.AuthMark, 0)
 			menuResp.Children = make([]response.Menu, 0)
 		}
 		menuMap[menuDo.ID] = &menuResp
 	}
-	// 遍历所有菜单，构建树形结构
+
+	// Step 17. 组装菜单树结构 & 挂载按钮权限
 	for _, dbMenu := range menuList {
 		frontendMenu := menuMap[dbMenu.ID]
-		// 跳过按钮类型（按钮的 AuthCode 会挂到父菜单上）
-		if dbMenu.Type == 3 { // 按钮类型
+		if dbMenu.Type == 3 { // 按钮类型，挂到父菜单 AuthList
 			if parent, exists := menuMap[dbMenu.ParentID]; exists {
-				// 将按钮的 AuthCode 添加到父菜单的 AuthList
 				parent.Meta.AuthList = append(parent.Meta.AuthList, response.AuthMark{
 					ID:   dbMenu.ID,
 					Name: dbMenu.Title,
@@ -173,25 +195,24 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*response.Menu, err 
 			}
 			continue
 		}
-		// 如果是顶级菜单，直接添加到结果列表
 		if dbMenu.ParentID == -1 {
-			res = append(res, frontendMenu)
+			res = append(res, frontendMenu) // 顶级菜单
 		} else {
-			// 否则挂到父菜单的 Children 下
 			if parent, exists := menuMap[dbMenu.ParentID]; exists {
 				parent.Children = append(parent.Children, *frontendMenu)
 			}
 		}
 	}
-	// 写入缓存
-	// 即使空切片也写入缓存，保证缓存的健壮性
+
+	// Step 18. 将结果写入 Redis 缓存
 	cacheBytes, _ := sonic.Marshal(&res)
 	err = m.Redis.Set(cacheKey, string(cacheBytes), rediskey.MenuListRoleTTL)
 	if err != nil {
 		zap.L().Error("菜单列表写入缓存失败", zap.Error(err))
 		return
 	}
-	// 写入映射表
+
+	// Step 19. 写入菜单依赖映射表（用于后续清缓存）
 	for _, rid := range roleIds {
 		depKey := fmt.Sprintf(rediskey.MenuRoleDependencies+"%d", rid)
 		err = m.Redis.SAdd(depKey, cacheKey)
