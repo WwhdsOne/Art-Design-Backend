@@ -47,19 +47,7 @@ func (s *AuthService) Login(c *gin.Context, u *request.Login) (tokenStr string, 
 		err = fmt.Errorf("用户名或密码错误")
 		return
 	}
-	roleIdList, err := s.UserRolesRepo.GetRoleIDListByUserID(c, user.ID)
-	if err != nil {
-		return
-	}
-	roleIdList, err = s.RoleRepo.FilterValidRoleIDs(c, roleIdList)
-	if err != nil {
-		return
-	}
-	if len(roleIdList) == 0 {
-		err = fmt.Errorf("用户未分配角色")
-		return
-	}
-	claims := jwt.NewBaseClaims(user.ID, roleIdList)
+	claims := jwt.NewBaseClaims(user.ID)
 	return s.createToken(claims)
 }
 
@@ -196,5 +184,9 @@ func (s *AuthService) Register(c *gin.Context, userReq *request.RegisterUser) (e
 		}
 		return
 	})
+	if err != nil {
+		zap.L().Error("注册失败", zap.Error(err))
+		return
+	}
 	return
 }

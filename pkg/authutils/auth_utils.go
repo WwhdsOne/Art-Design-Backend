@@ -15,14 +15,6 @@ func GetUserID(c context.Context) int64 {
 	return -1
 }
 
-func GetUserRoleIDs(c context.Context) (roleIds []int64) {
-	value := c.Value("claims")
-	if value != nil {
-		return value.(*jwt.CustomClaims).BaseClaims.RoleIDs
-	}
-	return
-}
-
 func GetClaims(c context.Context) *jwt.CustomClaims {
 	value := c.Value("claims")
 	if value != nil {

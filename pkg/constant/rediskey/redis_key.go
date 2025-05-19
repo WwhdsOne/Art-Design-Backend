@@ -20,6 +20,9 @@ const (
 
 // 用户权限相关
 const (
-	UserRoleList    = "USER:ROLE:LIST:" // userID -> roleID list
-	UserRoleListTTL = 5 * time.Minute   // 缓存有效期
+	UserRoleList         = "USER:ROLE:LIST:" // userID -> roleID list
+	UserRoleListTTL      = 30 * time.Minute  // 缓存有效期
+	RoleInfo             = "ROLE:INFO:"
+	RoleInfoTTL          = 1 * time.Hour
+	RoleUserDependencies = "ROLE:USER:DEPENDENCIES:"
 )

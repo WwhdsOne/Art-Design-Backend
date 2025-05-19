@@ -8,6 +8,7 @@ import (
 	"Art-Design-Backend/internal/controller"
 	"Art-Design-Backend/internal/repository"
 	"Art-Design-Backend/pkg/middleware"
+	"Art-Design-Backend/pkg/provider"
 	"github.com/google/wire"
 )
 
@@ -24,6 +25,7 @@ func wireApp() *config.HttpServer {
 		config.NewGin,
 		config.NewJWT,
 		config.NewOSSClient,
+		provider.ProvideSyncMap,
 		// 这里解释一下没有serviceProvider的原因:
 		// 	service总是只被对应的controller使用，但是repo可能被多个service使用
 		//  所以controllerProvider中直接就创建了service，没有单独的serviceProvider

@@ -61,11 +61,9 @@ func (u *UserRolesRepository) AssignRoleToUser(c context.Context, userID int64, 
 		return
 	}
 
-	// 删除原有角色缓存
+	// 删除原有用户角色信息缓存
 	cacheKey := fmt.Sprintf(rediskey.UserRoleList+"%d", userID)
-	if delErr := u.redis.Del(cacheKey); delErr != nil {
-		zap.L().Warn("删除用户角色缓存失败", zap.Int64("userID", userID))
-	}
+	_ = u.redis.Del(cacheKey)
 
 	// 创建新的关联
 	if len(roleIDList) > 0 {

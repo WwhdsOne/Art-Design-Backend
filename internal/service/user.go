@@ -58,44 +58,54 @@ func (u *UserService) GetUserById(c *gin.Context) (res response.User, err error)
 	return
 }
 
-// getUserRoleListByUserID 尝试从 Redis 获取用户角色列表，获取不到就查数据库并写入缓存
-func (u *UserService) getUserRoleListByUserID(c context.Context, userID int64) (roleList []entity.Role, error error) {
-	key := fmt.Sprintf(rediskey.UserRoleList+"%d", userID)
-	// 先查 Redis
-	cacheStr, err := u.Redis.Get(key)
-	// 缓存未命中或出错
-	if err != nil {
-		if errors.Is(err, redis.Nil) {
-			zap.L().Debug("获取用户角色对应关系缓存未命中", zap.Int64("userID", userID))
-		} else {
-			zap.L().Error("获取用户角色对应关系缓存失败", zap.Error(err))
+func (u *UserService) getUserRoleListByUserID(c context.Context, userID int64) (roleList []entity.Role, err error) {
+	userRoleKey := fmt.Sprintf(rediskey.UserRoleList+"%d", userID)
+
+	// 1. 尝试从 Redis 获取缓存
+	cacheStr, err := u.Redis.Get(userRoleKey)
+	if err == nil {
+		if err = sonic.Unmarshal([]byte(cacheStr), &roleList); err == nil {
+			// 缓存命中，返回
 			return
 		}
-	}
-	// 缓存命中
-	// 如果缓存解析失败，则从数据库重新获取
-	if err = sonic.Unmarshal([]byte(cacheStr), &roleList); err != nil {
+		// 缓存解析失败，从数据库重新读取，防止数据污染
 		zap.L().Error("用户角色对应关系缓存解析失败", zap.Error(err))
-	} else {
+	} else if !errors.Is(err, redis.Nil) {
+		zap.L().Error("获取用户角色对应关系缓存失败", zap.Error(err))
+		// 若 Redis 出错（但不是未命中），直接返回错误
 		return
+	} else {
+		zap.L().Debug("获取用户角色对应关系缓存未命中", zap.Int64("userID", userID))
 	}
-	// 获取用户角色ID列表
+
+	// 2. 从数据库查询
 	roleIDList, err := u.UserRolesRepo.GetRoleIDListByUserID(c, userID)
 	if err != nil {
-		return
+		zap.L().Error("获取用户角色列表失败", zap.Error(err))
+		return nil, err
 	}
-	// 根据上一步获取的用户角色ID获取角色列表
+
 	roleList, err = u.RoleRepo.GetRoleListByRoleIDList(c, roleIDList)
 	if err != nil {
-		return
+		zap.L().Error("获取角色列表失败", zap.Error(err))
+		return nil, err
 	}
-	// 存入 Redis
-	cacheBytes, _ := sonic.Marshal(roleList)
-	err = u.Redis.Set(key, string(cacheBytes), rediskey.UserRoleListTTL)
-	if err != nil {
-		zap.L().Error("用户角色对应关系写入缓存失败", zap.Int64("userID", userID))
-		return
+
+	// 3. 写入 Redis 缓存
+	cacheBytes, _ := sonic.MarshalString(roleList)
+	if err = u.Redis.Set(userRoleKey, cacheBytes, rediskey.UserRoleListTTL); err != nil {
+		zap.L().Error("用户角色对应关系写入缓存失败", zap.Int64("userID", userID), zap.Error(err))
 	}
+
+	// 4. 写入 Redis 映射表（每个角色映射该用户缓存key）
+	for _, roleID := range roleIDList {
+		roleUserDepKey := fmt.Sprintf(rediskey.RoleUserDependencies+"%d", roleID)
+		if err = u.Redis.SAdd(roleUserDepKey, userRoleKey); err != nil {
+			zap.L().Error("用户角色对应关系写入映射表失败", zap.Error(err))
+			// 不 return，非关键失败
+		}
+	}
+
 	return
 }
 

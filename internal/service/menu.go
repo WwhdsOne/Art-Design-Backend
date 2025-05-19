@@ -7,6 +7,7 @@ import (
 	"Art-Design-Backend/internal/repository"
 	"Art-Design-Backend/pkg/authutils"
 	"Art-Design-Backend/pkg/constant/rediskey"
+	myerror "Art-Design-Backend/pkg/errors"
 	"Art-Design-Backend/pkg/redisx"
 	"context"
 	"errors"
@@ -26,11 +27,11 @@ type MenuService struct {
 	RoleMenusRepo *repository.RoleMenusRepository // 角色菜单关联 Repo
 	UserRolesRepo *repository.UserRolesRepository // 用户角色关联 Repo
 	Redis         *redisx.RedisWrapper            // redis
-	menuListLocks sync.Map                        // 根据角色键的菜单列表锁
+	MenuListLocks *sync.Map                       // 根据角色键的菜单列表锁
 }
 
 func (m *MenuService) getMenuLock(key string) *sync.RWMutex {
-	actual, _ := m.menuListLocks.LoadOrStore(key, &sync.RWMutex{})
+	actual, _ := m.MenuListLocks.LoadOrStore(key, &sync.RWMutex{})
 	return actual.(*sync.RWMutex)
 }
 
@@ -53,23 +54,38 @@ func (m *MenuService) CreateMenu(c context.Context, menu *request.Menu) (err err
 	return
 }
 
+// GetMenuList 由于每次都是先是获取用户信息，再根据用户角色获取菜单列表
 func (m *MenuService) GetMenuList(c context.Context) (res []*response.Menu, err error) {
-	roleIds := authutils.GetUserRoleIDs(c)
-	if len(roleIds) == 0 {
-		return
-	}
-
-	// 获取有效角色 ID
-	validRoleIDList, err := m.RoleRepo.FilterValidRoleIDs(c, roleIds)
+	// 获取用户角色ID
+	userRoleKey := fmt.Sprintf(rediskey.UserRoleList+"%d", authutils.GetUserID(c))
+	val, err := m.Redis.Get(userRoleKey)
+	// 获取当前用户角色ID
+	var roleList []entity.Role
 	if err != nil {
-		return
+		if errors.Is(err, redis.Nil) {
+			var roleIDList []int64
+			roleIDList, err = m.UserRolesRepo.GetRoleIDListByUserID(c, authutils.GetUserID(c))
+			if err != nil {
+				zap.L().Error("获取用户角色ID列表失败", zap.Error(err))
+				return
+			}
+			roleList, err = m.RoleRepo.GetRoleListByRoleIDList(c, roleIDList)
+			if err != nil {
+				zap.L().Error("获取角色列表失败", zap.Error(err))
+				return
+			}
+			zap.L().Debug("获取用户角色对应关系缓存未命中", zap.Int64("userID", authutils.GetUserID(c)))
+		} else {
+			zap.L().Error("获取用户角色对应关系缓存失败", zap.Error(err))
+			err = myerror.NewCacheError("缓存获取失败,请刷新页面")
+			return
+		}
 	}
-	// 获取用户实际拥有的有效角色ID列表
-	validRoleIDList, err = m.UserRolesRepo.FilterValidUserRoles(c, validRoleIDList)
-	if err != nil {
-		return
+	_ = sonic.Unmarshal([]byte(val), &roleList)
+	roleIds := make([]int64, 0, len(roleList))
+	for _, role := range roleList {
+		roleIds = append(roleIds, role.ID)
 	}
-
 	// 构建缓存 key
 	buildMenuCacheKey := func(roleIds []int64) string {
 		sort.Slice(roleIds, func(i, j int) bool {
@@ -81,7 +97,6 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*response.Menu, err 
 		}
 		return rediskey.MenuListRole + strings.Join(ids, "_")
 	}
-
 	// 提取成局部函数：尝试读取缓存
 	tryGetCache := func(key string) bool {
 		cacheData, cacheErr := m.Redis.Get(key)
@@ -102,7 +117,7 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*response.Menu, err 
 	}
 
 	// 调用局部函数尝试读取缓存
-	cacheKey := buildMenuCacheKey(validRoleIDList)
+	cacheKey := buildMenuCacheKey(roleIds)
 	// 根据角色键获取锁
 	lock := m.getMenuLock(cacheKey)
 
@@ -121,7 +136,7 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*response.Menu, err 
 		return
 	}
 	// 查询角色关联菜单数据
-	menuIDList, err := m.RoleMenusRepo.GetMenuIDListByRoleIDList(c, validRoleIDList)
+	menuIDList, err := m.RoleMenusRepo.GetMenuIDListByRoleIDList(c, roleIds)
 	if err != nil {
 		return
 	}
@@ -177,7 +192,7 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*response.Menu, err 
 		return
 	}
 	// 写入映射表
-	for _, rid := range validRoleIDList {
+	for _, rid := range roleIds {
 		depKey := fmt.Sprintf(rediskey.MenuRoleDependencies+"%d", rid)
 		err = m.Redis.SAdd(depKey, cacheKey)
 		if err != nil {

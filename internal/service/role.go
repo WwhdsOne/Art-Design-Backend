@@ -71,6 +71,11 @@ func (r *RoleService) UpdateRole(c *gin.Context, roleReq *request.Role) (err err
 	if err = r.RoleRepo.UpdateRole(c, &roleDo); err != nil {
 		return
 	}
+	go func() {
+		if cacheErr := r.RoleRepo.InvalidRoleInfoCache(roleDo.ID); cacheErr != nil {
+			zap.L().Error("用户信息缓存删除失败（需补偿）", zap.Int64("roleID", roleDo.ID), zap.Error(cacheErr))
+		}
+	}()
 	return
 }
 

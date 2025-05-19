@@ -26,14 +26,12 @@ type JWT struct {
 // BaseClaims 基础声明结构体
 type BaseClaims struct {
 	UserID            int64         // 主键 id
-	RoleIDs           []int64       // 角色id列表
 	refreshWindowTime time.Duration // 刷新窗口时间
 }
 
-func NewBaseClaims(userId int64, roleIds []int64) BaseClaims {
+func NewBaseClaims(userId int64) BaseClaims {
 	return BaseClaims{
-		UserID:  userId,
-		RoleIDs: roleIds,
+		UserID: userId,
 	}
 }
 

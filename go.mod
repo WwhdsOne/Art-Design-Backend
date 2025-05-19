@@ -7,7 +7,7 @@ tool github.com/google/wire/cmd/wire
 require (
 	github.com/aliyun/alibabacloud-oss-go-sdk-v2 v1.2.2
 	github.com/bytedance/sonic v1.13.2
-	github.com/dromara/carbon/v2 v2.6.5
+	github.com/dromara/carbon/v2 v2.6.6
 	github.com/gin-contrib/gzip v1.2.3
 	github.com/gin-contrib/zap v1.1.5
 	github.com/gin-gonic/gin v1.10.0
