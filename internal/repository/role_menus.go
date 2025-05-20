@@ -59,19 +59,8 @@ func (r *RoleMenusRepository) InvalidateMenuCacheByRoleID(roleID int64) (err err
 	// 获取记录角色所关联的菜单缓存 key 的依赖集合 key（Set 类型）
 	depKey := fmt.Sprintf(rediskey.MenuRoleDependencies+"%d", roleID)
 
-	// 查询该角色所依赖的所有用户菜单缓存 key
-	cacheKeys := r.redis.SMembers(depKey)
-
 	// 构造删除列表：包括依赖集合本身 和 依赖集合中记录的所有菜单缓存 key
-	delKeys := make([]string, 0, len(cacheKeys)+1)
-	delKeys = append(delKeys, depKey)       // 删除依赖表（防止过期错误等影响新依赖写入）
-	delKeys = append(delKeys, cacheKeys...) // 删除所有受影响的用户菜单缓存
-
-	// 批量删除（使用 Redis 管道提高性能）
-	if err = r.redis.PipelineDel(delKeys); err != nil {
-		zap.L().Error("角色菜单缓存批量删除失败", zap.Int64("roleID", roleID), zap.Error(err))
-		return
-	}
+	err = r.redis.DelBySetMembers(depKey)
 
 	return
 }

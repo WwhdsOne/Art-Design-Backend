@@ -81,9 +81,11 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*response.Menu, err 
 				zap.L().Error("获取用户角色ID列表失败", zap.Error(err))
 				return
 			}
+			// Step 4.2 验证角色是否启用
+			roleIds, _ = m.RoleRepo.FilterValidRoleIDs(c, roleIds)
 			zap.L().Debug("获取用户角色对应关系缓存未命中", zap.Int64("userID", userID))
 		} else {
-			// Step 4.2 Redis 查询出错（非未命中），返回缓存错误提示
+			// Step 4.3 Redis 查询出错（非未命中），返回缓存错误提示
 			zap.L().Error("获取用户角色对应关系缓存失败", zap.Error(err))
 			err = myerror.NewCacheError("缓存获取失败,请刷新页面")
 			return

@@ -30,11 +30,5 @@ func NewRedis(cfg *Config) *redisx.RedisWrapper {
 	if err != nil {
 		zap.L().Fatal("Redis 连接失败")
 	}
-	redisWrapper := &redisx.RedisWrapper{
-		Client:           client,
-		OperationTimeout: utils.ParseDuration(r.OperationTimeout),
-	}
-	// 启动命中率日志
-	redisWrapper.StartHitRateLogger(utils.ParseDuration(r.HitRateLogInterval))
-	return redisWrapper
+	return redisx.NewRedisWrapper(client, utils.ParseDuration(r.OperationTimeout), utils.ParseDuration(r.HitRateLogInterval))
 }

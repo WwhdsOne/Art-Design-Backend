@@ -102,55 +102,23 @@ func (r *RoleRepository) GetRoleByID(c context.Context, roleID int64) (role *ent
 		err = errors.NewDBError("查询角色失败")
 		return
 	}
+	// 异步写入 Redis
+	go func() {
+		roleJson, _ = sonic.MarshalString(role)
+		err = r.redis.Set(rediskey.RoleInfo+key, roleJson, rediskey.RoleInfoTTL)
+	}()
 	return
 }
 
 func (r *RoleRepository) GetRoleListByRoleIDList(c context.Context, roleIDList []int64) (roleList []entity.Role, err error) {
-	var (
-		cacheHitRoles []entity.Role
-		missIDs       []int64
-	)
-
 	for _, roleID := range roleIDList {
-		key := strconv.FormatInt(roleID, 10)
-		var role entity.Role
-		// 从 Redis 读取
-		_, err = r.redis.Get(key)
-		if err == nil {
-			cacheHitRoles = append(cacheHitRoles, role)
-			continue
+		var role *entity.Role
+		role, err = r.GetRoleByID(c, roleID)
+		if err != nil {
+			return
 		}
-		// 不存在或出错，加入待查列表
-		missIDs = append(missIDs, roleID)
+		roleList = append(roleList, *role)
 	}
-
-	var dbRoles []entity.Role
-	if len(missIDs) > 0 {
-		for _, roleID := range missIDs {
-			var role *entity.Role
-			role, err = r.GetRoleByID(c, roleID)
-			if err != nil {
-				err = errors.NewDBError("查询角色失败")
-				return
-			}
-			dbRoles = append(dbRoles, *role)
-		}
-
-		// 将从数据库查到的结果写入 Redis
-		for _, role := range dbRoles {
-			roleID := strconv.FormatInt(role.ID, 10)
-			roleJson, _ := sonic.MarshalString(role)
-			err = r.redis.Set(rediskey.RoleInfo+roleID, roleJson, rediskey.RoleInfoTTL)
-			// 失败
-			if err != nil {
-				err = errors.NewCacheError("角色缓存写入失败")
-				return
-			}
-		}
-	}
-
-	// 合并缓存命中和数据库查出的数据
-	roleList = append(cacheHitRoles, dbRoles...)
 	return
 }
 
@@ -192,16 +160,7 @@ func (r *RoleRepository) InvalidRoleInfoCache(roleID int64) (err error) {
 	}
 	// 根据角色用户映射表删除用户角色信息缓存
 	key = fmt.Sprintf(rediskey.RoleUserDependencies+"%d", roleID)
-	vals := r.redis.SMembers(key)
-	if len(vals) > 0 {
-		err = r.redis.PipelineDel(vals)
-		if err != nil {
-			err = errors.NewCacheError("删除角色用户映射表缓存失败")
-			return
-		}
-	}
-	// 删除角色菜单映射表缓存
-	err = r.redis.Del(key)
+	err = r.redis.DelBySetMembers(key)
 	if err != nil {
 		err = errors.NewCacheError("删除角色菜单映射表缓存失败")
 		return

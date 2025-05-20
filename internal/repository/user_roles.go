@@ -2,7 +2,6 @@ package repository
 
 import (
 	"Art-Design-Backend/internal/model/entity"
-	"Art-Design-Backend/pkg/authutils"
 	"Art-Design-Backend/pkg/constant/rediskey"
 	"Art-Design-Backend/pkg/errors"
 	"Art-Design-Backend/pkg/redisx"
@@ -22,19 +21,6 @@ func NewUserRolesRepository(db *gorm.DB, redis *redisx.RedisWrapper) *UserRolesR
 		db:    db,
 		redis: redis,
 	}
-}
-
-// FilterValidUserRoles 获取用户实际拥有的有效角色ID列表
-func (u *UserRolesRepository) FilterValidUserRoles(c context.Context, roleIDs []int64) (validRoleIDs []int64, err error) {
-	if err = DB(c, u.db).
-		Model(&entity.UserRoles{}).
-		Where("user_id = ? AND role_id IN ?", authutils.GetUserID(c), roleIDs).
-		Pluck("role_id", &validRoleIDs).Error; err != nil {
-		zap.L().Error("查询用户有效角色失败", zap.Error(err))
-		err = errors.NewDBError("查询用户有效角色失败")
-		return
-	}
-	return
 }
 
 // GetRoleIDListByUserID 根据用户ID获取角色ID列表
