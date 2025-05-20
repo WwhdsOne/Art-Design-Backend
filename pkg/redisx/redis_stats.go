@@ -1,8 +1,8 @@
 package redisx
 
 import (
+	"bytes"
 	"fmt"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -57,13 +57,29 @@ func (r *RedisWrapper) statProcessor() {
 	}
 }
 
-// getKeyCategory 根据key获取分类
+// 使用缓冲池，减少内存分配
+// 指定最长长度，避免频繁分配内存
+// 128字节兼顾性能和空间
+var bufferPool = sync.Pool{
+	New: func() interface{} {
+		return make([]byte, 0, 128) // 128字节
+	},
+}
+
+// 根据 key 获取分类
 func getKeyCategory(key string) string {
-	parts := strings.Split(key, ":")
-	if len(parts) <= 1 {
+	b := bufferPool.Get().([]byte)
+	b = append(b[:0], key...) // 重置并复用切片
+
+	idx := bytes.LastIndexByte(b, ':')
+	if idx == -1 {
+		bufferPool.Put(b)
 		return key
 	}
-	return strings.Join(parts[:len(parts)-1], ":") + ":" // 去掉最后一段
+
+	result := string(b[:idx+1])
+	bufferPool.Put(b)
+	return result
 }
 
 // 原子计数
