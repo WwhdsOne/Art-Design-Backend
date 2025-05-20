@@ -51,25 +51,22 @@ func (s *AuthService) Login(c *gin.Context, u *request.Login) (tokenStr string, 
 	return s.createToken(claims)
 }
 
-func (s *AuthService) RefreshToken(c *gin.Context) (tokenStr string, err error) {
-	// 路径参数中获取用户 id
-	idStr := c.Param("id")
+func (s *AuthService) RefreshToken(c *gin.Context, userID int64) (tokenStr string, err error) {
 	// 确保该用户在登录状态
-	sessionKey := rediskey.SESSION + idStr
-	_, err = s.Redis.Get(sessionKey)
+	sessionKey := rediskey.SESSION + strconv.FormatInt(userID, 10)
+	tokenStr, err = s.Redis.Get(sessionKey)
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
 			// 用户未登录
 			err = errors.New("用户未在登录状态")
-			zap.L().Warn("用户未登录", zap.String("user_id", idStr))
+			zap.L().Warn("用户未登录", zap.Int64("user_id", userID))
 			return
 		}
 		// Redis 出错
 		zap.L().Error("Redis 获取 Session 失败", zap.String("key", sessionKey), zap.Error(err))
 		return
 	}
-	// 根据原有的用户 Claims 创建一个新的 token
-	claims := authutils.GetClaims(c)
+	claims, _ := s.Jwt.ParseToken(tokenStr)
 	return s.createToken(claims.BaseClaims)
 }
 

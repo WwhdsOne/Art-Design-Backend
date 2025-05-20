@@ -26,7 +26,7 @@ type JWT struct {
 // BaseClaims 基础声明结构体
 type BaseClaims struct {
 	UserID            int64         // 主键 id
-	refreshWindowTime time.Duration // 刷新窗口时间
+	RefreshWindowTime time.Duration // 刷新窗口时间
 }
 
 func NewBaseClaims(userId int64) BaseClaims {
@@ -45,13 +45,13 @@ type CustomClaims struct {
 func IsWithinRefreshWindow(c *CustomClaims) bool {
 	now := time.Now()
 	expireTime := c.ExpiresAt.Time
-	return now.Add(c.refreshWindowTime).After(expireTime)
+	return now.Add(c.RefreshWindowTime).After(expireTime)
 }
 
 // createClaims 创建负载
 func (j *JWT) createClaims(baseClaims BaseClaims) CustomClaims {
 	// 设置刷新窗口时间
-	baseClaims.refreshWindowTime = j.RefreshWindowTime
+	baseClaims.RefreshWindowTime = j.RefreshWindowTime
 	claims := CustomClaims{
 		BaseClaims: baseClaims,
 		RegisteredClaims: jwt.RegisteredClaims{

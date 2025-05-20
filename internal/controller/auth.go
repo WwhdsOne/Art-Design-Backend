@@ -5,6 +5,7 @@ import (
 	"Art-Design-Backend/internal/service"
 	"Art-Design-Backend/pkg/middleware"
 	"Art-Design-Backend/pkg/result"
+	"Art-Design-Backend/pkg/utils"
 	"github.com/gin-gonic/gin"
 )
 
@@ -63,7 +64,12 @@ func (a *AuthController) logout(c *gin.Context) {
 
 // refreshToken 处理用户刷新 token 请求
 func (a *AuthController) refreshToken(c *gin.Context) {
-	token, err := a.authService.RefreshToken(c)
+	userID, err := utils.ParseID(c)
+	if err != nil {
+		result.FailWithMessage("用户ID解析失败", c)
+		return
+	}
+	token, err := a.authService.RefreshToken(c, userID)
 	if err != nil {
 		_ = c.Error(err)
 		return
