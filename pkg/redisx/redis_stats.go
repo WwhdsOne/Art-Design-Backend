@@ -1,8 +1,8 @@
 package redisx
 
 import (
-	"bytes"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -15,6 +15,7 @@ func (r *RedisWrapper) StartHitRateLogger(interval time.Duration) {
 		defer ticker.Stop()
 
 		for range ticker.C {
+			fmt.Println()
 			fmt.Println("┌────────────────────────────┬────────────┬────────────┬────────────┐")
 			fmt.Println("│ Redis Key Prefix           │ Hit Count  │ Total Req  │ Hit Rate % │")
 			fmt.Println("├────────────────────────────┼────────────┼────────────┼────────────┤")
@@ -57,29 +58,9 @@ func (r *RedisWrapper) statProcessor() {
 	}
 }
 
-// 使用缓冲池，减少内存分配
-// 指定最长长度，避免频繁分配内存
-// 128字节兼顾性能和空间
-var bufferPool = sync.Pool{
-	New: func() interface{} {
-		return make([]byte, 0, 128) // 128字节
-	},
-}
-
-// 根据 key 获取分类
 func getKeyCategory(key string) string {
-	b := bufferPool.Get().([]byte)
-	b = append(b[:0], key...) // 重置并复用切片
-
-	idx := bytes.LastIndexByte(b, ':')
-	if idx == -1 {
-		bufferPool.Put(b)
-		return key
-	}
-
-	result := string(b[:idx+1])
-	bufferPool.Put(b)
-	return result
+	idx := strings.LastIndex(key, ":")
+	return key[:idx+1]
 }
 
 // 原子计数
