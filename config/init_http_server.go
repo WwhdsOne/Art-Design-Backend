@@ -24,13 +24,14 @@ type Server struct {
 }
 
 type HttpServer struct {
-	Engine         *gin.Engine                // gin引擎
-	Logger         *zap.Logger                // 日志
-	AuthController *controller.AuthController // 鉴权Ctrl
-	UserController *controller.UserController // 用户Ctrl
-	MenuController *controller.MenuController // 菜单Ctrl
-	RoleController *controller.RoleController // 角色Ctrl
-	Config         *Config                    // 服务器配置
+	Engine                 *gin.Engine                        // gin引擎
+	Logger                 *zap.Logger                        // 日志
+	AuthController         *controller.AuthController         // 鉴权Ctrl
+	UserController         *controller.UserController         // 用户Ctrl
+	MenuController         *controller.MenuController         // 菜单Ctrl
+	RoleController         *controller.RoleController         // 角色Ctrl
+	DigitPredictController *controller.DigitPredictController // 数字预测Ctrl
+	Config                 *Config                            // 服务器配置
 }
 
 func NewGin(m *middleware.Middlewares, logger *zap.Logger) *gin.Engine {

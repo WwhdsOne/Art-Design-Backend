@@ -7,4 +7,5 @@ var (
 	RoleTableName      = "role"
 	RoleMenusTableName = "role_menus"
 	UserRolesTableName = "user_roles"
+	DigitPredict       = "digit_predict"
 )

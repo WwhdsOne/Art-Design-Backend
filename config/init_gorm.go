@@ -34,6 +34,8 @@ func AutoMigrate(db *gorm.DB) {
 	//db.AutoMigrate(&entity.Role{})
 	//// 4. 菜单
 	//db.AutoMigrate(&entity.Menu{})
+	// 5. 数字识别
+	db.AutoMigrate(&entity.DigitPredict{})
 }
 
 // snowflakeIDPlugin GORM插件实现
@@ -171,6 +173,7 @@ func NewGorm(cfg *Config, log *zap.Logger) (DB *gorm.DB) {
 		registerIDField(&entity.User{}, "ID")
 		registerIDField(&entity.OperationLog{}, "ID")
 		registerIDField(&entity.Menu{}, "ID")
+		registerIDField(&entity.DigitPredict{}, "ID")
 	}
 
 	// 雪花ID插件

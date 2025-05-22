@@ -25,6 +25,7 @@ func wireApp() *config.HttpServer {
 		config.NewGin,
 		config.NewJWT,
 		config.NewOSSClient,
+		config.NewDigitPredict,
 		container.Container,
 		// 这里解释一下没有serviceProvider的原因:
 		// 	service总是只被对应的controller使用，但是repo可能被多个service使用

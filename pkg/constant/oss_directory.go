@@ -1,3 +1,6 @@
 package constant
 
-var AvatarDirectory = "avatar"
+var (
+	AvatarDirectory = "avatar"
+	Mnist           = "mnist"
+)

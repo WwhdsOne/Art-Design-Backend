@@ -32,3 +32,19 @@ func (o *OssClient) UploadAvatar(c context.Context, filename string, reader io.R
 	fileUrl = "https://" + o.BucketName + "." + o.Endpoint + "/" + constant.AvatarDirectory + "/" + uploadFileName
 	return
 }
+
+func (o *OssClient) UploadDigitImage(c context.Context, filename string, reader io.Reader) (fileUrl string, err error) {
+	uploadFileName := utils.StdUUID() + filepath.Ext(filename)
+	request := oss.PutObjectRequest{
+		Bucket: oss.Ptr(o.BucketName),
+		Key:    oss.Ptr(constant.Mnist + "/" + uploadFileName),
+		Body:   reader,
+	}
+	if _, err = o.Client.PutObject(c, &request); err != nil {
+		zap.L().Error("上传头像失败", zap.Error(err))
+		return
+	}
+	// 拼接完整的URL
+	fileUrl = "https://" + o.BucketName + "." + o.Endpoint + "/" + constant.Mnist + "/" + uploadFileName
+	return
+}

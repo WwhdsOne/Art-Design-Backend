@@ -10,6 +10,7 @@ var ControllersProvider = wire.NewSet(
 	UserCtrlProvider,
 	MenuCtrlProvider,
 	RoleCtrlProvider,
+	DigitPredictProvider,
 )
 
 var AuthCtrlProvider = wire.NewSet(
@@ -30,4 +31,9 @@ var MenuCtrlProvider = wire.NewSet(
 var RoleCtrlProvider = wire.NewSet(
 	NewRoleController,
 	wire.Struct(new(service.RoleService), "*"),
+)
+
+var DigitPredictProvider = wire.NewSet(
+	NewDigitPredictController,
+	wire.Struct(new(service.DigitPredictService), "*"),
 )

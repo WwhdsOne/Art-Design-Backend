@@ -10,12 +10,13 @@ import (
 
 // Config 定义配置结构体
 type Config struct {
-	Server Server `yaml:"server"`
-	Mysql  Mysql  `yaml:"mysql"`
-	Redis  Redis  `yaml:"redis"`
-	JWT    JWT    `yaml:"jwt"`
-	Zap    Zap    `yaml:"zap"`
-	OSS    OSS    `yaml:"oss"`
+	Server       Server       `yaml:"server"`
+	Mysql        Mysql        `yaml:"mysql"`
+	Redis        Redis        `yaml:"redis"`
+	JWT          JWT          `yaml:"jwt"`
+	Zap          Zap          `yaml:"zap"`
+	OSS          OSS          `yaml:"oss"`
+	DigitPredict DigitPredict `yaml:"digit_predict"`
 }
 
 func NewConfig() (cfg *Config) {
