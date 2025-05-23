@@ -6,6 +6,7 @@ import (
 	"Art-Design-Backend/pkg/authutils"
 	"Art-Design-Backend/pkg/middleware"
 	"Art-Design-Backend/pkg/result"
+	"Art-Design-Backend/pkg/utils"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
@@ -23,6 +24,7 @@ func NewDigitPredictController(engine *gin.Engine, middleware *middleware.Middle
 	{
 		// 私有路由组（需要 JWT 认证）
 		r.GET("/list", digitCtrl.getDigitPredictList)
+		r.GET("/get/:id", digitCtrl.getDigitById)
 		r.POST("/predict", digitCtrl.predict)
 		r.POST("/upload", digitCtrl.uploadDigitImage)
 	}
@@ -46,7 +48,10 @@ func (d *DigitPredictController) predict(c *gin.Context) {
 		c.Set(gin.BindKey, req)
 		return
 	}
-	_ = d.DigitPredictService.SubmitMission(c, &req)
+	if err := d.DigitPredictService.SubmitMission(c, &req); err != nil {
+		_ = c.Error(err)
+		return
+	}
 	result.OkWithMessage("提交成功", c)
 }
 
@@ -81,4 +86,18 @@ func (d *DigitPredictController) uploadDigitImage(c *gin.Context) {
 	}
 
 	result.OkWithData(digitImageUrl, c)
+}
+
+func (d *DigitPredictController) getDigitById(c *gin.Context) {
+	id, err := utils.ParseID(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	digit, err := d.DigitPredictService.GetDigitById(c, id)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithData(digit, c)
 }

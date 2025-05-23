@@ -9,7 +9,7 @@ func (e *CacheError) Error() string {
 }
 
 func NewCacheError(message string) error {
-	return &DBError{
+	return &CacheError{
 		Message: message,
 	}
 }

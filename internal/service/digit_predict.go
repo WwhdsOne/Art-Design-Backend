@@ -7,6 +7,7 @@ import (
 	"Art-Design-Backend/internal/repository"
 	"Art-Design-Backend/pkg/aliyun"
 	"Art-Design-Backend/pkg/client"
+	"Art-Design-Backend/pkg/errors"
 	"context"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
@@ -33,20 +34,29 @@ func (d *DigitPredictService) GetDigitPredictList(c context.Context, createdBy i
 	return
 }
 
-func (d *DigitPredictService) SubmitMission(c context.Context, req *request.DigitPredict) error {
+func (d *DigitPredictService) SubmitMission(c context.Context, req *request.DigitPredict) (err error) {
+	id := int64(req.ID)
+	labeled, err := d.DigitPredictRepo.IsLabeled(c, id)
+	if err != nil {
+		zap.L().Error("查询任务状态失败", zap.Error(err))
+		return
+	}
+	if labeled {
+		zap.L().Error("该图片已经识别，请勿重复提交", zap.Int64("id", id))
+		return errors.NewBusinessError("该图片已经识别，请勿重复提交")
+	}
 	go func() {
 		var result int
-		var err error
 		if result, err = d.DigitPredictClient.Predict(req.Image); err != nil {
 			zap.L().Error("预测任务失败", zap.Error(err))
 		}
 		zap.L().Info("预测结果", zap.Int("result", result))
-		err = d.DigitPredictRepo.UpdateLabelByID(c, int64(req.ID), result)
+		err = d.DigitPredictRepo.UpdateLabelByID(c, id, result)
 		if err != nil {
 			zap.L().Error("更新任务结果失败", zap.Error(err))
 		}
 	}()
-	return nil
+	return
 }
 
 func (d *DigitPredictService) UploadDigitImage(c *gin.Context, filename string, src multipart.File) (fileUrl string, err error) {
@@ -62,5 +72,16 @@ func (d *DigitPredictService) UploadDigitImage(c *gin.Context, filename string, 
 		zap.L().Error("创建数字识别失败", zap.Error(err))
 		return
 	}
+	return
+}
+
+func (d *DigitPredictService) GetDigitById(c *gin.Context, id int64) (res *response.DigitPredict, err error) {
+	res = &response.DigitPredict{}
+	digitDo, err := d.DigitPredictRepo.GetDigitById(c, id)
+	if err != nil {
+		zap.L().Error("查询数字识别失败", zap.Error(err))
+		return
+	}
+	_ = copier.Copy(res, digitDo)
 	return
 }
