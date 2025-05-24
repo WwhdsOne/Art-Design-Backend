@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"Art-Design-Backend/internal/model/entity"
+	"Art-Design-Backend/internal/model/request"
 	myerrors "Art-Design-Backend/pkg/errors"
 	"Art-Design-Backend/pkg/result"
 	"errors"
@@ -115,9 +115,14 @@ func handleGenericErrors(c *gin.Context, ginErr *gin.Error) bool {
 func (m *Middlewares) ErrorHandlerMiddleware() gin.HandlerFunc {
 	{
 		// 注册校验器错误返回信息
-		registerValidator(entity.User{})
-		registerValidator(entity.Menu{})
-		registerValidator(entity.Role{})
+		registerValidator(request.ChangePassword{})
+		registerValidator(request.DigitPredict{})
+		registerValidator(request.Login{})
+		registerValidator(request.Menu{})
+		registerValidator(request.RegisterUser{})
+		registerValidator(request.Role{})
+		registerValidator(request.RoleMenuBinding{})
+		registerValidator(request.User{})
 	}
 	return func(c *gin.Context) {
 		c.Next() // 先调用后续的处理函数

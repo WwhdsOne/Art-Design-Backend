@@ -8,12 +8,12 @@ import (
 type Menu struct {
 	base.BaseModel
 	Name      string `gorm:"type:varchar(30);not null;unique;comment:组件名称"`
-	Type      int8   `gorm:"type:tinyint;not null;default:1;comment:类型（1：目录；2：菜单；3：按钮）"`
+	Type      int8   `gorm:"type:smallint;not null;default:1;comment:类型（1：目录；2：菜单；3：按钮）"`
 	Path      string `gorm:"type:varchar(255);unique;comment:路由地址"`
 	Component string `gorm:"type:varchar(255);comment:组件路径"`
 	ParentID  int64  `gorm:"type:bigint;not null;default:0;index:idx_parent_id;comment:上级菜单ID,顶级菜单父ID为-1"`
 	Meta             // 页面元信息
-	Sort      int    `gorm:"type:int;default:999;comment:排序"`
+	Sort      int    `gorm:"type:integer;default:999;comment:排序"`
 	Children  []Menu `gorm:"-"` // 子页面
 }
 

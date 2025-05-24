@@ -6,18 +6,19 @@ import (
 	"context"
 	"fmt"
 	"go.uber.org/zap"
-	"gorm.io/driver/mysql"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 	"reflect"
 	"time"
 )
 
-type Mysql struct {
-	Host     string `yaml:"host"`
-	Port     int    `yaml:"port"`
+// PostgreSQL 配置结构体
+type PostgreSQL struct {
 	User     string `yaml:"user"`
 	Password string `yaml:"password"`
+	Host     string `yaml:"host"`
+	Port     int    `yaml:"port"`
 	Database string `yaml:"database"`
 }
 
@@ -26,7 +27,7 @@ var snowflakeIdFieldsMap = make(map[reflect.Type]string)
 
 // AutoMigrate 自动迁移
 func AutoMigrate(db *gorm.DB) {
-	// 1. 操作日志
+	//// 1. 操作日志
 	//db.AutoMigrate(&entity.OperationLog{})
 	//// 2. 用户
 	//db.AutoMigrate(&entity.User{})
@@ -34,8 +35,8 @@ func AutoMigrate(db *gorm.DB) {
 	//db.AutoMigrate(&entity.Role{})
 	//// 4. 菜单
 	//db.AutoMigrate(&entity.Menu{})
-	// 5. 数字识别
-	db.AutoMigrate(&entity.DigitPredict{})
+	//// 5. 数字识别
+	//db.AutoMigrate(&entity.DigitPredict{})
 }
 
 // snowflakeIDPlugin GORM插件实现
@@ -142,13 +143,15 @@ func (z *zapGormLogger) Trace(c context.Context, begin time.Time, fc func() (str
 }
 
 func NewGorm(cfg *Config, log *zap.Logger) (DB *gorm.DB) {
-	m := cfg.Mysql
-	ds := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
-		m.User,     //用户名
-		m.Password, //密码
-		m.Host,     //地址
-		m.Port,     //端口
-		m.Database, //数据库
+	m := cfg.PostgreSql
+	// 构建PostgreSQL连接字符串
+	dsn := fmt.Sprintf(
+		"host=%s port=%d user=%s password=%s dbname=%s sslmode=disable TimeZone=Asia/Shanghai",
+		m.Host,
+		m.Port,
+		m.User,
+		m.Password,
+		m.Database,
 	)
 	// 创建 Zap 日志适配器
 	gormLogger := &zapGormLogger{
@@ -157,7 +160,7 @@ func NewGorm(cfg *Config, log *zap.Logger) (DB *gorm.DB) {
 	}
 
 	// 连接数据库
-	DB, err := gorm.Open(mysql.Open(ds), &gorm.Config{
+	DB, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		Logger:                                   gormLogger,
 		DisableForeignKeyConstraintWhenMigrating: true, // 关闭自动迁移外键创建
 	})

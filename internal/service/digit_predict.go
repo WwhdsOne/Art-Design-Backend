@@ -49,6 +49,7 @@ func (d *DigitPredictService) SubmitMission(c context.Context, req *request.Digi
 		var result int
 		if result, err = d.DigitPredictClient.Predict(req.Image); err != nil {
 			zap.L().Error("预测任务失败", zap.Error(err))
+			return
 		}
 		zap.L().Info("预测结果", zap.Int("result", result))
 		err = d.DigitPredictRepo.UpdateLabelByID(c, id, result)

@@ -11,7 +11,7 @@ import (
 // Config 定义配置结构体
 type Config struct {
 	Server       Server       `yaml:"server"`
-	Mysql        Mysql        `yaml:"mysql"`
+	PostgreSql   PostgreSQL   `yaml:"postgre_sql"`
 	Redis        Redis        `yaml:"redis"`
 	JWT          JWT          `yaml:"jwt"`
 	Zap          Zap          `yaml:"zap"`

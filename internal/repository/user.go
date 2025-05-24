@@ -22,7 +22,6 @@ func NewUserRepository(db *gorm.DB) *UserRepository {
 }
 
 func (u *UserRepository) CheckUserDuplicate(user *entity.User) (err error) {
-
 	var result struct {
 		UsernameExists bool
 		EmailExists    bool
@@ -42,18 +41,18 @@ func (u *UserRepository) CheckUserDuplicate(user *entity.User) (err error) {
 
 	// 只检查非空字段
 	if user.Username != "" {
-		conditions = append(conditions, "EXISTS(SELECT 1 FROM user WHERE username = ? "+excludeID+") AS username_exists")
+		conditions = append(conditions, "EXISTS(SELECT 1 FROM \"user\" WHERE username = ? "+excludeID+") AS username_exists")
 		args = append(args, user.Username)
 	}
 
 	if user.Email != nil {
-		conditions = append(conditions, "EXISTS(SELECT 1 FROM user WHERE email = ? "+excludeID+") AS email_exists")
-		args = append(args, user.Email)
+		conditions = append(conditions, "EXISTS(SELECT 1 FROM \"user\" WHERE email = ? "+excludeID+") AS email_exists")
+		args = append(args, *user.Email) // 注意：解引用指针
 	}
 
 	if user.Phone != nil {
-		conditions = append(conditions, "EXISTS(SELECT 1 FROM user WHERE phone = ? "+excludeID+") AS phone_exists")
-		args = append(args, user.Phone)
+		conditions = append(conditions, "EXISTS(SELECT 1 FROM \"user\" WHERE phone = ? "+excludeID+") AS phone_exists")
+		args = append(args, *user.Phone) // 注意：解引用指针
 	}
 
 	// 如果没有需要检查的字段，直接返回

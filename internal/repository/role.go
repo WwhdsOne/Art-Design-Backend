@@ -46,12 +46,12 @@ func (r *RoleRepository) CheckRoleDuplicate(c context.Context, role *entity.Role
 
 	// 只检查非空字段
 	if role.Name != "" {
-		conditions = append(conditions, "EXISTS(SELECT 1 FROM role WHERE name = ? "+excludeID+") AS name_exists")
+		conditions = append(conditions, "EXISTS(SELECT 1 FROM \"role\" WHERE \"name\" = ? "+excludeID+") AS name_exists")
 		args = append(args, role.Name)
 	}
 
 	if role.Code != "" {
-		conditions = append(conditions, "EXISTS(SELECT 1 FROM role WHERE code = ? "+excludeID+") AS code_exists")
+		conditions = append(conditions, "EXISTS(SELECT 1 FROM \"role\" WHERE \"code\" = ? "+excludeID+") AS code_exists")
 		args = append(args, role.Code)
 	}
 
@@ -77,7 +77,7 @@ func (r *RoleRepository) CheckRoleDuplicate(c context.Context, role *entity.Role
 		return errors.NewDBError("角色编码已存在")
 	}
 
-	return
+	return nil
 }
 func (r *RoleRepository) CreateRole(c context.Context, role *entity.Role) (err error) {
 	if err = DB(c, r.db).Create(role).Error; err != nil {
