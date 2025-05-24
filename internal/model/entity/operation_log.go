@@ -13,7 +13,7 @@ type OperationLog struct {
 	IP         string    `gorm:"type:inet;comment:客户端IP地址"`
 	Params     string    `gorm:"type:text;comment:请求参数(JSON格式存储)"`
 	Status     int16     `gorm:"type:smallint;not null;comment:HTTP响应状态码"`
-	CreatedAt  time.Time `gorm:"type:timestamp with time zone;not null;index:idx_created_at;comment:操作时间"`
+	CreatedAt  time.Time `gorm:"type:timestamp;not null;index:idx_created_at;comment:操作时间"`
 }
 
 func (o *OperationLog) TableName() string {
