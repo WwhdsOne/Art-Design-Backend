@@ -1,12 +1,76 @@
 package redisx
 
 import (
+	"Art-Design-Backend/pkg/constant/rediskey"
+	"context"
+	"errors"
 	"fmt"
+	"github.com/bytedance/sonic"
+	"github.com/redis/go-redis/v9"
+	"go.uber.org/zap"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 )
+
+type persistData struct {
+	HitCounts   map[string]uint64 `json:"hit_counts"`
+	TotalCounts map[string]uint64 `json:"total_counts"`
+}
+
+func (r *RedisWrapper) SaveStatsToRedis(interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for range ticker.C {
+		data := persistData{
+			HitCounts:   make(map[string]uint64),
+			TotalCounts: make(map[string]uint64),
+		}
+
+		r.hitCountMap.Range(func(key, value any) bool {
+			data.HitCounts[key.(string)] = atomic.LoadUint64(value.(*uint64))
+			return true
+		})
+		r.totalCountMap.Range(func(key, value any) bool {
+			data.TotalCounts[key.(string)] = atomic.LoadUint64(value.(*uint64))
+			return true
+		})
+
+		jsonBytes, _ := sonic.Marshal(data)
+		err := r.client.Set(context.Background(), rediskey.KeyStats, jsonBytes, 0).Err()
+		if err != nil {
+			zap.L().Error("Redis键统计数据存储失败", zap.Error(err))
+		}
+	}
+}
+
+func (r *RedisWrapper) LoadStatsFromRedis() error {
+	val, err := r.client.Get(context.Background(), rediskey.KeyStats).Result()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return nil
+		}
+		return err
+	}
+
+	var data persistData
+	if err = sonic.Unmarshal([]byte(val), &data); err != nil {
+		return err
+	}
+
+	for k, v := range data.HitCounts {
+		count := new(uint64)
+		atomic.StoreUint64(count, v)
+		r.hitCountMap.Store(k, count)
+	}
+	for k, v := range data.TotalCounts {
+		count := new(uint64)
+		atomic.StoreUint64(count, v)
+		r.totalCountMap.Store(k, count)
+	}
+	return nil
+}
 
 // StartHitRateLogger 启动一个协程定时打印命中率
 func (r *RedisWrapper) StartHitRateLogger(interval time.Duration) {

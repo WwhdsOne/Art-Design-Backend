@@ -28,6 +28,12 @@ const (
 	RoleUserDependencies = "ROLE:USER:DEPENDENCIES:"
 )
 
+// 访问频率限制
 const (
 	RateLimiter = "RATE:LIMITER:"
+)
+
+// KeyStats 键前缀统计数据
+const (
+	KeyStats = "KEY_STATS"
 )

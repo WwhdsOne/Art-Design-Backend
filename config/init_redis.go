@@ -16,6 +16,7 @@ type Redis struct {
 	DB                 int    `yaml:"db"`                    // 数据库编号
 	OperationTimeout   string `yaml:"operation-timeout"`     // 操作超时时间
 	HitRateLogInterval string `yaml:"hit-rate-log-interval"` // 命中率日志间隔
+	SaveStatsInterval  string `yaml:"save-stats-interval"`   // 保存统计信息间隔
 }
 
 func NewRedis(cfg *Config) *redisx.RedisWrapper {
@@ -30,5 +31,9 @@ func NewRedis(cfg *Config) *redisx.RedisWrapper {
 	if err != nil {
 		zap.L().Fatal("Redis 连接失败")
 	}
-	return redisx.NewRedisWrapper(client, utils.ParseDuration(r.OperationTimeout), utils.ParseDuration(r.HitRateLogInterval))
+	return redisx.NewRedisWrapper(client,
+		utils.ParseDuration(r.OperationTimeout),
+		utils.ParseDuration(r.HitRateLogInterval),
+		utils.ParseDuration(r.SaveStatsInterval),
+	)
 }
