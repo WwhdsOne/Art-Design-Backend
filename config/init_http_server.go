@@ -21,6 +21,10 @@ type Server struct {
 	Port         string `yaml:"port"`
 	ReadTimeOut  string `yaml:"read-time-out"`
 	WriteTimeOut string `yaml:"write-time-out"`
+	RateLimit    struct {
+		MaxReq int8 `yaml:"max-req"`
+		Window int8 `yaml:"window"`
+	} `yaml:"rate-limit"`
 }
 
 type HttpServer struct {
@@ -34,7 +38,7 @@ type HttpServer struct {
 	Config                 *Config                            // 服务器配置
 }
 
-func NewGin(m *middleware.Middlewares, logger *zap.Logger) *gin.Engine {
+func NewGin(m *middleware.Middlewares, logger *zap.Logger, c *Config) *gin.Engine {
 	// 注册自定义校验器
 	RegisterValidator()
 	// 创建gin引擎
@@ -48,6 +52,8 @@ func NewGin(m *middleware.Middlewares, logger *zap.Logger) *gin.Engine {
 	engine.Use(m.ErrorHandlerMiddleware())
 	// 设置操作日志数据库记录中间件
 	engine.Use(m.OperationLoggerMiddleware())
+	// 添加限流中间件
+	engine.Use(m.RedisRateLimitMiddleware(c.Server.RateLimit.Window, c.Server.RateLimit.MaxReq))
 	// 添加操作日志记录
 	return engine
 }

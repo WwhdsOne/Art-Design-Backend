@@ -27,3 +27,7 @@ const (
 	// RoleUserDependencies 角色用户依赖关系，不过期
 	RoleUserDependencies = "ROLE:USER:DEPENDENCIES:"
 )
+
+const (
+	RateLimiter = "RATE:LIMITER:"
+)

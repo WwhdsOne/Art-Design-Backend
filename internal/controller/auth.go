@@ -34,11 +34,9 @@ func NewAuthController(engine *gin.Engine, middleware *middleware.Middlewares, s
 // login 处理用户登录请求
 func (a *AuthController) login(c *gin.Context) {
 	var loginReq request.Login
-	err := c.ShouldBindJSON(&loginReq)
 	// 如果绑定过程中出现错误，返回错误响应并结束函数执行
-	if err != nil {
+	if err := c.ShouldBindBodyWithJSON(&loginReq); err != nil {
 		_ = c.Error(err)
-		c.Set(gin.BindKey, loginReq)
 		return
 	}
 	// 调用service.Login函数尝试验证用户登录信息
@@ -80,14 +78,11 @@ func (a *AuthController) refreshToken(c *gin.Context) {
 // register 处理用户注册请求
 func (a *AuthController) register(c *gin.Context) {
 	var userReq request.RegisterUser
-	err := c.ShouldBindJSON(&userReq)
-	if err != nil {
+	if err := c.ShouldBindBodyWithJSON(&userReq); err != nil {
 		_ = c.Error(err)
-		c.Set(gin.BindKey, userReq)
 		return
 	}
-	err = a.authService.Register(c, &userReq)
-	if err != nil {
+	if err := a.authService.Register(c, &userReq); err != nil {
 		_ = c.Error(err)
 		return
 	}

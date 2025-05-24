@@ -12,6 +12,14 @@ import (
 
 // OperationLoggerMiddleware 日志中间件
 func (m *Middlewares) OperationLoggerMiddleware() gin.HandlerFunc {
+	loggerChan := make(chan *entity.OperationLog, 1000)
+	go func() {
+		for log := range loggerChan {
+			if err := m.Db.Create(log).Error; err != nil {
+				zap.L().Error("保存操作日志失败", zap.Error(err))
+			}
+		}
+	}()
 	return func(c *gin.Context) {
 		startTime := time.Now()
 		var bodyBytes []byte
@@ -42,15 +50,6 @@ func (m *Middlewares) OperationLoggerMiddleware() gin.HandlerFunc {
 			Status:     int16(statusCode),
 			CreatedAt:  startTime,
 		}
-		cCp := c.Copy()
-		// 保存日志到数据库
-		go func() { // 异步保存，避免阻塞请求
-			if err := m.Db.WithContext(cCp).Create(log).Error; err != nil {
-				// 打印日志或记录到其他地方
-				zap.L().Error("Failed to save operation log\n")
-				// 打印具体错误
-				zap.L().Error(err.Error())
-			}
-		}()
+		loggerChan <- log
 	}
 }

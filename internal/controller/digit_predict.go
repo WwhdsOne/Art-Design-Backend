@@ -43,9 +43,8 @@ func (d *DigitPredictController) getDigitPredictList(c *gin.Context) {
 
 func (d *DigitPredictController) predict(c *gin.Context) {
 	var req request.DigitPredict
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
 		_ = c.Error(err)
-		c.Set(gin.BindKey, req)
 		return
 	}
 	if err := d.DigitPredictService.SubmitMission(c, &req); err != nil {

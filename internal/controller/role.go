@@ -33,9 +33,8 @@ func NewRoleController(engine *gin.Engine, middleware *middleware.Middlewares, s
 
 func (r *RoleController) createRole(c *gin.Context) {
 	var role request.Role
-	if err := c.ShouldBindJSON(&role); err != nil {
+	if err := c.ShouldBindBodyWithJSON(&role); err != nil {
 		_ = c.Error(err)
-		c.Set(gin.BindKey, role)
 		return
 	}
 	err := r.roleService.CreateRole(c, &role)
@@ -62,9 +61,8 @@ func (r *RoleController) gerRolePage(c *gin.Context) {
 
 func (r *RoleController) updateRole(c *gin.Context) {
 	var role request.Role
-	if err := c.ShouldBindJSON(&role); err != nil {
+	if err := c.ShouldBindBodyWithJSON(&role); err != nil {
 		_ = c.Error(err)
-		c.Set(gin.BindKey, role)
 		return
 	}
 	err := r.roleService.UpdateRole(c, &role)
@@ -105,9 +103,8 @@ func (r *RoleController) getRoleMenuBinding(c *gin.Context) {
 
 func (r *RoleController) updateRoleMenuBinding(c *gin.Context) {
 	var roleMenuBinding request.RoleMenuBinding
-	if err := c.ShouldBindJSON(&roleMenuBinding); err != nil {
+	if err := c.ShouldBindBodyWithJSON(&roleMenuBinding); err != nil {
 		_ = c.Error(err)
-		c.Set(gin.BindKey, roleMenuBinding)
 		return
 	}
 	err := r.roleService.UpdateRoleMenuBinding(c, &roleMenuBinding)

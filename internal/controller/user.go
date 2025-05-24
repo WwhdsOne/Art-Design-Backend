@@ -56,14 +56,11 @@ func (u *UserController) getUserPage(c *gin.Context) {
 
 func (u *UserController) updateUserBaseInfo(c *gin.Context) {
 	var userReq request.User
-	err := c.ShouldBindJSON(&userReq)
-	if err != nil {
+	if err := c.ShouldBindBodyWithJSON(&userReq); err != nil {
 		_ = c.Error(err)
-		c.Set(gin.BindKey, userReq)
 		return
 	}
-	err = u.userService.UpdateUserBaseInfo(c, &userReq)
-	if err != nil {
+	if err := u.userService.UpdateUserBaseInfo(c, &userReq); err != nil {
 		_ = c.Error(err)
 		return
 	}
@@ -72,14 +69,11 @@ func (u *UserController) updateUserBaseInfo(c *gin.Context) {
 
 func (u *UserController) updateUserPassword(c *gin.Context) {
 	var changePwd request.ChangePassword
-	err := c.ShouldBindJSON(&changePwd)
-	if err != nil {
+	if err := c.ShouldBindBodyWithJSON(&changePwd); err != nil {
 		_ = c.Error(err)
-		c.Set(gin.BindKey, changePwd)
 		return
 	}
-	err = u.userService.UpdateUserPassword(c, &changePwd)
-	if err != nil {
+	if err := u.userService.UpdateUserPassword(c, &changePwd); err != nil {
 		_ = c.Error(err)
 		return
 	}

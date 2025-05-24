@@ -37,9 +37,8 @@ func (m *MenuController) getMenuList(c *gin.Context) {
 
 func (m *MenuController) createMenu(c *gin.Context) {
 	var menu request.Menu
-	if err := c.ShouldBindJSON(&menu); err != nil {
+	if err := c.ShouldBindBodyWithJSON(&menu); err != nil {
 		_ = c.Error(err)
-		c.Set(gin.BindKey, menu)
 		return
 	}
 	err := m.menuService.CreateMenu(c, &menu)
