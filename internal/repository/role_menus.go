@@ -54,7 +54,6 @@ func NewRoleMenusRepository(db *gorm.DB, redis *redisx.RedisWrapper) *RoleMenusR
 //     "MENU:ROLE:DEPENDENCIES:2" → ["MENU:LIST:ROLE:1_2"]
 //     "MENU:ROLE:DEPENDENCIES:3" → ["MENU:LIST:ROLE:1_3"]
 //   - 当角色1权限变更时，自动清除两个用户的菜单缓存，以及角色1的依赖缓存表。
-//     todo后续使用时可能加入重试机制
 func (r *RoleMenusRepository) InvalidateMenuCacheByRoleID(roleID int64) (err error) {
 	// 获取记录角色所关联的菜单缓存 key 的依赖集合 key（Set 类型）
 	depKey := fmt.Sprintf(rediskey.MenuRoleDependencies+"%d", roleID)

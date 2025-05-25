@@ -36,6 +36,95 @@
 │   └── utils                     # 常用工具方法（如 UUID、时间解析等）
 ```
 
+# 完整技术栈
+
+```mermaid
+graph TD
+    %% 全局样式
+    classDef frontend fill:#e1f5fe,stroke:#039be5,color:#01579b;
+    classDef backend fill:#e8f5e9,stroke:#43a047,color:#1b5e20;
+    classDef deploy fill:#f3e5f5,stroke:#8e24aa,color:#4a148c;
+    classDef db fill:#fff3e0,stroke:#fb8c00,color:#e65100;
+
+    %% 前端
+    subgraph 前端技术栈
+        direction LR
+        Vue3["Vue 3 (vue)"] --> ElementPlus["Element Plus (element-plus)"]
+        Vue3 --> Pinia["Pinia (pinia)"]
+        Vue3 --> VueRouter["Vue Router (vue-router)"]
+        Vue3 --> Vite["Vite (vite)"]
+        Vite --> Axios["Axios (axios)"]
+        class Vue3,Vite,Axios,ElementPlus,VueRouter,Pinia frontend
+    end
+
+    %% 后端核心
+    subgraph 后端核心
+        direction LR
+        Go["Go 1.24 (language)"] --> Gin["Gin (github.com/gin-gonic/gin)"]
+        Gin --> Wire["Wire (github.com/google/wire)"]
+        Gin --> Zap["Zap (go.uber.org/zap)"]
+        class Go,Gin,Wire,Zap backend
+    end
+
+    %% 业务架构
+    subgraph 业务分层
+        direction LR
+        Controllers["控制器 (internal/controller)"] --> Services["服务层 (无单独provider)"]
+        Services --> Repositories["仓储 (internal/repository)"]
+        class Controllers,Services,Repositories backend
+    end
+
+    %% 中间件
+    subgraph 中间件
+        direction LR
+        Middleware["中间件管理器 (pkg/middleware)"] --> Auth["JWT (github.com/golang-jwt/jwt/v5)"]
+        Middleware --> RateLimiter["限流器 (基于滑动窗口算法)"]
+        Middleware --> ErrorHandler["错误处理 (统一封装)"]
+        Middleware --> OpLog["操作日志 (zap-based)"]
+        class Middleware,ErrorHandler,Auth,RateLimiter,OpLog backend
+    end
+
+    %% 存储系统
+    subgraph 数据存储
+        direction TB
+        PostgreSQL["PostgreSQL (v17)"] --> GORM["GORM (gorm.io/gorm)"]
+        Redis["Redis (v7)"] --> GoRedis["go-redis (github.com/redis/go-redis/v9)"]
+        class PostgreSQL,Redis db
+        class GORM,GoRedis backend
+    end
+
+    %% 基础设施
+    subgraph 基础设施
+        direction LR
+        OSS["OSS SDK (github.com/aliyun/alibabacloud-oss-go-sdk-v2)"]
+        Validator["校验器 (github.com/go-playground/validator/v10)"]
+        Sonic["JSON库 (github.com/bytedance/sonic)"]
+        Carbon["日期库 (github.com/dromara/carbon/v2)"]
+        class OSS,Validator,Sonic,Carbon backend
+    end
+
+    %% DevOps
+    subgraph CI/CD & 部署
+        direction LR
+        CI["GitHub Actions (.github/workflows)"] --> Docker["Docker (容器部署)"]
+        class CI,Docker deploy
+    end
+
+    %% 连接关系
+    Vue3 -->|HTTP| Gin
+    Gin --> Middleware
+    Controllers --> Middleware
+    Controllers --> Services
+    Services --> Repositories
+    Repositories --> GORM
+    Repositories --> GoRedis
+    Gin --> Validator
+    Gin --> OSS
+    Gin --> Sonic
+    Gin --> Carbon
+
+```
+
 # 注意事项
 
 运行前记得生成依赖注入的wire代码

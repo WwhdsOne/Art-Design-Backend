@@ -17,7 +17,7 @@ BUILD_TIME=$(date '+%Y-%m-%d_%H:%M:%S')
 LD_FLAGS="-w -s -X main.version=${VERSION} -X main.buildTime=${BUILD_TIME}"
 TAGS="sonic,avx"
 
-# 执行构建
+# 构建
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -trimpath \
     -buildvcs=false \
@@ -26,5 +26,10 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -o "${APP_NAME}" \
     ./cmd/app
 
-# 使用 UPX 压缩
-upx --lzma --best "${APP_NAME}"
+# 如果安装了 upx，则执行压缩
+if command -v upx >/dev/null 2>&1; then
+    echo "🔧 使用 UPX 压缩可执行文件..."
+    upx --lzma --best "${APP_NAME}"
+else
+    echo "⚠️  未找到 upx，跳过压缩。"
+fi

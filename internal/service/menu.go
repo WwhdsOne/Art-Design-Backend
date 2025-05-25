@@ -46,7 +46,6 @@ func (m *MenuService) CreateMenu(c context.Context, menu *request.Menu) (err err
 		zap.L().Error("菜单属性复制失败", zap.Error(err))
 		return
 	}
-	// todo 每个新的菜单都应该跟超级管理员产生关联
 	err = m.MenuRepo.CreateMenu(c, &menuDo)
 	if err != nil {
 		return
