@@ -1,5 +1,13 @@
-# 生成wire依赖注入
-go tool github.com/google/wire/cmd/wire ./...
+#!/usr/bin/env bash
+# ❗ 一旦脚本中的任意一条命令返回非零状态（即执行失败），整个脚本立即终止执行。
+set -e
+
+# 切换到项目根目录
+cd "$(dirname "$0")/.."
+
+# 生成 wire 依赖注入代码
+go run github.com/google/wire/cmd/wire ./...
+
 # 配置
 APP_NAME="myapp"
 VERSION=$(git describe --tags --always --dirty)
@@ -18,5 +26,5 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -o "${APP_NAME}" \
     ./cmd/app
 
-# 使用UPX压缩
+# 使用 UPX 压缩
 upx --lzma --best "${APP_NAME}"
