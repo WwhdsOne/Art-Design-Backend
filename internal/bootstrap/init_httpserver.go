@@ -1,12 +1,10 @@
-package config
+package bootstrap
 
 import (
+	"Art-Design-Backend/config"
 	"Art-Design-Backend/internal/controller"
-	"Art-Design-Backend/pkg/middleware"
 	"Art-Design-Backend/pkg/utils"
 	"context"
-	"github.com/gin-contrib/gzip"
-	ginzap "github.com/gin-contrib/zap"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"log"
@@ -17,16 +15,6 @@ import (
 	"time"
 )
 
-type Server struct {
-	Port         string `yaml:"port"`
-	ReadTimeOut  string `yaml:"read-time-out"`
-	WriteTimeOut string `yaml:"write-time-out"`
-	RateLimit    struct {
-		MaxReq int8 `yaml:"max-req"`
-		Window int8 `yaml:"window"`
-	} `yaml:"rate-limit"`
-}
-
 type HttpServer struct {
 	Engine                 *gin.Engine                        // gin引擎
 	Logger                 *zap.Logger                        // 日志
@@ -35,30 +23,10 @@ type HttpServer struct {
 	MenuController         *controller.MenuController         // 菜单Ctrl
 	RoleController         *controller.RoleController         // 角色Ctrl
 	DigitPredictController *controller.DigitPredictController // 数字预测Ctrl
-	Config                 *Config                            // 服务器配置
+	Config                 *config.Config                     // 服务器配置
 }
 
-func NewGin(m *middleware.Middlewares, logger *zap.Logger, c *Config) *gin.Engine {
-	// 注册自定义校验器
-	RegisterValidator()
-	// 创建gin引擎
-	engine := gin.New()
-	// 通过Gzip压缩响应内容，减少传输数据量，提高传输速度。
-	engine.Use(gzip.Gzip(gzip.DefaultCompression))
-	// 设置日志
-	engine.Use(ginzap.Ginzap(logger, time.RFC3339, true))
-	engine.Use(ginzap.RecoveryWithZap(logger, true))
-	// 设置全局错误校验器错误中间件
-	engine.Use(m.ErrorHandlerMiddleware())
-	// 设置操作日志数据库记录中间件
-	engine.Use(m.OperationLoggerMiddleware())
-	// 添加限流中间件
-	engine.Use(m.RedisRateLimitMiddleware(c.Server.RateLimit.Window, c.Server.RateLimit.MaxReq))
-	// 添加操作日志记录
-	return engine
-}
-
-func (h *HttpServer) GinServer() {
+func (h *HttpServer) InitGinServer() {
 	cfg := h.Config
 	httpServer := http.Server{
 		Addr:         cfg.Server.Port,

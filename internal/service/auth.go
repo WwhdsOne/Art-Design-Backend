@@ -1,11 +1,11 @@
 package service
 
 import (
+	"Art-Design-Backend/config"
 	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/internal/model/request"
 	"Art-Design-Backend/internal/repository"
 	"Art-Design-Backend/pkg/authutils"
-	"Art-Design-Backend/pkg/constant"
 	"Art-Design-Backend/pkg/constant/rediskey"
 	"Art-Design-Backend/pkg/jwt"
 	"Art-Design-Backend/pkg/redisx"
@@ -22,12 +22,13 @@ import (
 )
 
 type AuthService struct {
-	UserRepo      *repository.UserRepository         // 用户Repo
-	RoleRepo      *repository.RoleRepository         // 角色Repo
-	UserRolesRepo *repository.UserRolesRepository    // 用户角色关联Repo
-	GormTX        *repository.GormTransactionManager // gorm事务管理
-	Redis         *redisx.RedisWrapper               // redis
-	Jwt           *jwt.JWT                           // jwt相关
+	UserRepo          *repository.UserRepository         // 用户Repo
+	RoleRepo          *repository.RoleRepository         // 角色Repo
+	UserRolesRepo     *repository.UserRolesRepository    // 用户角色关联Repo
+	GormTX            *repository.GormTransactionManager // gorm事务管理
+	Redis             *redisx.RedisWrapper               // redis
+	Jwt               *jwt.JWT                           // jwt相关
+	DefaultUserConfig *config.DefaultUserConfig          // 默认用户配置
 }
 
 // Login 登录
@@ -164,7 +165,7 @@ func (s *AuthService) Register(c *gin.Context, userReq *request.RegisterUser) (e
 	password, _ := bcrypt.GenerateFromPassword([]byte(userReq.Password), bcrypt.DefaultCost)
 	user.Password = string(password)
 	// 随机设置头像
-	user.Avatar = constant.DefaultAvatar[utils.GenerateRandomNumber(0, len(constant.DefaultAvatar))]
+	user.Avatar = s.DefaultUserConfig.Avatars[utils.GenerateRandomNumber(0, len(s.DefaultUserConfig.Avatars))]
 	// 判重
 	if err = s.UserRepo.CheckUserDuplicate(&user); err != nil {
 		return err

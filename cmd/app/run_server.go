@@ -8,7 +8,7 @@ func RunServer() {
 	// 展示神兽
 	displayGodAnimal()
 	app := wireApp()
-	app.GinServer()
+	app.InitGinServer()
 }
 
 func displayGodAnimal() {

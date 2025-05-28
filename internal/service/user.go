@@ -1,6 +1,7 @@
 package service
 
 import (
+	"Art-Design-Backend/config"
 	"Art-Design-Backend/internal/model/base"
 	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/internal/model/query"
@@ -24,12 +25,13 @@ import (
 )
 
 type UserService struct {
-	UserRepo      *repository.UserRepository         // 用户Repo
-	RoleRepo      *repository.RoleRepository         // 角色Repo
-	UserRolesRepo *repository.UserRolesRepository    // 用户角色Repo
-	GormTX        *repository.GormTransactionManager // gorm事务管理
-	OssClient     *aliyun.OssClient                  // 阿里云OSS
-	Redis         *redisx.RedisWrapper               // redis
+	UserRepo          *repository.UserRepository         // 用户Repo
+	RoleRepo          *repository.RoleRepository         // 角色Repo
+	UserRolesRepo     *repository.UserRolesRepository    // 用户角色Repo
+	GormTX            *repository.GormTransactionManager // gorm事务管理
+	OssClient         *aliyun.OssClient                  // 阿里云OSS
+	Redis             *redisx.RedisWrapper               // redis
+	DefaultUserConfig *config.DefaultUserConfig          // 默认用户配置
 }
 
 func (u *UserService) GetUserById(c *gin.Context) (res response.User, err error) {
@@ -158,7 +160,7 @@ func (u *UserService) UpdateUserBaseInfo(c *gin.Context, userReq *request.User) 
 	return
 }
 
-func (u *UserService) UpdateUserPassword(c *gin.Context, userReq *request.ChangePassword) (err error) {
+func (u *UserService) ChangeUserPassword(c *gin.Context, userReq *request.ChangePassword) (err error) {
 	var userDo entity.User
 	if err = copier.Copy(&userDo, userReq); err != nil {
 		zap.L().Error("复制属性失败")
@@ -198,6 +200,17 @@ func (u *UserService) UploadAvatar(c *gin.Context, filename string, src multipar
 		return
 	}
 	fileUrl = url
+	return
+}
+
+func (u *UserService) ResetPassword(c *gin.Context, id int64) (err error) {
+	var userDo entity.User
+	userDo.ID = id
+	password, _ := bcrypt.GenerateFromPassword([]byte(u.DefaultUserConfig.ResetPassword), bcrypt.DefaultCost)
+	userDo.Password = string(password)
+	if err = u.UserRepo.UpdateUser(c, &userDo); err != nil {
+		return
+	}
 	return
 }
 

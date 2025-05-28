@@ -1,24 +1,14 @@
-package config
+package bootstrap
 
 import (
+	"Art-Design-Backend/config"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"os"
 	"time"
 )
 
-type Zap struct {
-	Level         string `yaml:"level"`          // 级别
-	Prefix        string `yaml:"prefix"`         // 日志前缀
-	Format        string `yaml:"format"`         // 输出
-	Director      string `yaml:"director"`       // 日志文件夹
-	EncodeLevel   string `yaml:"encode-level"`   // 编码级
-	StacktraceKey string `yaml:"stacktrace-key"` // 栈名
-	ShowLine      bool   `yaml:"show-line"`      // 显示行
-	LogInConsole  bool   `yaml:"log-in-console"` // 输出控制台
-}
-
-func encoder(z *Zap) zapcore.Encoder {
+func encoder(z *config.Zap) zapcore.Encoder {
 	cfg := zapcore.EncoderConfig{
 		TimeKey:       "time",
 		NameKey:       "name",
@@ -59,8 +49,8 @@ func levelEncoder(encodeLevel string) zapcore.LevelEncoder {
 	}
 }
 
-// NewLogger 初始化并替换全局 Zap Logger
-func NewLogger(c *Config) *zap.Logger {
+// InitLogger 初始化并替换全局 Zap Logger
+func InitLogger(c *config.Config) *zap.Logger {
 	cfg := c.Zap
 	// 创建编码器
 	zapEncoder := encoder(&cfg)

@@ -28,7 +28,7 @@ const (
 	RoleUserDependencies = "ROLE:USER:DEPENDENCIES:"
 )
 
-// 访问频率限制
+// RateLimiter 访问频率限制
 const (
 	RateLimiter = "RATE:LIMITER:"
 )

@@ -6,6 +6,7 @@ import (
 	"Art-Design-Backend/internal/service"
 	"Art-Design-Backend/pkg/middleware"
 	"Art-Design-Backend/pkg/result"
+	"Art-Design-Backend/pkg/utils"
 	"fmt"
 	"github.com/gin-gonic/gin"
 )
@@ -25,7 +26,8 @@ func NewUserController(engine *gin.Engine, middleware *middleware.Middlewares, s
 		r.GET("/info", userCtrl.getUserInfo)
 		r.POST("/page", userCtrl.getUserPage)
 		r.POST("/update", userCtrl.updateUserBaseInfo)
-		r.POST("/updatePassword", userCtrl.updateUserPassword)
+		r.POST("/changePassword", userCtrl.changeUserPassword)
+		r.POST("/resetPassword/:id", userCtrl.resetUserPassword)
 		r.POST("/uploadAvatar", userCtrl.uploadAvatar)
 	}
 	return userCtrl
@@ -67,13 +69,13 @@ func (u *UserController) updateUserBaseInfo(c *gin.Context) {
 	result.OkWithMessage("更新用户成功", c)
 }
 
-func (u *UserController) updateUserPassword(c *gin.Context) {
+func (u *UserController) changeUserPassword(c *gin.Context) {
 	var changePwd request.ChangePassword
 	if err := c.ShouldBindBodyWithJSON(&changePwd); err != nil {
 		_ = c.Error(err)
 		return
 	}
-	if err := u.userService.UpdateUserPassword(c, &changePwd); err != nil {
+	if err := u.userService.ChangeUserPassword(c, &changePwd); err != nil {
 		_ = c.Error(err)
 		return
 	}
@@ -111,4 +113,18 @@ func (u *UserController) uploadAvatar(c *gin.Context) {
 	}
 
 	result.OkWithData(avatarURL, c)
+}
+
+func (u *UserController) resetUserPassword(c *gin.Context) {
+	id, err := utils.ParseID(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	err = u.userService.ResetPassword(c, id)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithMessage("重置密码成功", c)
 }

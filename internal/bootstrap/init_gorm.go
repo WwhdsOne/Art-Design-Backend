@@ -1,6 +1,7 @@
-package config
+package bootstrap
 
 import (
+	"Art-Design-Backend/config"
 	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/pkg/utils"
 	"context"
@@ -12,15 +13,6 @@ import (
 	"reflect"
 	"time"
 )
-
-// PostgreSQL 配置结构体
-type PostgreSQL struct {
-	User     string `yaml:"user"`
-	Password string `yaml:"password"`
-	Host     string `yaml:"host"`
-	Port     int    `yaml:"port"`
-	Database string `yaml:"database"`
-}
 
 // snowflakeIdFieldsMap 存储类型和对应的ID字段名
 var snowflakeIdFieldsMap = make(map[reflect.Type]string)
@@ -142,7 +134,7 @@ func (z *zapGormLogger) Trace(c context.Context, begin time.Time, fc func() (str
 	}
 }
 
-func NewGorm(cfg *Config, log *zap.Logger) (DB *gorm.DB) {
+func InitGorm(cfg *config.Config, log *zap.Logger) (DB *gorm.DB) {
 	m := cfg.PostgreSql
 	// 构建PostgreSQL连接字符串
 	dsn := fmt.Sprintf(

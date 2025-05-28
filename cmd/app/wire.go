@@ -5,6 +5,7 @@ package main
 
 import (
 	"Art-Design-Backend/config"
+	"Art-Design-Backend/internal/bootstrap"
 	"Art-Design-Backend/internal/controller"
 	"Art-Design-Backend/internal/repository"
 	"Art-Design-Backend/pkg/container"
@@ -14,18 +15,19 @@ import (
 
 // 构造函数是因为初始化时有其他操作
 // wire.Struct则只需要构造一个结构体
-func wireApp() *config.HttpServer {
+func wireApp() *bootstrap.HttpServer {
 	wire.Build(
-		wire.Struct(new(config.HttpServer), "*"),
-		config.NewConfig,
-		config.NewLogger,
-		config.NewRedis,
-		config.NewGorm,
+		wire.Struct(new(bootstrap.HttpServer), "*"),
+		config.LoadConfig,
+		config.ProvideDefaultUserConfig,
+		bootstrap.InitLogger,
+		bootstrap.InitRedis,
+		bootstrap.InitGorm,
 		wire.Struct(new(middleware.Middlewares), "*"),
-		config.NewGin,
-		config.NewJWT,
-		config.NewOSSClient,
-		config.NewDigitPredict,
+		bootstrap.InitGin,
+		bootstrap.InitJWT,
+		bootstrap.InitOSSClient,
+		bootstrap.InitDigitPredict,
 		container.Container,
 		// 这里解释一下没有serviceProvider的原因:
 		// 	service总是只被对应的controller使用，但是repo可能被多个service使用
