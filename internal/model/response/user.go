@@ -20,4 +20,5 @@ type User struct {
 	Roles        []Role          `json:"roles"`
 	Status       int8            `json:"status"`
 	CreatedAt    carbon.DateTime `json:"created_at"`
+	UpdatedAt    carbon.DateTime `json:"updated_at"`
 }

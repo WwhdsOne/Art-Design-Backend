@@ -24,7 +24,7 @@ func (r *RedisWrapper) Get(key string) (val string, err error) {
 	defer cancelFunc()
 
 	val, err = r.client.Get(ctx, key).Result()
-	r.statChan <- statRecord{Key: key, IsHit: err == nil}
+	r.statsChan <- statsRecord{Key: key, IsHit: err == nil}
 	if err != nil {
 		return
 	}

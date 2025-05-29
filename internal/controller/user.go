@@ -29,6 +29,7 @@ func NewUserController(engine *gin.Engine, middleware *middleware.Middlewares, s
 		r.POST("/changePassword", userCtrl.changeUserPassword)
 		r.POST("/resetPassword/:id", userCtrl.resetUserPassword)
 		r.POST("/uploadAvatar", userCtrl.uploadAvatar)
+		r.POST("/changeStatus", userCtrl.changeUserStatus)
 	}
 	return userCtrl
 }
@@ -127,4 +128,18 @@ func (u *UserController) resetUserPassword(c *gin.Context) {
 		return
 	}
 	result.OkWithMessage("重置密码成功", c)
+}
+
+func (u *UserController) changeUserStatus(c *gin.Context) {
+	var changeStatus request.ChangeStatus
+	if err := c.ShouldBindBodyWithJSON(&changeStatus); err != nil {
+		_ = c.Error(err)
+		return
+	}
+	err := u.userService.ChangeUserStatus(c, changeStatus)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithMessage("更新用户状态成功", c)
 }

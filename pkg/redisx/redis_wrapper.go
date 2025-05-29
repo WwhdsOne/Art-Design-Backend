@@ -15,10 +15,10 @@ type RedisWrapper struct {
 	hitCountMap   sync.Map
 	totalCountMap sync.Map
 
-	statChan chan statRecord
+	statsChan chan statsRecord
 }
 
-type statRecord struct {
+type statsRecord struct {
 	Key   string
 	IsHit bool
 }
@@ -29,7 +29,7 @@ func NewRedisWrapper(client *redis.Client, timeout time.Duration, hitRateLogInte
 		operationTimeout: timeout,
 		hitCountMap:      sync.Map{},
 		totalCountMap:    sync.Map{},
-		statChan:         make(chan statRecord, 1000), // 有缓冲，避免阻塞
+		statsChan:        make(chan statsRecord, 1000), // 有缓冲，避免阻塞
 	}
 	// 读取持久化统计数据
 	err := rw.LoadStatsFromRedis()

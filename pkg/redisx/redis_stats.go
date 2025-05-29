@@ -108,7 +108,7 @@ func (r *RedisWrapper) StartHitRateLogger(interval time.Duration) {
 
 // 统计处理
 func (r *RedisWrapper) statProcessor() {
-	for stat := range r.statChan {
+	for stat := range r.statsChan {
 		category := getKeyCategory(stat.Key)
 		// 增加总请求数
 		r.incrMapCounter(&r.totalCountMap, category)

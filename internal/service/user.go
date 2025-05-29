@@ -22,6 +22,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 	"mime/multipart"
+	"strconv"
 )
 
 type UserService struct {
@@ -206,11 +207,45 @@ func (u *UserService) UploadAvatar(c *gin.Context, filename string, src multipar
 func (u *UserService) ResetPassword(c *gin.Context, id int64) (err error) {
 	var userDo entity.User
 	userDo.ID = id
-	password, _ := bcrypt.GenerateFromPassword([]byte(u.DefaultUserConfig.ResetPassword), bcrypt.DefaultCost)
+	password, err := bcrypt.GenerateFromPassword([]byte(u.DefaultUserConfig.ResetPassword), bcrypt.DefaultCost)
+	if err != nil {
+		zap.L().Error("生成密码失败", zap.Error(err))
+		return
+	}
 	userDo.Password = string(password)
 	if err = u.UserRepo.UpdateUser(c, &userDo); err != nil {
 		return
 	}
+	return
+}
+
+func (u *UserService) ChangeUserStatus(c *gin.Context, req request.ChangeStatus) (err error) {
+	var userDo entity.User
+	id := int64(req.ID)
+	userDo.ID = id
+	userDo.Status = req.Status
+	if err = u.UserRepo.UpdateUser(c, &userDo); err != nil {
+		return
+	}
+	go func() {
+		// 删除用户登录状态
+		id := strconv.FormatInt(id, 10)
+		// 获取用户登录状态的 Redis 键
+		tokenStr, _ := u.Redis.Get(id)
+
+		// 准备需要删除的 Redis 键
+		delKeys := []string{
+			rediskey.SESSION + id,
+			rediskey.LOGIN + tokenStr,
+		}
+
+		// 使用管道删除 Redis 中的会话和登录状态键
+		err = u.Redis.PipelineDel(delKeys)
+		if err != nil {
+			zap.L().Error(err.Error())
+			return
+		}
+	}()
 	return
 }
 
