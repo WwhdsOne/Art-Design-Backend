@@ -5,7 +5,7 @@ set -e
 cd "$(dirname "$0")/.."
 
 # 设置代理
-export GOPROXY=https://goproxy.cn,direct
+go env -w GOPROXY=https://mirrors.aliyun.com/goproxy/,direct
 
 # 更新依赖
 go get -u ./... && go mod tidy
