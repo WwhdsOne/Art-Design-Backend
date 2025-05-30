@@ -5,9 +5,6 @@ set -e
 # 切换到项目根目录
 cd "$(dirname "$0")/.."
 
-# 生成 wire 依赖注入代码
-go tool github.com/google/wire/cmd/wire ./...
-
 # 配置
 APP_NAME="myapp"
 VERSION=$(git describe --tags --always --dirty)

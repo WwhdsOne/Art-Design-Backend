@@ -36,10 +36,13 @@ jobs:
           # 更新依赖
           go get -u ./... && go mod tidy
 
+      - name: Generate Wire Code
+        run: |
+          go tool github.com/google/wire/cmd/wire ./...
+
       - name: Build Application
         run: |
           sh scripts/build.sh
-
 
       - name: Check for existing Docker container
         run: |
