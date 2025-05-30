@@ -13,7 +13,7 @@ LD_FLAGS="-w -s"
 TAGS="sonic,avx"
 
 # 构建
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v \
     -trimpath \
     -buildvcs=false \
     -ldflags "${LD_FLAGS}" \

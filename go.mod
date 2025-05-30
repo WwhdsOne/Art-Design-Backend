@@ -4,6 +4,9 @@ go 1.24.3
 
 tool github.com/google/wire/cmd/wire
 
+// 仓库迁移使用新地址
+replace github.com/armon/go-metrics => github.com/hashicorp/go-metrics v0.5.4
+
 require (
 	github.com/aliyun/alibabacloud-oss-go-sdk-v2 v1.2.2
 	github.com/bytedance/sonic v1.13.2
