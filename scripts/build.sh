@@ -6,7 +6,7 @@ set -e
 cd "$(dirname "$0")/.."
 
 # 生成 wire 依赖注入代码
-go run github.com/google/wire/cmd/wire ./...
+go tool github.com/google/wire/cmd/wire ./...
 
 # 配置
 APP_NAME="myapp"
@@ -18,7 +18,7 @@ LD_FLAGS="-w -s -X main.version=${VERSION} -X main.buildTime=${BUILD_TIME}"
 TAGS="sonic,avx"
 
 # 构建
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v \
     -trimpath \
     -buildvcs=false \
     -ldflags "${LD_FLAGS}" \

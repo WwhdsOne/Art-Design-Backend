@@ -36,9 +36,10 @@ jobs:
           # 更新依赖
           go get -u ./... && go mod tidy
 
-      - name: Build MyApp
+      - name: Build Application
         run: |
           sh scripts/build.sh
+
 
       - name: Check for existing Docker container
         run: |
