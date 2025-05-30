@@ -21,7 +21,6 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v \
     -o "${APP_NAME}" \
     ./cmd/app
 
-
 # 如果安装了 upx，则执行压缩
 if command -v upx >/dev/null 2>&1; then
     echo "🔧 使用 UPX 压缩可执行文件..."
