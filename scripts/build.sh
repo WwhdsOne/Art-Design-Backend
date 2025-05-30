@@ -10,11 +10,6 @@ APP_NAME="myapp"
 LD_FLAGS="-w -s"
 TAGS="sonic,avx"
 
-# 检测平台是否为 Linux
-if [ "$(uname)" = "Linux" ]; then
-    echo "🧠 Linux 平台，限制为单核编译"
-    export GOMAXPROCS=1
-fi
 
 # 构建
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v \

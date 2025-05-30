@@ -38,6 +38,10 @@ jobs:
 
       - name: Build Application
         run: |
+          # 降低GC 以降低内存占用，代价是增加一些 CPU 消耗。
+          # 当堆（heap）的大小相对于上一次垃圾回收之后的堆大小增长了 GOGC% 时，会触发下一次 GC
+          export GOGC=50
+          
           CGO_ENABLED=0 go build -v \
             -trimpath \
             -buildvcs=false \
