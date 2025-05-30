@@ -38,7 +38,13 @@ jobs:
 
       - name: Build Application
         run: |
-          sh scripts/build.sh
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v \
+            -trimpath \
+            -buildvcs=false \
+            -ldflags "-w -s" \
+            -tags "sonic,avx,netgo,osusergo" \
+            -o "myapp" \
+            ./cmd/app
 
       - name: Check for existing Docker container
         run: |
