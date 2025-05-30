@@ -1,6 +1,5 @@
 configs
 myapp
-wire_gen.go
 
 # Go 编译生成文件
 /bin/
