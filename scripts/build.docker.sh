@@ -10,6 +10,7 @@ go env -w GOPROXY=https://mirrors.aliyun.com/goproxy/,direct
 # 更新依赖
 go get -u ./... && go mod tidy
 
+
 # 生成 wire 依赖注入代码
 go run github.com/google/wire/cmd/wire ./...
 
