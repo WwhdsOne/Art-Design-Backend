@@ -7,21 +7,20 @@ cd "$(dirname "$0")/.."
 
 # 配置
 APP_NAME="myapp"
-VERSION=$(git describe --tags --always --dirty)
-BUILD_TIME=$(date '+%Y-%m-%d_%H:%M:%S')
 
 # 构建参数
-LD_FLAGS="-w -s -X main.version=${VERSION} -X main.buildTime=${BUILD_TIME}"
+LD_FLAGS="-w -s"
 TAGS="sonic,avx"
 
 # 构建
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v \
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -trimpath \
     -buildvcs=false \
     -ldflags "${LD_FLAGS}" \
     -tags "${TAGS},netgo,osusergo" \
     -o "${APP_NAME}" \
     ./cmd/app
+
 
 # 如果安装了 upx，则执行压缩
 if command -v upx >/dev/null 2>&1; then
