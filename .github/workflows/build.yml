@@ -28,9 +28,17 @@ jobs:
           # 在issue https://github.com/actions/setup-go/issues/403 提及
           cache: false
 
-      - name: Update Go dependencies And Build
+      - name: Update Go dependencies
         run: |
-          sh scripts/build.docker.sh
+          # 设置代理
+          go env -w GOPROXY=https://goproxy.cn,https://mirrors.aliyun.com/goproxy/,direct
+          
+          # 更新依赖
+          go get -u ./... && go mod tidy
+
+      - name: Build MyApp
+        run: |
+          sh scripts/build.sh
 
       - name: Check for existing Docker container
         run: |
