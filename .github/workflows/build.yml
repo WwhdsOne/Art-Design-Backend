@@ -18,7 +18,7 @@ jobs:
       SERVER_IP: ${{ secrets.SERVER_IP }}
       SSH_USER:  ${{ secrets.SSH_USER }}
       SERVER_PORT: ${{ secrets.SERVER_PORT }}
-      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
     steps:
       # 用于拉取代码
       - name: Check out repository code
@@ -62,7 +62,7 @@ jobs:
         with:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          password: ${{ secrets.SSH_PASSWORD }}
           port: ${{ secrets.SERVER_PORT }}
           script: |
             echo "🔍 Checking and cleaning existing Docker container and image..."
@@ -88,7 +88,7 @@ jobs:
         with:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          password: ${{ secrets.SSH_PASSWORD }}
           port: ${{ secrets.SERVER_PORT }}
           source: "myapp,Dockerfile"
           target: "/home/docker-images/${{ env.IMAGE_NAME }}"
@@ -98,7 +98,7 @@ jobs:
         with:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          password: ${{ secrets.SSH_PASSWORD }}
           port: ${{ secrets.SERVER_PORT }}
           script: |
             cd /home/docker-images/${{ env.IMAGE_NAME }}
