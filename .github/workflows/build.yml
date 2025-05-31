@@ -60,25 +60,29 @@ jobs:
           port: ${{ secrets.SERVER_PORT }}
           script: |
             echo "🔍 Checking and cleaning existing Docker container and image..."
-            
-            # 强制停止并移除旧容器（如果存在）
-            if docker ps -a --filter "name=${{ env.CONTAINER_NAME }}" --format "{{.Names}}" | grep -q "${{ env.CONTAINER_NAME }}"; then
-                echo "🛑 Force stopping and removing container: ${{ env.CONTAINER_NAME }}"
-                docker stop ${{ env.CONTAINER_NAME }} --time 0 || true  # 立即强制停止
-                docker rm -f ${{ env.CONTAINER_NAME }} || true          # 强制删除容器
-                echo "✅ Container ${{ env.CONTAINER_NAME }} removed."
+
+            # ========= 1. 移除旧容器 ==========
+            CONTAINER_ID=$(docker ps -a -q --filter "name=^/${{ env.CONTAINER_NAME }}$")
+
+            if [ -n "$CONTAINER_ID" ]; then
+              echo "🛑 Removing container: ${{ env.CONTAINER_NAME }} ($CONTAINER_ID)"
+              docker rm -f "$CONTAINER_ID" || true
+              echo "✅ Container removed."
             else
-                echo "ℹ️ No container named ${{ env.CONTAINER_NAME }} found."
+              echo "ℹ️ No container named ${{ env.CONTAINER_NAME }} found."
             fi
-            
-            # 强制删除旧镜像（如果存在）
-            if docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "${{ env.IMAGE_NAME }}:latest"; then
-                echo "🧹 Force removing image: ${{ env.IMAGE_NAME }}:latest"
-                docker rmi -f ${{ env.IMAGE_NAME }}:latest || true
-                echo "✅ Image ${{ env.IMAGE_NAME }}:latest removed."
+
+            # ========= 2. 移除旧镜像 ==========
+            IMAGE_ID=$(docker images -q ${{ env.IMAGE_NAME }}:latest)
+
+            if [ -n "$IMAGE_ID" ]; then
+              echo "🧹 Removing image: ${{ env.IMAGE_NAME }}:latest ($IMAGE_ID)"
+              docker rmi -f "$IMAGE_ID" || true
+              echo "✅ Image removed."
             else
-                echo "ℹ️ No image named ${{ env.IMAGE_NAME }}:latest found."
+              echo "ℹ️ No image named ${{ env.IMAGE_NAME }}:latest found."
             fi
+
       - name: Upload artifact to server
         uses: appleboy/scp-action@master
         with:
@@ -106,7 +110,7 @@ jobs:
             docker run -d \
             --network docker-compose_app-net \
             --name ${{ env.CONTAINER_NAME }} \
-            --restart always \
+            --restart unless-stopped \
             -e CONSUL_ADDR=${{ env.CONSUL_ADDR }} \
             -e CONSUL_CONFIG_KEY=${{ env.CONSUL_CONFIG_KEY }} \
             -e OSS_ACCESS_KEY_ID=${{ env.OSS_ACCESS_KEY_ID }} \
