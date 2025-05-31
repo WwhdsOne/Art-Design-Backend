@@ -31,12 +31,6 @@ jobs:
           # 自建Runner需要关闭缓存，否在会报错
           # 在issue https://github.com/actions/setup-go/issues/403 提及
           cache: true
-      - name: Cache UPX binary
-        id: cache-upx
-        uses: actions/cache@v4
-        with:
-          path: ~/upx
-          key: upx-5.0.1
 
       - name: Install UPX
         if: steps.cache-upx.outputs.cache-hit != 'true'
@@ -66,22 +60,24 @@ jobs:
           port: ${{ secrets.SERVER_PORT }}
           script: |
             echo "🔍 Checking and cleaning existing Docker container and image..."
-      
-            # 停止并移除旧容器（如果存在）
-            if docker ps --filter "name=${{ env.CONTAINER_NAME }}" --format "{{.Names}}" | grep -q "${{ env.CONTAINER_NAME }}"; then
-              echo "🛑 Stopping and removing existing container: ${{ env.CONTAINER_NAME }}"
-              docker stop ${{ env.CONTAINER_NAME }}
-              docker rm ${{ env.CONTAINER_NAME }}
+            
+            # 强制停止并移除旧容器（如果存在）
+            if docker ps -a --filter "name=${{ env.CONTAINER_NAME }}" --format "{{.Names}}" | grep -q "${{ env.CONTAINER_NAME }}"; then
+                echo "🛑 Force stopping and removing container: ${{ env.CONTAINER_NAME }}"
+                docker stop ${{ env.CONTAINER_NAME }} --time 0 || true  # 立即强制停止
+                docker rm -f ${{ env.CONTAINER_NAME }} || true          # 强制删除容器
+                echo "✅ Container ${{ env.CONTAINER_NAME }} removed."
             else
-              echo "✅ No running container named ${{ env.CONTAINER_NAME }} found."
+                echo "ℹ️ No container named ${{ env.CONTAINER_NAME }} found."
             fi
-      
-            # 删除旧镜像（如果存在）
+            
+            # 强制删除旧镜像（如果存在）
             if docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "${{ env.IMAGE_NAME }}:latest"; then
-              echo "🧹 Removing existing image: ${{ env.IMAGE_NAME }}:latest"
-              docker rmi ${{ env.IMAGE_NAME }}:latest
+                echo "🧹 Force removing image: ${{ env.IMAGE_NAME }}:latest"
+                docker rmi -f ${{ env.IMAGE_NAME }}:latest || true
+                echo "✅ Image ${{ env.IMAGE_NAME }}:latest removed."
             else
-              echo "✅ No image named ${{ env.IMAGE_NAME }}:latest found."
+                echo "ℹ️ No image named ${{ env.IMAGE_NAME }}:latest found."
             fi
       - name: Upload artifact to server
         uses: appleboy/scp-action@master
