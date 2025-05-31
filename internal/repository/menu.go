@@ -18,6 +18,14 @@ func NewMenuRepository(db *gorm.DB) *MenuRepository {
 	}
 }
 
+func (m *MenuRepository) GetAllMenus(c context.Context) (res []*entity.Menu, err error) {
+	if err = DB(c, m.db).Find(&res).Error; err != nil {
+		zap.L().Error("获取所有菜单失败", zap.Error(err))
+		return nil, errors.NewDBError("获取所有菜单失败")
+	}
+	return
+}
+
 func (m *MenuRepository) GetMenuListByIDList(c context.Context, menuIDList []int64) (menuList []*entity.Menu, err error) {
 	if err = DB(c, m.db).
 		Where("id IN ?", menuIDList).

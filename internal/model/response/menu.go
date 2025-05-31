@@ -24,11 +24,11 @@ type Meta struct {
 	Link              string     `json:"link"`
 	IsIframe          bool       `json:"isIframe"`
 	KeepAlive         bool       `json:"keepAlive"`
-	AuthList          []AuthMark `json:"authList"`
+	AuthList          []MenuAuth `json:"authList"`
 	IsInMainContainer bool       `json:"isInMainContainer"`
 }
 
-type AuthMark struct {
+type MenuAuth struct {
 	ID   int64  `json:"id,string"`
 	Name string `json:"name"`
 	Code string `json:"code"`

@@ -36,7 +36,7 @@ func (m *Middlewares) RedisRateLimitMiddleware(windowSec int8, maxReq int8) gin.
 		}
 
 		allowed, _ := res.(int64)
-		if allowed == 0 {
+		if allowed <= 0 {
 			result.FailWithMessage("请求过于频繁", c)
 			c.Abort()
 			return

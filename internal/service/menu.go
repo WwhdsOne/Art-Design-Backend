@@ -36,6 +36,53 @@ func (m *MenuService) getMenuLock(key string) *sync.RWMutex {
 	return actual.(*sync.RWMutex)
 }
 
+// BuildMenuTree 构建菜单树结构并挂载按钮权限
+// 参数 filterHidden 控制是否过滤隐藏菜单（true 过滤，false 不过滤）
+func (m *MenuService) BuildMenuTree(menuList []*entity.Menu, filterHidden bool) (res []*response.Menu, err error) {
+	menuMap := make(map[int64]*response.Menu)
+	for _, menuDo := range menuList {
+		if filterHidden && menuDo.IsHide {
+			continue
+		}
+		var menuResp response.Menu
+		err = copier.Copy(&menuResp, &menuDo)
+		if err != nil {
+			zap.L().Error("菜单属性复制失败", zap.Error(err))
+			return nil, err
+		}
+		if menuDo.Type != 3 {
+			menuResp.Meta.AuthList = make([]response.MenuAuth, 0)
+			menuResp.Children = make([]response.Menu, 0)
+		}
+		menuMap[menuDo.ID] = &menuResp
+	}
+	for _, dbMenu := range menuList {
+		frontendMenu := menuMap[dbMenu.ID]
+		if frontendMenu == nil {
+			continue
+		}
+		if dbMenu.Type == 3 {
+			if parent, exists := menuMap[dbMenu.ParentID]; exists {
+				parent.Meta.AuthList = append(parent.Meta.AuthList, response.MenuAuth{
+					ID:   dbMenu.ID,
+					Name: dbMenu.Title,
+					Code: dbMenu.AuthCode,
+				})
+			}
+			continue
+		}
+		// 顶级菜单直接添加到结果列表
+		if dbMenu.ParentID == -1 {
+			res = append(res, frontendMenu)
+		} else {
+			if parent, exists := menuMap[dbMenu.ParentID]; exists {
+				parent.Children = append(parent.Children, *frontendMenu)
+			}
+		}
+	}
+	return
+}
+
 func (m *MenuService) CreateMenu(c context.Context, menu *request.Menu) (err error) {
 	var menuDo entity.Menu
 	err = copier.Copy(&menuDo, &menu)
@@ -51,6 +98,32 @@ func (m *MenuService) CreateMenu(c context.Context, menu *request.Menu) (err err
 	if err != nil {
 		return
 	}
+	return
+}
+
+func (m *MenuService) CreateMenuAuth(c context.Context, menu *request.MenuAuth) (err error) {
+	var menuDo entity.Menu
+	err = copier.Copy(&menuDo, &menu)
+	// todo后续有必要统一前后端关于角色码的格式
+	menuDo.AuthCode = menu.Code
+	if err != nil {
+		zap.L().Error("菜单属性复制失败", zap.Error(err))
+		return
+	}
+	err = m.MenuRepo.CreateMenu(c, &menuDo)
+	if err != nil {
+		return
+	}
+	return
+}
+
+// GetAllMenus 获取全部菜单
+func (m *MenuService) GetAllMenus(c context.Context) (res []*response.Menu, err error) {
+	menus, err := m.MenuRepo.GetAllMenus(c)
+	if err != nil {
+		return
+	}
+	res, err = m.BuildMenuTree(menus, false)
 	return
 }
 
@@ -168,48 +241,10 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*response.Menu, err 
 		return
 	}
 
-	// Step 16. 构建菜单树结构（map 方便后续挂载）
-	menuMap := make(map[int64]*response.Menu)
-	for _, menuDo := range menuList {
-		if menuDo.IsHide {
-			continue
-		}
-		var menuResp response.Menu
-		err = copier.Copy(&menuResp, &menuDo)
-		if err != nil {
-			zap.L().Error("菜单属性复制失败", zap.Error(err))
-			return
-		}
-		if menuDo.Type != 3 { // 非按钮类型
-			menuResp.Meta.AuthList = make([]response.AuthMark, 0)
-			menuResp.Children = make([]response.Menu, 0)
-		}
-		menuMap[menuDo.ID] = &menuResp
-	}
+	// Step 16. 构建菜单树结构
+	res, err = m.BuildMenuTree(menuList, true)
 
-	// Step 17. 组装菜单树结构 & 挂载按钮权限
-	for _, dbMenu := range menuList {
-		frontendMenu := menuMap[dbMenu.ID]
-		if dbMenu.Type == 3 { // 按钮类型，挂到父菜单 AuthList
-			if parent, exists := menuMap[dbMenu.ParentID]; exists {
-				parent.Meta.AuthList = append(parent.Meta.AuthList, response.AuthMark{
-					ID:   dbMenu.ID,
-					Name: dbMenu.Title,
-					Code: dbMenu.AuthCode,
-				})
-			}
-			continue
-		}
-		if dbMenu.ParentID == -1 {
-			res = append(res, frontendMenu) // 顶级菜单
-		} else {
-			if parent, exists := menuMap[dbMenu.ParentID]; exists {
-				parent.Children = append(parent.Children, *frontendMenu)
-			}
-		}
-	}
-
-	// Step 18. 将结果写入 Redis 缓存
+	// Step 17. 将结果写入 Redis 缓存
 	cacheBytes, _ := sonic.Marshal(&res)
 	err = m.Redis.Set(cacheKey, string(cacheBytes), rediskey.MenuListRoleTTL)
 	if err != nil {
@@ -217,7 +252,7 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*response.Menu, err 
 		return
 	}
 
-	// Step 19. 写入菜单依赖映射表（用于后续清缓存）
+	// Step 18. 写入菜单依赖映射表（用于后续清缓存）
 	for _, rid := range roleIds {
 		depKey := fmt.Sprintf(rediskey.MenuRoleDependencies+"%d", rid)
 		err = m.Redis.SAdd(depKey, cacheKey)
