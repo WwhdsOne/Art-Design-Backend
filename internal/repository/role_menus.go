@@ -7,6 +7,7 @@ import (
 	"Art-Design-Backend/pkg/redisx"
 	"context"
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -111,6 +112,17 @@ func (r *RoleMenusRepository) CreateRoleMenus(c context.Context, roleID int64, m
 	if err = DB(c, r.db).Create(&roleMenus).Error; err != nil {
 		zap.L().Error("创建角色菜单关联失败", zap.Error(err))
 		return errors.NewDBError("创建角色菜单关联失败")
+	}
+	return
+}
+
+// DeleteByMenuIDs 删除角色菜单关联
+func (r *RoleMenusRepository) DeleteByMenuIDs(c *gin.Context, menuIDList []int64) (err error) {
+	if err = DB(c, r.db).
+		Where("menu_id IN ?", menuIDList).
+		Delete(&entity.RoleMenus{}).Error; err != nil {
+		zap.L().Error("删除角色菜单关联失败", zap.Error(err))
+		return errors.NewDBError("删除角色菜单关联失败")
 	}
 	return
 }

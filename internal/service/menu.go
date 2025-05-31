@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/bytedance/sonic"
+	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
@@ -170,6 +171,9 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*response.Menu, err 
 	// Step 16. 构建菜单树结构（map 方便后续挂载）
 	menuMap := make(map[int64]*response.Menu)
 	for _, menuDo := range menuList {
+		if menuDo.IsHide {
+			continue
+		}
 		var menuResp response.Menu
 		err = copier.Copy(&menuResp, &menuDo)
 		if err != nil {
@@ -220,6 +224,63 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*response.Menu, err 
 		if err != nil {
 			zap.L().Error("菜单列表写入映射表失败", zap.Error(err))
 			return
+		}
+	}
+	return
+}
+
+func (m *MenuService) DeleteMenu(c *gin.Context, id int64) (err error) {
+	// Step 1. 获取所有需要删除的菜单 ID（包括子菜单、按钮）
+	var allMenuIDs []int64
+	err = m.collectMenuIDTree(c, id, &allMenuIDs)
+	if err != nil {
+		zap.L().Error("递归收集子菜单失败", zap.Error(err))
+		return
+	}
+
+	if len(allMenuIDs) == 0 {
+		return
+	}
+
+	// Step 2. 删除菜单表中记录
+	err = m.MenuRepo.DeleteMenuByIDList(c, allMenuIDs)
+	if err != nil {
+		zap.L().Error("删除菜单失败", zap.Error(err))
+		return
+	}
+
+	// Step 3. 删除角色-菜单映射关系
+	err = m.RoleMenusRepo.DeleteByMenuIDs(c, allMenuIDs)
+	if err != nil {
+		zap.L().Error("删除角色菜单关系失败", zap.Error(err))
+		return
+	}
+
+	// Step 4. 清除所有菜单相关缓存
+	if err = m.Redis.DeleteByPrefix(rediskey.MenuListRole, 100); err != nil {
+		zap.L().Error("批量删除菜单缓存失败", zap.Error(err))
+	}
+
+	if err = m.Redis.DeleteByPrefix(rediskey.MenuRoleDependencies, 100); err != nil {
+		zap.L().Error("批量删除角色-菜单依赖失败", zap.Error(err))
+	}
+
+	return
+}
+
+// collectMenuIDTree 递归收集某个菜单及其所有子菜单 ID
+func (m *MenuService) collectMenuIDTree(c context.Context, parentID int64, result *[]int64) (err error) {
+	*result = append(*result, parentID)
+
+	children, err := m.MenuRepo.GetChildMenuIDsByParentID(c, parentID)
+	if err != nil {
+		return err
+	}
+
+	for _, childID := range children {
+		err = m.collectMenuIDTree(c, childID, result)
+		if err != nil {
+			return err
 		}
 	}
 	return

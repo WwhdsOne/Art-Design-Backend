@@ -5,6 +5,7 @@ import (
 	"Art-Design-Backend/internal/service"
 	"Art-Design-Backend/pkg/middleware"
 	"Art-Design-Backend/pkg/result"
+	"Art-Design-Backend/pkg/utils"
 	"github.com/gin-gonic/gin"
 )
 
@@ -22,6 +23,7 @@ func NewMenuController(engine *gin.Engine, middleware *middleware.Middlewares, s
 		// 私有路由组（需要 JWT 认证）
 		r.GET("/list", menuCtrl.getMenuList)
 		r.POST("/create", menuCtrl.createMenu)
+		r.POST("/delete/:id", menuCtrl.deleteMenu)
 	}
 	return menuCtrl
 }
@@ -47,4 +49,18 @@ func (m *MenuController) createMenu(c *gin.Context) {
 		return
 	}
 	result.OkWithMessage("添加成功", c)
+}
+
+func (m *MenuController) deleteMenu(c *gin.Context) {
+	id, err := utils.ParseID(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	err = m.menuService.DeleteMenu(c, id)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithMessage("删除成功", c)
 }

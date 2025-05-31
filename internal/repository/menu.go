@@ -47,3 +47,21 @@ func (m *MenuRepository) CreateMenu(c context.Context, menu *entity.Menu) (err e
 	}
 	return
 }
+
+func (m *MenuRepository) DeleteMenuByIDList(c context.Context, menuIDList []int64) (err error) {
+	if err = DB(c, m.db).Where("id IN ?", menuIDList).Delete(&entity.Menu{}).Error; err != nil {
+		zap.L().Error("删除菜单失败", zap.Error(err))
+		return errors.NewDBError("删除菜单失败")
+	}
+	return
+}
+
+func (m *MenuRepository) GetChildMenuIDsByParentID(ctx context.Context, parentID int64) (childrenIDs []int64, err error) {
+	if err = DB(ctx, m.db).Model(&entity.Menu{}).
+		Where("parent_id = ?", parentID).
+		Pluck("id", &childrenIDs).Error; err != nil {
+		zap.L().Error("获取子菜单失败", zap.Error(err))
+		return nil, errors.NewDBError("获取子菜单失败")
+	}
+	return
+}

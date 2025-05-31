@@ -7,7 +7,7 @@ type Menu struct {
 	Name      string          `json:"name"`
 	Path      string          `json:"path"`
 	Component string          `json:"component"`
-	ParentID  int64           `json:"parentID"`
+	ParentID  int64           `json:"parentID,string"`
 	*Meta     `json:"meta"`   // 不用指针则无法将修改映射到本体
 	Sort      int             `json:"sort"`
 	Children  []Menu          `json:"children"`
@@ -29,7 +29,7 @@ type Meta struct {
 }
 
 type AuthMark struct {
-	ID   int64  `json:"id"`
+	ID   int64  `json:"id,string"`
 	Name string `json:"name"`
 	Code string `json:"code"`
 }

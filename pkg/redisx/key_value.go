@@ -42,6 +42,39 @@ func (r *RedisWrapper) Del(key string) (err error) {
 	return
 }
 
+// Scan 方法用于扫描 Redis 键
+// prefix 为键的前缀，cursor 为游标，count 为每次扫描的键数量
+func (r *RedisWrapper) Scan(prefix string, cursor uint64, count int64) ([]string, uint64, error) {
+	timeout, cancelFunc := context.WithTimeout(context.Background(), r.operationTimeout)
+	defer cancelFunc()
+	return r.client.Scan(timeout, cursor, prefix+"*", count).Result()
+}
+
+// DeleteByPrefix 方法用于根据前缀删除 Redis 键
+// prefix 为键的前缀，count 为每次删除的键数量
+func (r *RedisWrapper) DeleteByPrefix(prefix string, count int64) (err error) {
+	var cursor uint64
+	var keys []string
+	timeout, cancelFunc := context.WithTimeout(context.Background(), r.operationTimeout)
+	defer cancelFunc()
+	for {
+
+		keys, cursor, err = r.Scan(prefix, cursor, count)
+		if err != nil {
+			return
+		}
+
+		if len(keys) > 0 {
+			_ = r.client.Del(timeout, keys...) // 忽略失败
+		}
+
+		if cursor == 0 {
+			break
+		}
+	}
+	return
+}
+
 // PipelineSet 方法用于批量设置 Redis 键值对
 func (r *RedisWrapper) PipelineSet(keyVal [][2]string, duration time.Duration) (err error) {
 	timeout, cancelFunc := context.WithTimeout(context.Background(), r.operationTimeout)

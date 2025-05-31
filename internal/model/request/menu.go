@@ -5,7 +5,7 @@ import "Art-Design-Backend/internal/model/base"
 type Menu struct {
 	ID        base.LongStringID `json:"id" label:"菜单ID"`
 	Type      int8              `json:"type" binding:"required" label:"菜单类型"`
-	Name      string            `json:"name" label:"组件名称"`
+	Name      string            `json:"name" binding:"required,min=2,max=20" label:"组件名称"`
 	Path      string            `json:"path" label:"路由地址"`
 	Component string            `json:"component" label:"组件路径"`
 	ParentID  base.LongStringID `json:"parentID" label:"上级菜单ID"`
@@ -14,7 +14,7 @@ type Menu struct {
 }
 
 type Meta struct {
-	Title             string `json:"title" binding:"required" label:"菜单名称"`
+	Title             string `json:"title" binding:"required,min=2,max=20" label:"菜单名称"`
 	Icon              string `json:"icon" label:"菜单图标"`
 	ShowBadge         bool   `json:"showBadge" label:"显示徽标"`
 	ShowTextBadge     string `json:"showTextBadge" label:"文本徽标内容"`
