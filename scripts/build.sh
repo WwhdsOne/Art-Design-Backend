@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
-# ❗ 一旦脚本中的任意一条命令返回非零状态（即执行失败），整个脚本立即终止执行。
 set -e
 
-# 切换到项目根目录
+# 切换到项目根目录（假设脚本在scripts目录）
 cd "$(dirname "$0")/.."
 
 # 配置
 APP_NAME="myapp"
-LD_FLAGS="-w -s"
-TAGS="sonic,avx"
+VERSION=$(git describe --tags --always --dirty)
+BUILD_TIME=$(date '+%Y-%m-%d_%H:%M:%S')
 
+# 构建参数
+LD_FLAGS="-w -s -X main.version=${VERSION} -X main.buildTime=${BUILD_TIME}"
+TAGS="sonic,avx"
 
 # 构建
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v \
@@ -20,7 +22,6 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v \
     -o "${APP_NAME}" \
     ./cmd/app
 
-# 如果安装了 upx，则执行压缩
 if command -v upx >/dev/null 2>&1; then
     echo "🔧 使用 UPX 压缩可执行文件..."
     upx --lzma --best "${APP_NAME}"

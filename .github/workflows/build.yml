@@ -1,4 +1,4 @@
-name: Art-Design-Backend
+name: Deploy to Server
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     env:
       IMAGE_NAME: art-design-backend
       CONTAINER_NAME: art-design-backend
@@ -15,6 +15,10 @@ jobs:
       CONSUL_CONFIG_KEY: ${{ secrets.CONSUL_CONFIG_KEY }}
       OSS_ACCESS_KEY_ID: ${{ secrets.OSS_ACCESS_KEY_ID }}
       OSS_ACCESS_KEY_SECRET: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
+      SERVER_IP: ${{ secrets.SERVER_IP }}
+      SSH_USER:  ${{ secrets.SSH_USER }}
+      SERVER_PORT: ${{ secrets.SERVER_PORT }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
     steps:
       # 用于拉取代码
       - name: Check out repository code
@@ -26,56 +30,84 @@ jobs:
           go-version: '1.24.3'
           # 自建Runner需要关闭缓存，否在会报错
           # 在issue https://github.com/actions/setup-go/issues/403 提及
-          cache: false
+          cache: true
+      - name: Cache UPX binary
+        id: cache-upx
+        uses: actions/cache@v4
+        with:
+          path: ~/upx
+          key: upx-5.0.1
+
+      - name: Install UPX
+        if: steps.cache-upx.outputs.cache-hit != 'true'
+        run: |
+          curl -L https://github.com/upx/upx/releases/download/v5.0.1/upx-5.0.1-amd64_linux.tar.xz -o upx.tar.xz
+          tar -xf upx.tar.xz
+          mkdir -p ~/upx
+          mv upx-*/upx ~/upx
+
+      - name: Add UPX to PATH
+        run: echo "$HOME/upx" >> $GITHUB_PATH
 
       - name: Update Go dependencies
         run: |
-          # 设置代理
-          go env -w GOPROXY=https://goproxy.cn,https://mirrors.aliyun.com/goproxy/,direct
-          
           # 更新依赖
           go get -u ./... && go mod tidy
 
       - name: Build Application
         run: |
-          # 降低GC 以降低内存占用，代价是增加一些 CPU 消耗。
-          # 当堆（heap）的大小相对于上一次垃圾回收之后的堆大小增长了 GOGC% 时，会触发下一次 GC
-          export GOGC=50
-          
-          CGO_ENABLED=0 go build -v \
-            -trimpath \
-            -buildvcs=false \
-            -ldflags "-w -s" \
-            -tags "sonic,avx,netgo,osusergo" \
-            -o "myapp" \
-            ./cmd/app
-
-      - name: Check for existing Docker container
-        run: |
-          # 检查名为${{ env.CONTAINER_NAME }}的容器是否正在运行
-          if docker ps --filter "name=${{ env.CONTAINER_NAME }}" --format "{{.Names}}" | grep -q "${{ env.CONTAINER_NAME }}"; then
-            # 如果容器正在运行，则停止并移除它
-            docker stop ${{ env.CONTAINER_NAME }}
-            docker rm ${{ env.CONTAINER_NAME }}
-          fi
-
-      - name: Check for existing Docker image
-        run: |
-          # 检查名为${{ env.IMAGE_NAME }}的镜像是否存在
-          if docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "${{ env.IMAGE_NAME }}:latest"; then
-            # 如果镜像存在，则移除它
-            docker rmi ${{ env.IMAGE_NAME }}:latest
-          fi
+          sh scripts/build.sh
+      - name: Cleanup existing Docker container and image
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SERVER_PORT }}
+          script: |
+            echo "🔍 Checking and cleaning existing Docker container and image..."
+      
+            # 停止并移除旧容器（如果存在）
+            if docker ps --filter "name=${{ env.CONTAINER_NAME }}" --format "{{.Names}}" | grep -q "${{ env.CONTAINER_NAME }}"; then
+              echo "🛑 Stopping and removing existing container: ${{ env.CONTAINER_NAME }}"
+              docker stop ${{ env.CONTAINER_NAME }}
+              docker rm ${{ env.CONTAINER_NAME }}
+            else
+              echo "✅ No running container named ${{ env.CONTAINER_NAME }} found."
+            fi
+      
+            # 删除旧镜像（如果存在）
+            if docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "${{ env.IMAGE_NAME }}:latest"; then
+              echo "🧹 Removing existing image: ${{ env.IMAGE_NAME }}:latest"
+              docker rmi ${{ env.IMAGE_NAME }}:latest
+            else
+              echo "✅ No image named ${{ env.IMAGE_NAME }}:latest found."
+            fi
+      - name: Upload artifact to server
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SERVER_PORT }}
+          source: "myapp,Dockerfile"
+          target: "/home/docker-images/${{ env.IMAGE_NAME }}"
 
       - name: Build Docker image
-        run: |
-          # 使用 Dockerfile 构建镜像，并指定镜像名称为${{ env.IMAGE_NAME }}
-          docker build -t ${{ env.IMAGE_NAME }}:latest .
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SERVER_PORT }}
+          script: |
+            cd /home/docker-images/${{ env.IMAGE_NAME }}
 
-      - name: Run Docker container
-        run: |
-          # 启动新镜像的容器，指定容器名称为${{ env.CONTAINER_NAME }}
-          docker run -d \
+            # 使用 Dockerfile 构建镜像，并指定镜像名称为${{ env.IMAGE_NAME }}
+            docker build -t ${{ env.IMAGE_NAME }}:latest .
+            
+             # 启动新镜像的容器，指定容器名称为${{ env.CONTAINER_NAME }}
+            docker run -d \
             --network app-net \
             --name ${{ env.CONTAINER_NAME }} \
             --restart always \
@@ -85,4 +117,6 @@ jobs:
             -e OSS_ACCESS_KEY_SECRET=${{ env.OSS_ACCESS_KEY_SECRET }} \
             ${{ env.IMAGE_NAME }}:latest
 
-      
+         
+            
+            
