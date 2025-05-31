@@ -108,7 +108,7 @@ jobs:
             
              # 启动新镜像的容器，指定容器名称为${{ env.CONTAINER_NAME }}
             docker run -d \
-            --network app-net \
+            --network docker-compose_app-net \
             --name ${{ env.CONTAINER_NAME }} \
             --restart always \
             -e CONSUL_ADDR=${{ env.CONSUL_ADDR }} \
