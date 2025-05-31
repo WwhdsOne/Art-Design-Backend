@@ -13,6 +13,7 @@ BUILD_TIME=$(date '+%Y-%m-%d_%H:%M:%S')
 LD_FLAGS="-w -s -X main.version=${VERSION} -X main.buildTime=${BUILD_TIME}"
 TAGS="sonic,avx"
 
+
 # 构建
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v \
     -trimpath \

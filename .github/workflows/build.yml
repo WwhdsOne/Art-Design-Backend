@@ -32,17 +32,6 @@ jobs:
           # 在issue https://github.com/actions/setup-go/issues/403 提及
           cache: true
 
-      - name: Install UPX
-        if: steps.cache-upx.outputs.cache-hit != 'true'
-        run: |
-          curl -L https://github.com/upx/upx/releases/download/v5.0.1/upx-5.0.1-amd64_linux.tar.xz -o upx.tar.xz
-          tar -xf upx.tar.xz
-          mkdir -p ~/upx
-          mv upx-*/upx ~/upx
-
-      - name: Add UPX to PATH
-        run: echo "$HOME/upx" >> $GITHUB_PATH
-
       - name: Update Go dependencies
         run: |
           # 更新依赖
