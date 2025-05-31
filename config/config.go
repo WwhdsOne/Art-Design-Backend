@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"sync"
 	"time"
 
-	"github.com/bytedance/sonic"
 	"github.com/hashicorp/consul/api"
 	"github.com/spf13/viper"
 )
@@ -24,30 +22,20 @@ type Config struct {
 	DefaultUser  DefaultUserConfig `mapstructure:"default_user"`
 }
 
-var (
-	globalConfig *Config
-	configLock   sync.RWMutex
-)
+var globalConfig *Config
 
 func ProvideDefaultUserConfig() *DefaultUserConfig {
 	return &globalConfig.DefaultUser
 }
 
-// GetConfig 提供线程安全的配置读取方法
 func GetConfig() *Config {
-	configLock.RLock()
-	defer configLock.RUnlock()
 	return globalConfig
 }
 
-// setGlobalConfig 替换当前配置（带写锁）
 func setGlobalConfig(cfg *Config) {
-	configLock.Lock()
-	defer configLock.Unlock()
 	globalConfig = cfg
 }
 
-// parseYAMLToConfig 将 YAML 内容解析为 Config 结构体
 func parseYAMLToConfig(data []byte) (*Config, error) {
 	v := viper.New()
 	v.SetConfigType("yaml")
@@ -64,11 +52,8 @@ func parseYAMLToConfig(data []byte) (*Config, error) {
 	return cfg, nil
 }
 
-// LoadConfig 从 Consul 拉取配置并启动监听协程
 func LoadConfig() *Config {
-	// 初始化 Consul 客户端
 	config := api.DefaultConfig()
-	// 地址和端口都要有
 	if addr := os.Getenv("CONSUL_ADDR"); addr != "" {
 		config.Address = addr
 		log.Println("使用自定义 Consul 地址:", addr)
@@ -86,7 +71,7 @@ func LoadConfig() *Config {
 		log.Fatal("未设置 CONSUL_CONFIG_KEY 环境变量")
 	}
 	kv := client.KV()
-	// ========== 第一次同步加载 ==========
+
 	kvPair, _, err := kv.Get(key, nil)
 	if err != nil || kvPair == nil {
 		log.Fatalf("首次加载配置失败（Consul 无此 key）: %v", err)
@@ -98,20 +83,15 @@ func LoadConfig() *Config {
 	}
 
 	setGlobalConfig(cfg)
-	printConfig("✅ 初始配置加载成功", cfg)
+	log.Println("✅ 初始配置加载成功")
 
-	// ========== 启动异步监听配置变化 ==========
 	go watchConsulConfig(kv, key, kvPair.ModifyIndex)
 
 	return GetConfig()
 }
 
-// watchConsulConfig 持续监听配置变更并更新
 func watchConsulConfig(kv *api.KV, key string, lastIndex uint64) {
 	for {
-		// 客户端向 Consul 发出请求：“如果 key 有变化就立即返回，否则最多等 5 分钟再返回”
-		// 如果在这段时间内 key 有变化，Consul 会立即返回（不用等满 5 分钟）
-		// 如果 5 分钟内没有变化，也会返回一次（但不会更新，因为 LastIndex 没变）
 		kvPair, meta, err := kv.Get(key, &api.QueryOptions{
 			WaitIndex: lastIndex,
 			WaitTime:  5 * time.Minute,
@@ -126,21 +106,8 @@ func watchConsulConfig(kv *api.KV, key string, lastIndex uint64) {
 			continue
 		}
 
-		lastIndex = meta.LastIndex
-
-		newCfg, err := parseYAMLToConfig(kvPair.Value)
-		if err != nil {
-			log.Printf("配置变更解析失败: %v", err)
-			continue
-		}
-
-		setGlobalConfig(newCfg)
-		printConfig("🔁 配置已更新", newCfg)
+		// 配置变化，打印日志
+		log.Println("🔁 检测到配置变更，程序即将退出以重启生效")
+		os.Exit(0)
 	}
-}
-
-// printConfig 打印当前配置
-func printConfig(label string, cfg *Config) {
-	cfgJson, _ := sonic.Marshal(cfg)
-	log.Printf("%s:\n%s\n", label, cfgJson)
 }
