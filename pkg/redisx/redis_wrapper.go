@@ -16,6 +16,8 @@ type RedisWrapper struct {
 	totalCountMap sync.Map
 
 	statsChan chan statsRecord
+
+	scriptShaMap sync.Map // map[string] => string（脚本内容 -> SHA1）
 }
 
 type statsRecord struct {
@@ -27,8 +29,6 @@ func NewRedisWrapper(client *redis.Client, timeout time.Duration, hitRateLogInte
 	rw := &RedisWrapper{
 		client:           client,
 		operationTimeout: timeout,
-		hitCountMap:      sync.Map{},
-		totalCountMap:    sync.Map{},
 		statsChan:        make(chan statsRecord, 1000), // 有缓冲，避免阻塞
 	}
 	// 读取持久化统计数据
