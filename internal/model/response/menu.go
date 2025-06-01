@@ -29,7 +29,7 @@ type Meta struct {
 }
 
 type MenuAuth struct {
-	ID   int64  `json:"id,string"`
-	Name string `json:"name"`
-	Code string `json:"code"`
+	ID       int64  `json:"id,string"`
+	Name     string `json:"name"`
+	AuthCode string `json:"authCode"`
 }

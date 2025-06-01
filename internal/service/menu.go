@@ -64,9 +64,9 @@ func (m *MenuService) BuildMenuTree(menuList []*entity.Menu, filterHidden bool) 
 		if dbMenu.Type == 3 {
 			if parent, exists := menuMap[dbMenu.ParentID]; exists {
 				parent.Meta.AuthList = append(parent.Meta.AuthList, response.MenuAuth{
-					ID:   dbMenu.ID,
-					Name: dbMenu.Title,
-					Code: dbMenu.AuthCode,
+					ID:       dbMenu.ID,
+					Name:     dbMenu.Title,
+					AuthCode: dbMenu.AuthCode,
 				})
 			}
 			continue
@@ -104,8 +104,6 @@ func (m *MenuService) CreateMenu(c context.Context, menu *request.Menu) (err err
 func (m *MenuService) CreateMenuAuth(c context.Context, menu *request.MenuAuth) (err error) {
 	var menuDo entity.Menu
 	err = copier.Copy(&menuDo, &menu)
-	// todo后续有必要统一前后端关于角色码的格式
-	menuDo.AuthCode = menu.Code
 	if err != nil {
 		zap.L().Error("菜单属性复制失败", zap.Error(err))
 		return

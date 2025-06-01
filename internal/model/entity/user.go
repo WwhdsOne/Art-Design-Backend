@@ -21,7 +21,7 @@ type User struct {
 	Occupation   string   `gorm:"type:varchar(50);comment:职业"`
 	Tags         []string `gorm:"type:jsonb;serializer:json;comment:个人标签"`
 	Status       int8     `gorm:"type:smallint;not null;default:1;comment:状态:0-禁用,1-正常"`
-	Roles        []Role   `gorm:"many2many:user_roles;comment:关联角色"`
+	Roles        []*Role  `gorm:"many2many:user_roles;comment:关联角色"`
 }
 
 func (u *User) TableName() string {

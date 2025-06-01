@@ -33,8 +33,8 @@ func wireApp() *bootstrap.HttpServer {
 	}
 	engine := bootstrap.InitGin(middlewares, logger, configConfig)
 	userRepository := repository.NewUserRepository(db)
-	roleRepository := repository.NewRoleRepository(db, redisWrapper)
-	userRolesRepository := repository.NewUserRolesRepository(db, redisWrapper)
+	roleRepository := repository.NewRoleRepository(db)
+	userRolesRepository := repository.NewUserRolesRepository(db)
 	gormTransactionManager := repository.NewGormTransactionManager(db)
 	defaultUserConfig := config.ProvideDefaultUserConfig()
 	authService := &service.AuthService{
@@ -59,7 +59,7 @@ func wireApp() *bootstrap.HttpServer {
 	}
 	userController := controller.NewUserController(engine, middlewares, userService)
 	menuRepository := repository.NewMenuRepository(db)
-	roleMenusRepository := repository.NewRoleMenusRepository(db, redisWrapper)
+	roleMenusRepository := repository.NewRoleMenusRepository(db)
 	syncMap := container.NewSyncMap()
 	menuService := &service.MenuService{
 		MenuRepo:      menuRepository,

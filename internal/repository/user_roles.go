@@ -2,24 +2,19 @@ package repository
 
 import (
 	"Art-Design-Backend/internal/model/entity"
-	"Art-Design-Backend/pkg/constant/rediskey"
 	"Art-Design-Backend/pkg/errors"
-	"Art-Design-Backend/pkg/redisx"
 	"context"
-	"fmt"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
 type UserRolesRepository struct {
-	db    *gorm.DB             // 用户表数据库连接
-	redis *redisx.RedisWrapper // redis缓存
+	db *gorm.DB // 用户表数据库连接
 }
 
-func NewUserRolesRepository(db *gorm.DB, redis *redisx.RedisWrapper) *UserRolesRepository {
+func NewUserRolesRepository(db *gorm.DB) *UserRolesRepository {
 	return &UserRolesRepository{
-		db:    db,
-		redis: redis,
+		db: db,
 	}
 }
 
@@ -46,10 +41,6 @@ func (u *UserRolesRepository) AssignRoleToUser(c context.Context, userID int64, 
 		err = errors.NewDBError("删除原有关联失败")
 		return
 	}
-
-	// 删除原有用户角色信息缓存
-	cacheKey := fmt.Sprintf(rediskey.UserRoleList+"%d", userID)
-	_ = u.redis.Del(cacheKey)
 
 	// 创建新的关联
 	if len(roleIDList) > 0 {

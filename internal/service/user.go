@@ -61,7 +61,7 @@ func (u *UserService) GetUserById(c *gin.Context) (res response.User, err error)
 	return
 }
 
-func (u *UserService) getRoleListByUserID(c context.Context, userID int64) (roleList []entity.Role, err error) {
+func (u *UserService) getRoleListByUserID(c context.Context, userID int64) (roleList []*entity.Role, err error) {
 	userRoleKey := fmt.Sprintf(rediskey.UserRoleList+"%d", userID)
 
 	// 1. 尝试从 Redis 获取缓存
@@ -81,26 +81,48 @@ func (u *UserService) getRoleListByUserID(c context.Context, userID int64) (role
 		zap.L().Debug("获取用户角色对应关系缓存未命中", zap.Int64("userID", userID))
 	}
 
-	// 2. 从数据库查询
+	// 2. 从数据库查询ID列表
 	roleIDList, err := u.UserRolesRepo.GetRoleIDListByUserID(c, userID)
 	if err != nil {
 		zap.L().Error("获取用户角色列表失败", zap.Error(err))
 		return nil, err
 	}
 
-	roleList, err = u.RoleRepo.GetRoleListByRoleIDList(c, roleIDList)
-	if err != nil {
-		zap.L().Error("获取角色列表失败", zap.Error(err))
-		return nil, err
+	// 3. 根据ID列表去数据库或缓存查询数据
+	for _, roleID := range roleIDList {
+		var role *entity.Role
+		key := strconv.FormatInt(roleID, 10)
+		var roleJson string
+		// 3.1 从 Redis 读取
+		roleJson, err = u.Redis.Get(rediskey.RoleInfo + key)
+		if err == nil {
+			_ = sonic.UnmarshalString(roleJson, &role)
+			return
+		}
+		// 3.2 从数据库读取
+		role, err = u.RoleRepo.GetRoleByID(c, roleID)
+		if err != nil {
+			zap.L().Error("获取角色列表失败", zap.Error(err))
+			return
+		}
+		// 3.3 角色信息异步写入 Redis
+		go func() {
+			roleJson, _ = sonic.MarshalString(role)
+			err = u.Redis.Set(rediskey.RoleInfo+key, roleJson, rediskey.RoleInfoTTL)
+			if err != nil {
+				zap.L().Error("角色缓存写入失败", zap.Error(err))
+			}
+		}()
+		roleList = append(roleList, role)
 	}
 
-	// 3. 写入 Redis 缓存
+	// 4. 用户角色对应关系写入 Redis 缓存
 	cacheBytes, _ := sonic.MarshalString(roleList)
 	if err = u.Redis.Set(userRoleKey, cacheBytes, rediskey.UserRoleListTTL); err != nil {
 		zap.L().Error("用户角色对应关系写入缓存失败", zap.Int64("userID", userID), zap.Error(err))
 	}
 
-	// 4. 写入 Redis 映射表（每个角色映射该用户缓存key）
+	// 5. 写入 Redis 映射表（每个角色映射该用户缓存key）
 	for _, roleID := range roleIDList {
 		roleUserDepKey := fmt.Sprintf(rediskey.RoleUserDependencies+"%d", roleID)
 		if err = u.Redis.SAdd(roleUserDepKey, userRoleKey); err != nil {
@@ -120,7 +142,7 @@ func (u *UserService) GetUserPage(c *gin.Context, query *query.User) (resp *base
 
 	userResponses := make([]response.User, 0, len(users))
 	for _, user := range users {
-		var roles []entity.Role
+		var roles []*entity.Role
 
 		// 从 Redis 缓存中获取用户角色
 		if roles, err = u.getRoleListByUserID(c, user.ID); err != nil {

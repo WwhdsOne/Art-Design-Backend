@@ -3,27 +3,21 @@ package repository
 import (
 	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/internal/model/query"
-	"Art-Design-Backend/pkg/constant/rediskey"
 	"Art-Design-Backend/pkg/errors"
-	"Art-Design-Backend/pkg/redisx"
 	"context"
 	"fmt"
-	"github.com/bytedance/sonic"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
-	"strconv"
 	"strings"
 )
 
 type RoleRepository struct {
-	db    *gorm.DB             // 用户表数据库连接
-	redis *redisx.RedisWrapper // redis
+	db *gorm.DB // 用户表数据库连接
 }
 
-func NewRoleRepository(db *gorm.DB, redis *redisx.RedisWrapper) *RoleRepository {
+func NewRoleRepository(db *gorm.DB) *RoleRepository {
 	return &RoleRepository{
-		db:    db,
-		redis: redis,
+		db: db,
 	}
 }
 
@@ -88,36 +82,12 @@ func (r *RoleRepository) CreateRole(c context.Context, role *entity.Role) (err e
 }
 
 func (r *RoleRepository) GetRoleByID(c context.Context, roleID int64) (role *entity.Role, err error) {
-	key := strconv.FormatInt(roleID, 10)
-	// 从 Redis 读取
-	roleJson, err := r.redis.Get(rediskey.RoleInfo + key)
-	if err == nil {
-		_ = sonic.UnmarshalString(roleJson, &role)
-		return
-	}
 	if err = DB(c, r.db).
 		Where("id = ?", roleID).
 		Where("status = 1").
 		First(&role).Error; err != nil {
 		err = errors.NewDBError("查询角色失败")
 		return
-	}
-	// 异步写入 Redis
-	go func() {
-		roleJson, _ = sonic.MarshalString(role)
-		err = r.redis.Set(rediskey.RoleInfo+key, roleJson, rediskey.RoleInfoTTL)
-	}()
-	return
-}
-
-func (r *RoleRepository) GetRoleListByRoleIDList(c context.Context, roleIDList []int64) (roleList []entity.Role, err error) {
-	for _, roleID := range roleIDList {
-		var role *entity.Role
-		role, err = r.GetRoleByID(c, roleID)
-		if err != nil {
-			return
-		}
-		roleList = append(roleList, *role)
 	}
 	return
 }
@@ -143,26 +113,6 @@ func (r *RoleRepository) GetRolePage(c context.Context, role *query.Role) (roleP
 	if err = queryConditions.Scopes(role.Paginate()).Find(&rolePage).Error; err != nil {
 		zap.L().Error("获取角色分页数据失败")
 		err = errors.NewDBError("获取角色分页数据失败")
-		return
-	}
-	return
-}
-
-// InvalidRoleInfoCache 删除角色信息缓存
-// 同时也删除映射表缓存
-func (r *RoleRepository) InvalidRoleInfoCache(roleID int64) (err error) {
-	// 删除角色信息缓存
-	key := rediskey.RoleInfo + strconv.FormatInt(roleID, 10)
-	err = r.redis.Del(key)
-	if err != nil {
-		err = errors.NewCacheError("删除角色信息缓存失败")
-		return
-	}
-	// 根据角色用户映射表删除用户角色信息缓存
-	key = fmt.Sprintf(rediskey.RoleUserDependencies+"%d", roleID)
-	err = r.redis.DelBySetMembers(key)
-	if err != nil {
-		err = errors.NewCacheError("删除角色菜单映射表缓存失败")
 		return
 	}
 	return
@@ -196,6 +146,5 @@ func (r *RoleRepository) FilterValidRoleIDs(ctx context.Context, roleIDs []int64
 		err = errors.NewDBError("查询有效角色失败")
 		return
 	}
-
 	return
 }
