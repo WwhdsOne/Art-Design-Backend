@@ -55,23 +55,29 @@ func (r *RedisWrapper) Scan(prefix string, cursor uint64, count int64) ([]string
 func (r *RedisWrapper) DeleteByPrefix(prefix string, count int64) (err error) {
 	var cursor uint64
 	var keys []string
-	timeout, cancelFunc := context.WithTimeout(context.Background(), r.operationTimeout)
-	defer cancelFunc()
-	for {
 
+	for {
+		// 扫描 keys
 		keys, cursor, err = r.Scan(prefix, cursor, count)
 		if err != nil {
 			return
 		}
 
+		// 每批次创建并释放独立的 context
 		if len(keys) > 0 {
-			_ = r.client.Del(timeout, keys...) // 忽略失败
+			ctx, cancel := context.WithTimeout(context.Background(), r.operationTimeout)
+			err = r.client.Del(ctx, keys...).Err() // 忽略失败
+			if err != nil {
+				zap.L().Error("删除缓存失败", zap.Error(err))
+			}
+			cancel() // ✅ 必须释放
 		}
 
 		if cursor == 0 {
 			break
 		}
 	}
+
 	return
 }
 

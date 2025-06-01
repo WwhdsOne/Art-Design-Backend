@@ -97,7 +97,6 @@ func (u *UserService) getRoleListByUserID(c context.Context, userID int64) (role
 		roleJson, err = u.Redis.Get(rediskey.RoleInfo + key)
 		if err == nil {
 			_ = sonic.UnmarshalString(roleJson, &role)
-			return
 		}
 		// 3.2 从数据库读取
 		role, err = u.RoleRepo.GetRoleByID(c, roleID)
@@ -107,9 +106,8 @@ func (u *UserService) getRoleListByUserID(c context.Context, userID int64) (role
 		}
 		// 3.3 角色信息异步写入 Redis
 		go func() {
-			roleJson, _ = sonic.MarshalString(role)
-			err = u.Redis.Set(rediskey.RoleInfo+key, roleJson, rediskey.RoleInfoTTL)
-			if err != nil {
+			roleJsonRes, _ := sonic.MarshalString(role)
+			if err = u.Redis.Set(rediskey.RoleInfo+key, roleJsonRes, rediskey.RoleInfoTTL); err != nil {
 				zap.L().Error("角色缓存写入失败", zap.Error(err))
 			}
 		}()

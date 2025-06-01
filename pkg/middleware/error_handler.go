@@ -123,6 +123,7 @@ func (m *Middlewares) ErrorHandlerMiddleware() gin.HandlerFunc {
 		registerValidator(request.Role{})
 		registerValidator(request.RoleMenuBinding{})
 		registerValidator(request.User{})
+		registerValidator(request.MenuAuth{})
 	}
 	return func(c *gin.Context) {
 		c.Next() // 先调用后续的处理函数

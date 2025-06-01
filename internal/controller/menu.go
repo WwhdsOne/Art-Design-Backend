@@ -25,6 +25,7 @@ func NewMenuController(engine *gin.Engine, middleware *middleware.Middlewares, s
 		r.GET("/all", menuCtrl.getAllMenus)
 		r.POST("/create", menuCtrl.createMenu)
 		r.POST("/createAuth", menuCtrl.createAuth)
+		r.POST("/updateAuth", menuCtrl.updateAuth)
 		r.POST("/delete/:id", menuCtrl.deleteMenu)
 
 	}
@@ -66,6 +67,20 @@ func (m *MenuController) createAuth(c *gin.Context) {
 		return
 	}
 	result.OkWithMessage("添加成功", c)
+}
+
+func (m *MenuController) updateAuth(c *gin.Context) {
+	var menu request.MenuAuth
+	if err := c.ShouldBindBodyWithJSON(&menu); err != nil {
+		_ = c.Error(err)
+		return
+	}
+	err := m.menuService.UpdateMenuAuth(c, &menu)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithMessage("更新成功", c)
 }
 
 func (m *MenuController) deleteMenu(c *gin.Context) {

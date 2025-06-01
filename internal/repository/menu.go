@@ -4,8 +4,10 @@ import (
 	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/pkg/errors"
 	"context"
+	"fmt"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
+	"strings"
 )
 
 type MenuRepository struct {
@@ -16,6 +18,59 @@ func NewMenuRepository(db *gorm.DB) *MenuRepository {
 	return &MenuRepository{
 		db: db,
 	}
+}
+
+func (r *MenuRepository) CheckMenuDuplicate(menu *entity.Menu) (err error) {
+	var result struct {
+		NameExists  bool
+		PathExists  bool
+		TitleExists bool
+	}
+
+	excludeID := ""
+	if menu.ID != 0 {
+		excludeID = fmt.Sprintf("AND id != %d", menu.ID)
+	}
+
+	var query strings.Builder
+	args := make([]interface{}, 0)
+	conditions := make([]string, 0)
+
+	if menu.Name != nil && *menu.Name != "" {
+		conditions = append(conditions, "EXISTS(SELECT 1 FROM \"menu\" WHERE name = ? "+excludeID+") AS name_exists")
+		args = append(args, *menu.Name)
+	}
+
+	if menu.Path != nil && *menu.Path != "" {
+		conditions = append(conditions, "EXISTS(SELECT 1 FROM \"menu\" WHERE path = ? "+excludeID+") AS path_exists")
+		args = append(args, *menu.Path)
+	}
+
+	if menu.Title != "" {
+		conditions = append(conditions, "EXISTS(SELECT 1 FROM \"menu\" WHERE title = ? "+excludeID+") AS title_exists")
+		args = append(args, menu.Title)
+	}
+
+	if len(conditions) == 0 {
+		return nil // 没有需要查重的字段
+	}
+
+	query.WriteString("SELECT ")
+	query.WriteString(strings.Join(conditions, ", "))
+
+	if err := r.db.Raw(query.String(), args...).Scan(&result).Error; err != nil {
+		return err
+	}
+
+	switch {
+	case result.NameExists:
+		err = errors.NewDBError("组件名称重复")
+	case result.PathExists:
+		err = errors.NewDBError("路由地址重复")
+	case result.TitleExists:
+		err = errors.NewDBError("菜单名称重复")
+	}
+	return
 }
 
 func (m *MenuRepository) GetAllMenus(c context.Context) (res []*entity.Menu, err error) {
@@ -64,12 +119,19 @@ func (m *MenuRepository) DeleteMenuByIDList(c context.Context, menuIDList []int6
 	return
 }
 
-func (m *MenuRepository) GetChildMenuIDsByParentID(ctx context.Context, parentID int64) (childrenIDs []int64, err error) {
-	if err = DB(ctx, m.db).Model(&entity.Menu{}).
+func (m *MenuRepository) GetChildMenuIDsByParentID(c context.Context, parentID int64) (childrenIDs []int64, err error) {
+	if err = DB(c, m.db).Model(&entity.Menu{}).
 		Where("parent_id = ?", parentID).
 		Pluck("id", &childrenIDs).Error; err != nil {
 		zap.L().Error("获取子菜单失败", zap.Error(err))
 		return nil, errors.NewDBError("获取子菜单失败")
+	}
+	return
+}
+
+func (m *MenuRepository) UpdateMenuAuth(c context.Context, menu *entity.Menu) (err error) {
+	if err = DB(c, m.db).Where("id = ?", menu.ID).Updates(menu).Error; err != nil {
+		return errors.NewDBError("更新菜单失败")
 	}
 	return
 }

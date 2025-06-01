@@ -36,6 +36,18 @@ func (m *MenuService) getMenuLock(key string) *sync.RWMutex {
 	return actual.(*sync.RWMutex)
 }
 
+func (m *MenuService) invalidAllMenuCache() (err error) {
+	// 清除所有菜单相关缓存
+	if err = m.Redis.DeleteByPrefix(rediskey.MenuListRole, 100); err != nil {
+		return
+	}
+
+	if err = m.Redis.DeleteByPrefix(rediskey.MenuRoleDependencies, 100); err != nil {
+		return
+	}
+	return
+}
+
 // BuildMenuTree 构建菜单树结构并挂载按钮权限
 // 参数 filterHidden 控制是否过滤隐藏菜单（true 过滤，false 不过滤）
 func (m *MenuService) BuildMenuTree(menuList []*entity.Menu, filterHidden bool) (res []*response.Menu, err error) {
@@ -290,13 +302,11 @@ func (m *MenuService) DeleteMenu(c *gin.Context, id int64) (err error) {
 	}
 
 	// Step 4. 清除所有菜单相关缓存
-	if err = m.Redis.DeleteByPrefix(rediskey.MenuListRole, 100); err != nil {
-		zap.L().Error("批量删除菜单缓存失败", zap.Error(err))
-	}
-
-	if err = m.Redis.DeleteByPrefix(rediskey.MenuRoleDependencies, 100); err != nil {
-		zap.L().Error("批量删除角色-菜单依赖失败", zap.Error(err))
-	}
+	go func() {
+		if err = m.invalidAllMenuCache(); err != nil {
+			zap.L().Error("删除菜单权限缓存失败", zap.Error(err))
+		}
+	}()
 
 	return
 }
@@ -316,5 +326,30 @@ func (m *MenuService) collectMenuIDTree(c context.Context, parentID int64, resul
 			return err
 		}
 	}
+	return
+}
+
+func (m *MenuService) UpdateMenuAuth(c *gin.Context, r *request.MenuAuth) (err error) {
+	var menu entity.Menu
+	err = copier.Copy(&menu, r)
+	if err != nil {
+		zap.L().Error("权限参数复制失败", zap.Error(err))
+		return
+	}
+	err = m.MenuRepo.CheckMenuDuplicate(&menu)
+	if err != nil {
+		zap.L().Error("菜单权限重复", zap.Error(err))
+		return
+	}
+	err = m.MenuRepo.UpdateMenuAuth(c, &menu)
+	if err != nil {
+		zap.L().Error("更新菜单权限失败", zap.Error(err))
+		return
+	}
+	go func() {
+		if err = m.invalidAllMenuCache(); err != nil {
+			zap.L().Error("删除菜单权限缓存失败", zap.Error(err))
+		}
+	}()
 	return
 }
