@@ -130,6 +130,14 @@ func getKeyCategory(key string) string {
 
 // 原子计数
 func (r *RedisWrapper) incrMapCounter(m *sync.Map, category string) {
-	counterPtr, _ := m.LoadOrStore(category, new(uint64))
-	atomic.AddUint64(counterPtr.(*uint64), 1)
+	// 优先尝试 Load，避免不必要的开销
+	if val, ok := m.Load(category); ok {
+		atomic.AddUint64(val.(*uint64), 1)
+		return
+	}
+
+	// 如果未找到，则尝试 LoadOrStore（双重检查）
+	newCounter := new(uint64)
+	actual, _ := m.LoadOrStore(category, newCounter)
+	atomic.AddUint64(actual.(*uint64), 1)
 }
