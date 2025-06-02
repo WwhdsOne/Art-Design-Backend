@@ -22,7 +22,6 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 	"mime/multipart"
-	"strconv"
 )
 
 type UserService struct {
@@ -91,10 +90,10 @@ func (u *UserService) getRoleListByUserID(c context.Context, userID int64) (role
 	// 3. 根据ID列表去数据库或缓存查询数据
 	for _, roleID := range roleIDList {
 		var role *entity.Role
-		key := strconv.FormatInt(roleID, 10)
+		key := fmt.Sprintf(rediskey.RoleInfo+"%d", roleID)
 		var roleJson string
 		// 3.1 从 Redis 读取
-		roleJson, err = u.Redis.Get(rediskey.RoleInfo + key)
+		roleJson, err = u.Redis.Get(key)
 		if err == nil {
 			_ = sonic.UnmarshalString(roleJson, &role)
 		}
@@ -107,7 +106,7 @@ func (u *UserService) getRoleListByUserID(c context.Context, userID int64) (role
 		// 3.3 角色信息异步写入 Redis
 		go func() {
 			roleJsonRes, _ := sonic.MarshalString(role)
-			if err = u.Redis.Set(rediskey.RoleInfo+key, roleJsonRes, rediskey.RoleInfoTTL); err != nil {
+			if err = u.Redis.Set(key, roleJsonRes, rediskey.RoleInfoTTL); err != nil {
 				zap.L().Error("角色缓存写入失败", zap.Error(err))
 			}
 		}()
@@ -249,13 +248,13 @@ func (u *UserService) ChangeUserStatus(c *gin.Context, req request.ChangeStatus)
 	}
 	go func() {
 		// 删除用户登录状态
-		id := strconv.FormatInt(id, 10)
+		key := fmt.Sprintf(rediskey.SESSION+"%d", id)
 		// 获取用户登录状态的 Redis 键
-		tokenStr, _ := u.Redis.Get(id)
+		tokenStr, _ := u.Redis.Get(key)
 
 		// 准备需要删除的 Redis 键
 		delKeys := []string{
-			rediskey.SESSION + id,
+			key,
 			rediskey.LOGIN + tokenStr,
 		}
 
@@ -268,36 +267,3 @@ func (u *UserService) ChangeUserStatus(c *gin.Context, req request.ChangeStatus)
 	}()
 	return
 }
-
-//func DeleteUser(ids []int64, deleteBy int64) error {
-//	// 开启事务
-//	tx := global.DB.Begin()
-//
-//	if tx.Error != nil {
-//		return tx.Error
-//	}
-//
-//	// 更新修改者 ID
-//	if err := tx.Model(&entity.User{}).Where("id IN (?)", ids).Update("updated_by", deleteBy).Error; err != nil {
-//		tx.Rollback() // 回滚事务
-//		zap.L().Error("更新修改者 ID 失败")
-//		return err
-//	}
-//
-//	// 删除用户
-//	if err := tx.Where("id IN (?)", ids).Delete(&entity.User{}).Error; err != nil {
-//		tx.Rollback() // 回滚事务
-//		zap.L().Error("删除用户失败")
-//		return err
-//	}
-//
-//	// 提交事务
-//	if err := tx.Commit().Error; err != nil {
-//		tx.Rollback() // 回滚事务
-//		zap.L().Error("提交事务失败")
-//		return err
-//	}
-//
-//	return nil
-//}
-//

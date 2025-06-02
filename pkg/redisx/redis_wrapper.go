@@ -4,6 +4,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -12,12 +13,14 @@ type RedisWrapper struct {
 	client           *redis.Client
 	operationTimeout time.Duration // 操作超时时间
 
-	hitCountMap   sync.Map
-	totalCountMap sync.Map
+	hitCountMap   map[string]*atomic.Uint64
+	totalCountMap map[string]*atomic.Uint64
+	countLock     sync.RWMutex
 
 	statsChan chan statsRecord
 
-	scriptShaMap sync.Map // map[string] => string（脚本内容 -> SHA1）
+	scriptShaMap map[string]string // map[string] => string（脚本内容 -> SHA1）
+	scriptLock   sync.RWMutex
 }
 
 type statsRecord struct {
@@ -31,6 +34,9 @@ func NewRedisWrapper(client *redis.Client, timeout time.Duration, hitRateLogInte
 		operationTimeout: timeout,
 		statsChan:        make(chan statsRecord, 1000), // 有缓冲，避免阻塞
 	}
+	rw.hitCountMap = make(map[string]*atomic.Uint64)
+	rw.totalCountMap = make(map[string]*atomic.Uint64)
+	rw.scriptShaMap = make(map[string]string)
 	// 读取持久化统计数据
 	err := rw.LoadStatsFromRedis()
 	if err != nil {

@@ -65,12 +65,10 @@ func (r *RedisWrapper) DeleteByPrefix(prefix string, count int64) (err error) {
 
 		// 每批次创建并释放独立的 context
 		if len(keys) > 0 {
-			ctx, cancel := context.WithTimeout(context.Background(), r.operationTimeout)
-			err = r.client.Del(ctx, keys...).Err() // 忽略失败
+			err = r.PipelineDel(keys)
 			if err != nil {
 				zap.L().Error("删除缓存失败", zap.Error(err))
 			}
-			cancel() // ✅ 必须释放
 		}
 
 		if cursor == 0 {

@@ -35,9 +35,7 @@ func (r *RedisWrapper) SAdd(key string, vals ...interface{}) (err error) {
 
 // DelBySetMembers 根据集合 key，删除集合中每个成员对应的缓存键，最后删除集合自身
 // 使用 Lua 脚本确保操作的原子性
-func (r *RedisWrapper) DelBySetMembers(setKey string) error {
-	timeout, cancelFunc := context.WithTimeout(context.Background(), r.operationTimeout)
-	defer cancelFunc()
+func (r *RedisWrapper) DelBySetMembers(setKey string) (err error) {
 
 	// Lua 脚本：获取集合成员，依次删除每个以成员为 key 的缓存，再删除集合自身
 	script := `
@@ -51,12 +49,12 @@ func (r *RedisWrapper) DelBySetMembers(setKey string) error {
     `
 
 	// 执行 Lua 脚本
-	result, err := r.client.Eval(timeout, script, []string{setKey}).Result()
+	_, err = r.Eval(script, []string{setKey})
 	if err != nil {
 		zap.L().Error("根据集合成员删除键失败", zap.String("setKey", setKey), zap.Error(err))
-		return err
+		return
 	}
 
-	zap.L().Info("根据集合成员删除键成功", zap.String("setKey", setKey), zap.Any("result", result))
-	return nil
+	zap.L().Info("根据集合成员删除键成功", zap.String("setKey", setKey))
+	return
 }

@@ -10,34 +10,43 @@ func isNoScriptErr(err error) bool {
 }
 
 // Eval 执行 Lua 脚本（自动缓存 SHA，自动降级）
-func (r *RedisWrapper) Eval(script string, keys []string, args ...interface{}) (result interface{}, err error) {
-	timeout, cancel := context.WithTimeout(context.Background(), r.operationTimeout)
+func (r *RedisWrapper) Eval(script string, keys []string, args ...interface{}) (interface{}, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), r.operationTimeout)
 	defer cancel()
 
-	// 尝试使用 EVALSHA
-	if val, ok := r.scriptShaMap.Load(script); ok {
-		sha := val.(string)
-		cmd := r.client.EvalSha(timeout, sha, keys, args...)
-		if cmd.Err() == nil {
+	r.scriptLock.RLock()
+	sha, ok := r.scriptShaMap[script]
+	r.scriptLock.RUnlock()
+
+	// 优先尝试使用缓存的 SHA
+	if ok {
+		cmd := r.client.EvalSha(ctx, sha, keys, args...)
+		if err := cmd.Err(); err == nil {
 			return cmd.Val(), nil
+		} else if !isNoScriptErr(err) {
+			return nil, err
 		}
-		// 如果不是 NOSCRIPT 错误，直接返回错误
-		if !isNoScriptErr(cmd.Err()) {
-			return nil, cmd.Err()
-		}
-		// 否则降级到 Eval 继续执行
+		// 否则 fallback 到 Eval
 	}
 
-	// 使用 Eval 执行脚本
-	cmd := r.client.Eval(timeout, script, keys, args...)
-	if cmd.Err() != nil {
-		return nil, cmd.Err()
+	// 直接执行脚本（Eval）
+	cmd := r.client.Eval(ctx, script, keys, args...)
+	if err := cmd.Err(); err != nil {
+		return nil, err
 	}
 
-	// 尝试加载脚本缓存 SHA
-	if sha, shaErr := r.client.ScriptLoad(timeout, script).Result(); shaErr == nil {
-		r.scriptShaMap.Store(script, sha)
-	}
+	// 尝试加载 SHA 并缓存
+	go func() {
+		// 后台并行加载脚本 SHA（非阻塞主流程）
+		ctx, cancel := context.WithTimeout(context.Background(), r.operationTimeout)
+		defer cancel()
+
+		if sha, err := r.client.ScriptLoad(ctx, script).Result(); err == nil {
+			r.scriptLock.Lock()
+			r.scriptShaMap[script] = sha
+			r.scriptLock.Unlock()
+		}
+	}()
 
 	return cmd.Val(), nil
 }

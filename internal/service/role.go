@@ -11,7 +11,6 @@ import (
 	"Art-Design-Backend/pkg/errors"
 	"Art-Design-Backend/pkg/redisx"
 	"context"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
 	"go.uber.org/zap"
@@ -26,7 +25,7 @@ type RoleService struct {
 	Redis         *redisx.RedisWrapper               // redis
 }
 
-// InvalidateMenuCacheByRoleID 清除与指定角色关联的所有菜单缓存
+// invalidateMenuCacheByRoleID 清除与指定角色关联的所有菜单缓存
 //
 // 缓存设计说明：
 // 1. 用户菜单缓存策略：
@@ -57,13 +56,26 @@ type RoleService struct {
 //     "MENU:ROLE:DEPENDENCIES:2" → ["MENU:LIST:ROLE:1_2"]
 //     "MENU:ROLE:DEPENDENCIES:3" → ["MENU:LIST:ROLE:1_3"]
 //   - 当角色1权限变更时，自动清除两个用户的菜单缓存，以及角色1的依赖缓存表。
-func (r *RoleService) InvalidateMenuCacheByRoleID(roleID int64) (err error) {
+func (r *RoleService) invalidateMenuCacheByRoleID(roleID int64) (err error) {
 	// 获取记录角色所关联的菜单缓存 key 的依赖集合 key（Set 类型）
-	depKey := fmt.Sprintf(rediskey.MenuRoleDependencies+"%d", roleID)
+	depKey := rediskey.MenuRoleDependencies + strconv.FormatInt(roleID, 10)
 
 	// 构造删除列表：包括依赖集合本身 和 依赖集合中记录的所有菜单缓存 key
 	err = r.Redis.DelBySetMembers(depKey)
 
+	return
+}
+
+// invalidRoleInfoCache 删除角色信息缓存
+// 同时也删除映射表缓存
+func (r *RoleService) invalidRoleInfoCache(roleID int64) (err error) {
+	// 删除角色信息缓存
+	key := rediskey.RoleInfo + strconv.FormatInt(roleID, 10)
+	err = r.Redis.DelBySetMembers(key)
+	if err != nil {
+		err = errors.NewCacheError("删除角色信息缓存失败")
+		return
+	}
 	return
 }
 
@@ -103,19 +115,6 @@ func (r *RoleService) GetRolePage(c *gin.Context, roleQuery *query.Role) (rolePa
 	return
 }
 
-// InvalidRoleInfoCache 删除角色信息缓存
-// 同时也删除映射表缓存
-func (r *RoleService) InvalidRoleInfoCache(roleID int64) (err error) {
-	// 删除角色信息缓存
-	key := rediskey.RoleInfo + strconv.FormatInt(roleID, 10)
-	err = r.Redis.DelBySetMembers(key)
-	if err != nil {
-		err = errors.NewCacheError("删除角色信息缓存失败")
-		return
-	}
-	return
-}
-
 func (r *RoleService) UpdateRole(c *gin.Context, roleReq *request.Role) (err error) {
 	var roleDo entity.Role
 	if err = copier.Copy(&roleDo, &roleReq); err != nil {
@@ -130,7 +129,7 @@ func (r *RoleService) UpdateRole(c *gin.Context, roleReq *request.Role) (err err
 		return
 	}
 	go func() {
-		if cacheErr := r.InvalidRoleInfoCache(roleDo.ID); cacheErr != nil {
+		if cacheErr := r.invalidRoleInfoCache(roleDo.ID); cacheErr != nil {
 			zap.L().Error("用户信息缓存删除失败（需补偿）", zap.Int64("roleID", roleDo.ID), zap.Error(cacheErr))
 		}
 	}()
@@ -151,7 +150,7 @@ func (r *RoleService) DeleteRoleByID(c *gin.Context, roleID int64) (err error) {
 		return
 	}
 	go func() {
-		if cacheErr := r.InvalidateMenuCacheByRoleID(roleID); cacheErr != nil {
+		if cacheErr := r.invalidateMenuCacheByRoleID(roleID); cacheErr != nil {
 			zap.L().Error("缓存删除失败（需补偿）", zap.Int64("roleID", roleID), zap.Error(cacheErr))
 		}
 	}()
@@ -208,15 +207,15 @@ func (r *RoleService) UpdateRoleMenuBinding(c *gin.Context, req *request.RoleMen
 		return nil
 	})
 	if err != nil {
-		return err
+		return
 	}
 
 	// 缓存清理移出事务
 	go func() {
-		if cacheErr := r.InvalidateMenuCacheByRoleID(int64(req.RoleId)); cacheErr != nil {
+		if cacheErr := r.invalidateMenuCacheByRoleID(int64(req.RoleId)); cacheErr != nil {
 			zap.L().Error("缓存删除失败（需补偿）", zap.Int64("roleID", int64(req.RoleId)), zap.Error(cacheErr))
 		}
 	}()
 
-	return nil
+	return
 }
