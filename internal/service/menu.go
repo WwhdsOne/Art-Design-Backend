@@ -50,12 +50,9 @@ func (m *MenuService) invalidAllMenuCache() (err error) {
 
 // BuildMenuTree 构建菜单树结构并挂载按钮权限
 // 参数 filterHidden 控制是否过滤隐藏菜单（true 过滤，false 不过滤）
-func (m *MenuService) BuildMenuTree(menuList []*entity.Menu, filterHidden bool) (res []*response.Menu, err error) {
+func (m *MenuService) BuildMenuTree(menuList []*entity.Menu) (res []*response.Menu, err error) {
 	menuMap := make(map[int64]*response.Menu)
 	for _, menuDo := range menuList {
-		if filterHidden && menuDo.IsHide {
-			continue
-		}
 		var menuResp response.Menu
 		err = copier.Copy(&menuResp, &menuDo)
 		if err != nil {
@@ -133,7 +130,7 @@ func (m *MenuService) GetAllMenus(c context.Context) (res []*response.Menu, err 
 	if err != nil {
 		return
 	}
-	res, err = m.BuildMenuTree(menus, false)
+	res, err = m.BuildMenuTree(menus)
 	return
 }
 
@@ -252,7 +249,7 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*response.Menu, err 
 	}
 
 	// Step 16. 构建菜单树结构
-	res, err = m.BuildMenuTree(menuList, true)
+	res, err = m.BuildMenuTree(menuList)
 
 	// Step 17. 将结果写入 Redis 缓存
 	cacheBytes, _ := sonic.Marshal(&res)

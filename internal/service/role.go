@@ -11,6 +11,7 @@ import (
 	"Art-Design-Backend/pkg/errors"
 	"Art-Design-Backend/pkg/redisx"
 	"context"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
 	"go.uber.org/zap"
@@ -58,7 +59,7 @@ type RoleService struct {
 //   - 当角色1权限变更时，自动清除两个用户的菜单缓存，以及角色1的依赖缓存表。
 func (r *RoleService) invalidateMenuCacheByRoleID(roleID int64) (err error) {
 	// 获取记录角色所关联的菜单缓存 key 的依赖集合 key（Set 类型）
-	depKey := rediskey.MenuRoleDependencies + strconv.FormatInt(roleID, 10)
+	depKey := fmt.Sprintf(rediskey.MenuRoleDependencies+"%d", roleID)
 
 	// 构造删除列表：包括依赖集合本身 和 依赖集合中记录的所有菜单缓存 key
 	err = r.Redis.DelBySetMembers(depKey)
