@@ -18,17 +18,17 @@ type Menu struct {
 }
 
 type Meta struct {
-	Title             string `gorm:"type:varchar(100);not null;unique;comment:菜单名称"`
-	Icon              string `gorm:"type:varchar(20);comment:菜单图标"`
-	ShowBadge         bool   `gorm:"type:boolean;default:false;comment:是否显示徽标"`
-	ShowTextBadge     string `gorm:"type:varchar(20);comment:文本徽标内容"`
-	IsHide            bool   `gorm:"type:boolean;default:false;comment:是否在菜单中隐藏"`
-	IsHideTab         bool   `gorm:"type:boolean;default:false;comment:是否在上方标签页中隐藏"`
-	Link              string `gorm:"type:varchar(255);comment:外部链接地址"`
-	IsIframe          bool   `gorm:"type:boolean;default:false;comment:是否是iframe嵌入"`
-	KeepAlive         bool   `gorm:"type:boolean;default:false;comment:是否缓存组件"`
-	AuthCode          string `gorm:"type:varchar(255);comment:权限标识码,只有按钮会填充这列"`
-	IsInMainContainer bool   `gorm:"type:boolean;default:false;comment:是否在主容器中"`
+	Title             string  `gorm:"type:varchar(100);not null;unique;comment:菜单名称"`
+	Icon              string  `gorm:"type:varchar(20);comment:菜单图标"`
+	ShowBadge         bool    `gorm:"type:boolean;default:false;comment:是否显示徽标"`
+	ShowTextBadge     string  `gorm:"type:varchar(20);comment:文本徽标内容"`
+	IsHide            bool    `gorm:"type:boolean;default:false;comment:是否在菜单中隐藏"`
+	IsHideTab         bool    `gorm:"type:boolean;default:false;comment:是否在上方标签页中隐藏"`
+	Link              string  `gorm:"type:varchar(255);comment:外部链接地址"`
+	IsIframe          bool    `gorm:"type:boolean;default:false;comment:是否是iframe嵌入"`
+	KeepAlive         bool    `gorm:"type:boolean;default:false;comment:是否缓存组件"`
+	AuthCode          *string `gorm:"type:varchar(255);comment:权限标识码,只有按钮会填充这列"`
+	IsInMainContainer bool    `gorm:"type:boolean;default:false;comment:是否在主容器中"`
 }
 
 // TableName 设置表名

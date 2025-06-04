@@ -135,3 +135,10 @@ func (m *MenuRepository) UpdateMenuAuth(c context.Context, menu *entity.Menu) (e
 	}
 	return
 }
+
+func (m *MenuRepository) UpdateMenu(c context.Context, menu *entity.Menu) (err error) {
+	if err = DB(c, m.db).Where("id = ?", menu.ID).Updates(menu).Error; err != nil {
+		return errors.NewDBError("更新菜单失败")
+	}
+	return
+}

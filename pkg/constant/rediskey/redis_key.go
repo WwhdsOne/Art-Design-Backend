@@ -14,13 +14,13 @@ const (
 const (
 	// MenuRoleDependencies 菜单角色依赖关系，不过期
 	MenuRoleDependencies = "MENU:ROLE:DEPENDENCIES:" // roleID -> dependency tree
-	MenuListRole         = "MENU:LIST:ROLE:"         // roleID -> menu list
+	MenuListRole         = "MENU:LIST:ROLE:"         // 角色的菜单信息
 	MenuListRoleTTL      = 1 * time.Hour
 )
 
 // 用户权限相关
 const (
-	UserRoleList    = "USER:ROLE:LIST:" // userID -> roleID list
+	UserRoleList    = "USER:ROLE:LIST:" // 用户的角色信息
 	UserRoleListTTL = 30 * time.Minute  // 缓存有效期
 	RoleInfo        = "ROLE:INFO:"
 	RoleInfoTTL     = 1 * time.Hour

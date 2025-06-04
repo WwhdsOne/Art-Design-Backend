@@ -48,9 +48,9 @@ func (m *MenuService) invalidAllMenuCache() (err error) {
 	return
 }
 
-// BuildMenuTree 构建菜单树结构并挂载按钮权限
+// buildMenuTree 构建菜单树结构并挂载按钮权限
 // 参数 filterHidden 控制是否过滤隐藏菜单（true 过滤，false 不过滤）
-func (m *MenuService) BuildMenuTree(menuList []*entity.Menu) (res []*response.Menu, err error) {
+func (m *MenuService) buildMenuTree(menuList []*entity.Menu) (res []*response.Menu, err error) {
 	menuMap := make(map[int64]*response.Menu)
 	for _, menuDo := range menuList {
 		var menuResp response.Menu
@@ -75,7 +75,7 @@ func (m *MenuService) BuildMenuTree(menuList []*entity.Menu) (res []*response.Me
 				parent.Meta.AuthList = append(parent.Meta.AuthList, response.MenuAuth{
 					ID:       dbMenu.ID,
 					Name:     dbMenu.Title,
-					AuthCode: dbMenu.AuthCode,
+					AuthCode: *dbMenu.AuthCode,
 				})
 			}
 			continue
@@ -105,8 +105,34 @@ func (m *MenuService) CreateMenu(c context.Context, menu *request.Menu) (err err
 	}
 	err = m.MenuRepo.CreateMenu(c, &menuDo)
 	if err != nil {
+		zap.L().Error("创建菜单失败", zap.Error(err))
 		return
 	}
+	return
+}
+
+func (m *MenuService) UpdateMenu(c context.Context, r *request.Menu) (err error) {
+	var menuDo entity.Menu
+	err = copier.Copy(&menuDo, &r)
+	if err != nil {
+		zap.L().Error("菜单属性复制失败", zap.Error(err))
+		return
+	}
+	err = m.MenuRepo.CheckMenuDuplicate(&menuDo)
+	if err != nil {
+		zap.L().Error("更新菜单时,菜单名称重复", zap.Error(err))
+		return
+	}
+	err = m.MenuRepo.UpdateMenu(c, &menuDo)
+	if err != nil {
+		zap.L().Error("更新菜单失败", zap.Error(err))
+		return
+	}
+	go func() {
+		if err = m.invalidAllMenuCache(); err != nil {
+			zap.L().Error("更新菜单时,删除菜单缓存失败", zap.Error(err))
+		}
+	}()
 	return
 }
 
@@ -114,11 +140,12 @@ func (m *MenuService) CreateMenuAuth(c context.Context, menu *request.MenuAuth) 
 	var menuDo entity.Menu
 	err = copier.Copy(&menuDo, &menu)
 	if err != nil {
-		zap.L().Error("菜单属性复制失败", zap.Error(err))
+		zap.L().Error("创建菜单权限时,菜单属性复制失败", zap.Error(err))
 		return
 	}
 	err = m.MenuRepo.CreateMenu(c, &menuDo)
 	if err != nil {
+		zap.L().Error("创建菜单权限失败", zap.Error(err))
 		return
 	}
 	return
@@ -130,7 +157,7 @@ func (m *MenuService) GetAllMenus(c context.Context) (res []*response.Menu, err 
 	if err != nil {
 		return
 	}
-	res, err = m.BuildMenuTree(menus)
+	res, err = m.buildMenuTree(menus)
 	return
 }
 
@@ -249,7 +276,7 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*response.Menu, err 
 	}
 
 	// Step 16. 构建菜单树结构
-	res, err = m.BuildMenuTree(menuList)
+	res, err = m.buildMenuTree(menuList)
 
 	// Step 17. 将结果写入 Redis 缓存
 	cacheBytes, _ := sonic.Marshal(&res)
