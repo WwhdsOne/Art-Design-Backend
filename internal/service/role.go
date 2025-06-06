@@ -159,7 +159,6 @@ func (r *RoleService) DeleteRoleByID(c *gin.Context, roleID int64) (err error) {
 }
 
 func (r *RoleService) GetRoleMenuBinding(c *gin.Context, roleID int64) (res *response.RoleMenuBinding, err error) {
-	res = &response.RoleMenuBinding{}
 	var simpleMenuList []*response.SimpleMenu
 	menuList, err := r.MenuRepo.GetReducedMenuList(c)
 	if err != nil {

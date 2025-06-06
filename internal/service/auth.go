@@ -44,7 +44,6 @@ func (s *AuthService) Login(c *gin.Context, u *request.Login) (tokenStr string, 
 	}
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(u.Password))
 	if err != nil {
-		// todo后续修改为统一鉴权错误
 		err = fmt.Errorf("用户名或密码错误")
 		return
 	}
@@ -177,7 +176,7 @@ func (s *AuthService) Register(c *gin.Context, userReq *request.RegisterUser) (e
 		}
 		// id是新用户的主键ID
 		// todo后续可能会换成动态获取
-		if err = s.UserRolesRepo.AssignRoleToUser(ctx, user.ID, []int64{42838646763553030}); err != nil {
+		if err = s.UserRolesRepo.AddRolesToUser(ctx, user.ID, []int64{42838646763553030}); err != nil {
 			return
 		}
 		return

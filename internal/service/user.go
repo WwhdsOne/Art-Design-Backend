@@ -253,6 +253,7 @@ func (u *UserService) ChangeUserStatus(c *gin.Context, req request.ChangeStatus)
 		tokenStr, _ := u.Redis.Get(key)
 
 		// 准备需要删除的 Redis 键
+		// 让用户退出登录
 		delKeys := []string{
 			key,
 			rediskey.LOGIN + tokenStr,
@@ -265,5 +266,69 @@ func (u *UserService) ChangeUserStatus(c *gin.Context, req request.ChangeStatus)
 			return
 		}
 	}()
+	return
+}
+
+func (u *UserService) GetUserRoleBinding(c context.Context, id int64) (res *response.UserRoleBinding, err error) {
+	reducedRoleList, err := u.UserRolesRepo.GetReducedRoleList(c)
+	if err != nil {
+		zap.L().Error("获取用户角色列表失败", zap.Error(err))
+		return
+	}
+	roleList, err := u.UserRolesRepo.GetRoleIDListByUserID(c, id)
+	if err != nil {
+		zap.L().Error("获取用户角色ID列表失败", zap.Error(err))
+		return
+	}
+	simpleRoleList := make([]*response.SimpleRole, 0, len(reducedRoleList))
+	for _, role := range reducedRoleList {
+		var roleResp response.SimpleRole
+		roleResp.ID = role.ID
+		roleResp.Name = role.Name
+		simpleRoleList = append(simpleRoleList, &roleResp)
+	}
+	res = &response.UserRoleBinding{
+		HasRoleIDs: roleList,
+		Roles:      simpleRoleList,
+	}
+	return
+}
+
+func (u *UserService) invalidUserRoleCache(userID int64, originalRoleIds []int64) (err error) {
+	userRoleInfoKey := fmt.Sprintf(rediskey.UserRoleList+"%d", userID)
+	if err = u.Redis.Del(userRoleInfoKey); err != nil {
+		return
+	}
+	for _, roleID := range originalRoleIds {
+		roleUserDepKey := fmt.Sprintf(rediskey.RoleUserDependencies+"%d", roleID)
+		if err = u.Redis.SRem(roleUserDepKey, userRoleInfoKey); err != nil {
+			zap.L().Error("删除用户角色对应关系失败", zap.Error(err))
+			// 不 return，非关键失败
+		}
+	}
+	return
+}
+
+func (u *UserService) UpdateUserRoleBinding(c *gin.Context, req *request.UserRoleBinding) (err error) {
+	err = u.GormTX.Transaction(c, func(ctx context.Context) (err error) {
+		if err = u.UserRolesRepo.DeleteRolesFromUserByUserID(ctx, int64(req.UserId)); err != nil {
+			return
+		}
+		if err = u.UserRolesRepo.AddRolesToUser(ctx, int64(req.UserId), req.RoleIds); err != nil {
+			return
+		}
+		return
+	})
+	if err != nil {
+		zap.L().Error("更新用户角色绑定失败", zap.Error(err))
+		return
+	}
+	// 缓存清理移出事务
+	go func() {
+		if cacheErr := u.invalidUserRoleCache(int64(req.UserId), req.OriginalRoleIds); cacheErr != nil {
+			zap.L().Error("用户变更角色信息删除缓存失败", zap.Int64("userID", int64(req.UserId)), zap.Error(cacheErr))
+		}
+	}()
+
 	return
 }

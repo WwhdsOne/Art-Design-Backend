@@ -29,6 +29,8 @@ func NewUserController(engine *gin.Engine, middleware *middleware.Middlewares, s
 		r.POST("/changePassword", userCtrl.changeUserPassword)
 		r.POST("/resetPassword/:id", userCtrl.resetUserPassword)
 		r.POST("/uploadAvatar", userCtrl.uploadAvatar)
+		r.POST("/getUserRole/:id", userCtrl.getUserRoleBinding)
+		r.POST("//updateUserRoleBinding", userCtrl.updateUserRoleBinding)
 		r.POST("/changeStatus", userCtrl.changeUserStatus)
 	}
 	return userCtrl
@@ -142,4 +144,32 @@ func (u *UserController) changeUserStatus(c *gin.Context) {
 		return
 	}
 	result.OkWithMessage("更新用户状态成功", c)
+}
+
+func (u *UserController) getUserRoleBinding(c *gin.Context) {
+	id, err := utils.ParseID(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	userRoles, err := u.userService.GetUserRoleBinding(c, id)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithData(userRoles, c)
+}
+
+func (u *UserController) updateUserRoleBinding(c *gin.Context) {
+	var req request.UserRoleBinding
+	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
+		_ = c.Error(err)
+		return
+	}
+	err := u.userService.UpdateUserRoleBinding(c, &req)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithMessage("更新用户角色绑定成功", c)
 }

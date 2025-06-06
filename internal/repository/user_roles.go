@@ -31,33 +31,43 @@ func (u *UserRolesRepository) GetRoleIDListByUserID(c context.Context, userID in
 	return
 }
 
-// AssignRoleToUser 分配角色给用户
-func (u *UserRolesRepository) AssignRoleToUser(c context.Context, userID int64, roleIDList []int64) (err error) {
-	// 删除原有关联
+// DeleteRolesFromUserByUserID 删除用户原有角色关联
+func (u *UserRolesRepository) DeleteRolesFromUserByUserID(c context.Context, userID int64) (err error) {
 	if err = DB(c, u.db).
 		Where("user_id = ?", userID).
 		Delete(&entity.UserRoles{}).Error; err != nil {
-		zap.L().Error("删除原有关联失败")
-		err = errors.NewDBError("删除原有关联失败")
+		zap.L().Error("删除原有关联失败", zap.Int64("userID", userID), zap.Error(err))
+		return errors.NewDBError("删除原有关联失败")
+	}
+	return
+}
+
+// AddRolesToUser 添加新的角色关联
+func (u *UserRolesRepository) AddRolesToUser(c context.Context, userID int64, roleIDList []int64) (err error) {
+	if len(roleIDList) == 0 {
 		return
 	}
-
-	// 创建新的关联
-	if len(roleIDList) > 0 {
-		userRoleList := make([]entity.UserRoles, 0, len(roleIDList))
-		for _, roleID := range roleIDList {
-			userRoleList = append(userRoleList, entity.UserRoles{
-				UserID: userID,
-				RoleID: roleID,
-			})
-		}
-		if err = DB(c, u.db).
-			Create(userRoleList).Error; err != nil {
-			zap.L().Error("创建新的关联失败")
-			err = errors.NewDBError("创建新的关联失败")
-			return
-		}
+	userRoleList := make([]entity.UserRoles, 0, len(roleIDList))
+	for _, roleID := range roleIDList {
+		userRoleList = append(userRoleList, entity.UserRoles{
+			UserID: userID,
+			RoleID: roleID,
+		})
 	}
+	if err = DB(c, u.db).Create(&userRoleList).Error; err != nil {
+		zap.L().Error("创建新的关联失败", zap.Int64("userID", userID), zap.Error(err))
+		return errors.NewDBError("创建新的关联失败")
+	}
+	return
+}
 
+func (u *UserRolesRepository) GetReducedRoleList(ctx context.Context) (roleList []*entity.Role, err error) {
+	if err = DB(ctx, u.db).
+		Select("id", "name").
+		Where("status = 1").
+		Find(&roleList).Error; err != nil {
+		err = errors.NewDBError("获取精简角色列表失败")
+		return
+	}
 	return
 }

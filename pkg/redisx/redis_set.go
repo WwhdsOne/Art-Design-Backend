@@ -33,6 +33,17 @@ func (r *RedisWrapper) SAdd(key string, vals ...interface{}) (err error) {
 	return
 }
 
+// SRem 删除元素
+func (r *RedisWrapper) SRem(key string, members ...interface{}) (err error) {
+	timeout, cancelFunc := context.WithTimeout(context.Background(), r.operationTimeout)
+	defer cancelFunc()
+	_, err = r.client.SRem(timeout, key, members...).Result()
+	if err != nil {
+		return
+	}
+	return
+}
+
 // DelBySetMembers 根据集合 key，删除集合中每个成员对应的缓存键，最后删除集合自身
 // 使用 Lua 脚本确保操作的原子性
 func (r *RedisWrapper) DelBySetMembers(setKey string) (err error) {
