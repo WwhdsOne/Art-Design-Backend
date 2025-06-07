@@ -33,7 +33,7 @@ func wireApp() *bootstrap.HttpServer {
 		Jwt:    jwt,
 		Config: configMiddleware,
 	}
-	engine := bootstrap.InitGin(middlewares, logger, configConfig)
+	engine := bootstrap.InitGin(middlewares, logger, configMiddleware)
 	userRepository := repository.NewUserRepository(db)
 	roleRepository := repository.NewRoleRepository(db)
 	userRolesRepository := repository.NewUserRolesRepository(db)
