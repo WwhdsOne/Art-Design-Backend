@@ -20,12 +20,17 @@ type Config struct {
 	OSS          OSS               `mapstructure:"oss"`
 	DigitPredict DigitPredict      `mapstructure:"digit_predict"`
 	DefaultUser  DefaultUserConfig `mapstructure:"default_user"`
+	Middleware   Middleware        `mapstructure:"middleware"`
 }
 
 var globalConfig *Config
 
 func ProvideDefaultUserConfig() *DefaultUserConfig {
 	return &globalConfig.DefaultUser
+}
+
+func ProviderMiddlewareConfig() *Middleware {
+	return &globalConfig.Middleware
 }
 
 func GetConfig() *Config {

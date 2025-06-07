@@ -20,6 +20,7 @@ func wireApp() *bootstrap.HttpServer {
 		wire.Struct(new(bootstrap.HttpServer), "*"),
 		config.LoadConfig,
 		config.ProvideDefaultUserConfig,
+		config.ProviderMiddlewareConfig,
 		bootstrap.InitLogger,
 		bootstrap.InitRedis,
 		bootstrap.InitGorm,

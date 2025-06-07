@@ -14,7 +14,7 @@ func NewAIModelController(engine *gin.Engine, middleware *middleware.Middlewares
 	aiModelCtrl := &AIModelController{
 		aiModelService: service,
 	}
-	_ = engine.Group("/api").Group("/auth").Use(middleware.AuthMiddleware())
+	_ = engine.Group("/api").Group("/aimodel").Use(middleware.AuthMiddleware())
 
 	return aiModelCtrl
 }

@@ -46,7 +46,7 @@ func InitGin(m *middleware.Middlewares, logger *zap.Logger, c *config.Config) *g
 	// 设置操作日志数据库记录中间件
 	engine.Use(m.OperationLoggerMiddleware())
 	// 添加限流中间件
-	engine.Use(m.RedisRateLimitMiddleware(c.Server.RateLimit.Window, c.Server.RateLimit.MaxReq))
+	engine.Use(m.RedisRateLimitMiddleware(c.Middleware.RateLimit.Window, c.Middleware.RateLimit.MaxReq))
 	// 添加操作日志记录
 	return engine
 }

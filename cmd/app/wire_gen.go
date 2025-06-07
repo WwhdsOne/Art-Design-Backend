@@ -26,10 +26,12 @@ func wireApp() *bootstrap.HttpServer {
 	db := bootstrap.InitGorm(configConfig, logger)
 	redisWrapper := bootstrap.InitRedis(configConfig)
 	jwt := bootstrap.InitJWT(configConfig)
+	configMiddleware := config.ProviderMiddlewareConfig()
 	middlewares := &middleware.Middlewares{
-		Db:    db,
-		Redis: redisWrapper,
-		Jwt:   jwt,
+		Db:     db,
+		Redis:  redisWrapper,
+		Jwt:    jwt,
+		Config: configMiddleware,
 	}
 	engine := bootstrap.InitGin(middlewares, logger, configConfig)
 	userRepository := repository.NewUserRepository(db)

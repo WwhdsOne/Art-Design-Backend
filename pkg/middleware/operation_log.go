@@ -19,12 +19,11 @@ type uaParsed struct {
 	Platform string
 }
 
-const maxUACacheSize = 1000
-
 // OperationLoggerMiddleware 日志中间件（带 UA 缓存）
 func (m *Middlewares) OperationLoggerMiddleware() gin.HandlerFunc {
-	loggerChan := make(chan *entity.OperationLog, 1000)
+	loggerChan := make(chan *entity.OperationLog, m.Config.OperationLog.LogChannelBufferSize)
 
+	maxUACacheSize := m.Config.OperationLog.MaxUACacheSize
 	// UA 缓存（map + FIFO keys）
 	uaCache := make(map[string]*uaParsed)
 	uaKeys := make([]string, 0, maxUACacheSize)
