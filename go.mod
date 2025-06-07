@@ -17,7 +17,8 @@ require (
 	github.com/google/wire v0.6.0
 	github.com/hashicorp/consul/api v1.32.1
 	github.com/jinzhu/copier v0.4.0
-	github.com/redis/go-redis/v9 v9.9.0
+	github.com/mssola/useragent v1.0.0
+	github.com/redis/go-redis/v9 v9.10.0
 	github.com/sony/sonyflake v1.2.1
 	github.com/spf13/viper v1.20.1
 	go.uber.org/zap v1.27.0
@@ -68,6 +69,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/sagikazarmark/locafero v0.9.0 // indirect
+	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.14.0 // indirect
 	github.com/spf13/cast v1.9.2 // indirect

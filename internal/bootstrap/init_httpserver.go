@@ -23,6 +23,7 @@ type HttpServer struct {
 	MenuController         *controller.MenuController         // 菜单Ctrl
 	RoleController         *controller.RoleController         // 角色Ctrl
 	DigitPredictController *controller.DigitPredictController // 数字预测Ctrl
+	AIModelController      *controller.AIModelController      // AI模型Ctrl
 	Config                 *config.Config                     // 服务器配置
 }
 

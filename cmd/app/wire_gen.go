@@ -86,6 +86,13 @@ func wireApp() *bootstrap.HttpServer {
 		OssClient:          ossClient,
 	}
 	digitPredictController := controller.NewDigitPredictController(engine, middlewares, digitPredictService)
+	aiModelRepository := repository.NewAIModelRepository(db)
+	aiModelService := &service.AIModelService{
+		AIModelRepo: aiModelRepository,
+		GormTX:      gormTransactionManager,
+		Redis:       redisWrapper,
+	}
+	aiModelController := controller.NewAIModelController(engine, middlewares, aiModelService)
 	httpServer := &bootstrap.HttpServer{
 		Engine:                 engine,
 		Logger:                 logger,
@@ -94,6 +101,7 @@ func wireApp() *bootstrap.HttpServer {
 		MenuController:         menuController,
 		RoleController:         roleController,
 		DigitPredictController: digitPredictController,
+		AIModelController:      aiModelController,
 		Config:                 configConfig,
 	}
 	return httpServer

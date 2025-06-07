@@ -11,6 +11,7 @@ var ControllersProvider = wire.NewSet(
 	MenuCtrlProvider,
 	RoleCtrlProvider,
 	DigitPredictProvider,
+	AIModelCtrlProvider,
 )
 
 var AuthCtrlProvider = wire.NewSet(
@@ -36,4 +37,9 @@ var RoleCtrlProvider = wire.NewSet(
 var DigitPredictProvider = wire.NewSet(
 	NewDigitPredictController,
 	wire.Struct(new(service.DigitPredictService), "*"),
+)
+
+var AIModelCtrlProvider = wire.NewSet(
+	NewAIModelController,
+	wire.Struct(new(service.AIModelService), "*"),
 )

@@ -5,17 +5,65 @@ import (
 	"Art-Design-Backend/pkg/authutils"
 	"bytes"
 	"github.com/gin-gonic/gin"
+	"github.com/mssola/useragent"
 	"go.uber.org/zap"
 	"io"
 	"time"
 )
 
-// OperationLoggerMiddleware 日志中间件
+// uaParsed 缓存结构
+type uaParsed struct {
+	Browser  string
+	Version  string
+	OS       string
+	Platform string
+}
+
+const maxUACacheSize = 1000
+
+// OperationLoggerMiddleware 日志中间件（带 UA 缓存）
 func (m *Middlewares) OperationLoggerMiddleware() gin.HandlerFunc {
 	loggerChan := make(chan *entity.OperationLog, 1000)
 
+	// UA 缓存（map + FIFO keys）
+	uaCache := make(map[string]*uaParsed)
+	uaKeys := make([]string, 0, maxUACacheSize)
+
+	// 后台异步处理日志写入
 	go func() {
 		for log := range loggerChan {
+			uaStr := log.UserAgent
+			var parsed *uaParsed
+
+			if val, ok := uaCache[uaStr]; ok {
+				parsed = val
+			} else {
+				ua := useragent.New(uaStr)
+				browser, version := ua.Browser()
+				parsed = &uaParsed{
+					Browser:  browser,
+					Version:  version,
+					OS:       ua.OS(),
+					Platform: ua.Platform(),
+				}
+
+				// 缓存维护
+				if len(uaKeys) >= maxUACacheSize {
+					oldest := uaKeys[0]
+					uaKeys = uaKeys[1:]
+					delete(uaCache, oldest)
+				}
+				uaKeys = append(uaKeys, uaStr)
+				uaCache[uaStr] = parsed
+			}
+
+			// 写入解析结果
+			log.Browser = parsed.Browser
+			log.BrowserVersion = parsed.Version
+			log.OS = parsed.OS
+			log.Platform = parsed.Platform
+
+			// 写入数据库
 			if err := m.Db.Create(log).Error; err != nil {
 				zap.L().Error("保存操作日志失败", zap.Error(err))
 			}
@@ -29,10 +77,10 @@ func (m *Middlewares) OperationLoggerMiddleware() gin.HandlerFunc {
 		contentType := c.GetHeader("Content-Type")
 		if contentType == "application/json" {
 			bodyBytes, _ = io.ReadAll(c.Request.Body)
-			c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes)) // 重置 body
+			c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes)) // 重新填充请求体
 		}
 
-		// 执行请求
+		// 继续处理请求
 		c.Next()
 
 		// 获取耗时（ms）
@@ -47,13 +95,13 @@ func (m *Middlewares) OperationLoggerMiddleware() gin.HandlerFunc {
 		// 获取 User-Agent
 		userAgent := c.GetHeader("User-Agent")
 
-		// 获取 Query 参数
+		// 获取 URL 参数
 		query := c.Request.URL.RawQuery
 
+		// 错误信息
 		var errMsg string
-		errors := c.Errors
-		if len(errors) > 0 {
-			errMsg = errors[0].Error()
+		if len(c.Errors) > 0 {
+			errMsg = c.Errors[0].Error()
 		}
 
 		// 构造日志对象

@@ -10,4 +10,5 @@ var RepositoriesProvider = wire.NewSet(
 	NewRoleMenusRepository,
 	NewUserRolesRepository,
 	NewDigitPredictRepository,
+	NewAIModelRepository,
 )

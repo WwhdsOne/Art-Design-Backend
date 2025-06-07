@@ -191,8 +191,10 @@ func (r *RoleService) GetRoleMenuBinding(c *gin.Context, roleID int64) (res *res
 			}
 		}
 	}
-	res.Menus = simpleMenuList
-	res.HasMenuIDs = hasMenuIDList
+	res = &response.RoleMenuBinding{
+		Menus:      simpleMenuList,
+		HasMenuIDs: hasMenuIDList,
+	}
 	return
 }
 
