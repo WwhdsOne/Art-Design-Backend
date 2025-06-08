@@ -20,7 +20,7 @@ func NewMenuRepository(db *gorm.DB) *MenuRepository {
 	}
 }
 
-func (r *MenuRepository) CheckMenuDuplicate(menu *entity.Menu) (err error) {
+func (m *MenuRepository) CheckMenuDuplicate(menu *entity.Menu) (err error) {
 	var result struct {
 		NameExists  bool
 		PathExists  bool
@@ -58,7 +58,7 @@ func (r *MenuRepository) CheckMenuDuplicate(menu *entity.Menu) (err error) {
 	query.WriteString("SELECT ")
 	query.WriteString(strings.Join(conditions, ", "))
 
-	if err := r.db.Raw(query.String(), args...).Scan(&result).Error; err != nil {
+	if err := m.db.Raw(query.String(), args...).Scan(&result).Error; err != nil {
 		return err
 	}
 

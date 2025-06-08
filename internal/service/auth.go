@@ -167,7 +167,7 @@ func (s *AuthService) Register(c *gin.Context, userReq *request.RegisterUser) (e
 	user.Avatar = s.DefaultUserConfig.Avatars[utils.GenerateRandomNumber(0, len(s.DefaultUserConfig.Avatars))]
 	// 判重
 	if err = s.UserRepo.CheckUserDuplicate(&user); err != nil {
-		return err
+		return
 	}
 	// 启用事务插入用户表和用户角色关联表
 	err = s.GormTX.Transaction(c, func(ctx context.Context) (err error) {

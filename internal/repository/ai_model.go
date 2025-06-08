@@ -1,6 +1,14 @@
 package repository
 
-import "gorm.io/gorm"
+import (
+	"Art-Design-Backend/internal/model/entity"
+	"Art-Design-Backend/internal/model/query"
+	"Art-Design-Backend/pkg/errors"
+	"context"
+	"fmt"
+	"gorm.io/gorm"
+	"strings"
+)
 
 type AIModelRepository struct {
 	db *gorm.DB
@@ -10,4 +18,97 @@ func NewAIModelRepository(db *gorm.DB) *AIModelRepository {
 	return &AIModelRepository{
 		db: db,
 	}
+}
+
+func (r *AIModelRepository) CheckAIDuplicate(model *entity.AIModel) (err error) {
+	var result struct {
+		ModelExists   bool
+		BaseURLExists bool
+		ModelIDExists bool
+	}
+
+	// 假设 AIModel 使用字符串 ID，可选排除逻辑
+	excludeID := ""
+	if model.ID != 0 {
+		excludeID = fmt.Sprintf("AND id != '%d'", model.ID)
+	}
+
+	var queryCondition strings.Builder
+	args := make([]interface{}, 0)
+	conditions := make([]string, 0)
+
+	if model.Model != "" {
+		conditions = append(conditions, "EXISTS(SELECT 1 FROM ai_model WHERE model = ? "+excludeID+") AS model_exists")
+		args = append(args, model.Model)
+	}
+	if model.BaseURL != "" {
+		conditions = append(conditions, "EXISTS(SELECT 1 FROM ai_model WHERE base_url = ? "+excludeID+") AS base_url_exists")
+		args = append(args, model.BaseURL)
+	}
+	if model.ModelID != "" {
+		conditions = append(conditions, "EXISTS(SELECT 1 FROM ai_model WHERE model_id = ? "+excludeID+") AS model_id_exists")
+		args = append(args, model.ModelID)
+	}
+
+	if len(conditions) == 0 {
+		return
+	}
+
+	queryCondition.WriteString("SELECT ")
+	queryCondition.WriteString(strings.Join(conditions, ", "))
+
+	if err = r.db.Raw(queryCondition.String(), args...).Scan(&result).Error; err != nil {
+		return
+	}
+
+	switch {
+	case result.ModelExists:
+		err = errors.NewDBError("模型名称重复")
+	case result.BaseURLExists:
+		err = errors.NewDBError("API 地址重复")
+	case result.ModelIDExists:
+		err = errors.NewDBError("模型接口标识重复")
+	}
+	return
+}
+
+func (r *AIModelRepository) Create(ctx context.Context, e *entity.AIModel) (err error) {
+	if err = DB(ctx, r.db).Create(e).Error; err != nil {
+		err = errors.NewDBError("创建AI模型失败")
+		return
+	}
+	return
+}
+
+func (r *AIModelRepository) GetAIModelPage(c context.Context, q *query.AIModel) (pageRes []*entity.AIModel, total int64, err error) {
+	db := DB(c, r.db)
+
+	// 构建通用查询条件
+	queryConditions := db.Model(&entity.AIModel{})
+
+	if q.Model != nil {
+		queryConditions = queryConditions.Where("model LIKE ?", "%"+*q.Model+"%")
+	}
+	if q.ModelType != nil {
+		queryConditions = queryConditions.Where("model_type LIKE ?", *q.ModelType)
+	}
+	if q.Provider != nil {
+		queryConditions = queryConditions.Where("provider LIKE ?", *q.Provider)
+	}
+	if q.Enabled != nil {
+		queryConditions = queryConditions.Where("enabled = ?", *q.Enabled)
+	}
+
+	// 查询总数
+	if err = queryConditions.Count(&total).Error; err != nil {
+		err = errors.NewDBError("获取角色分页失败")
+		return
+	}
+
+	// 查询分页数据
+	if err = queryConditions.Scopes(q.Paginate()).Find(&pageRes).Error; err != nil {
+		err = errors.NewDBError("获取角色分页失败")
+		return
+	}
+	return
 }
