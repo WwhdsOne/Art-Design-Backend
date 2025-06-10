@@ -12,6 +12,7 @@ import (
 	"Art-Design-Backend/internal/controller"
 	"Art-Design-Backend/internal/repository"
 	"Art-Design-Backend/internal/service"
+	"Art-Design-Backend/pkg/ai"
 	"Art-Design-Backend/pkg/container"
 	"Art-Design-Backend/pkg/middleware"
 )
@@ -89,10 +90,12 @@ func wireApp() *bootstrap.HttpServer {
 	}
 	digitPredictController := controller.NewDigitPredictController(engine, middlewares, digitPredictService)
 	aiModelRepository := repository.NewAIModelRepository(db)
+	aiModelClient := ai.NewAIModelClient()
 	aiModelService := &service.AIModelService{
-		AIModelRepo: aiModelRepository,
-		GormTX:      gormTransactionManager,
-		Redis:       redisWrapper,
+		AIModelRepo:   aiModelRepository,
+		GormTX:        gormTransactionManager,
+		AIModelClient: aiModelClient,
+		Redis:         redisWrapper,
 	}
 	aiModelController := controller.NewAIModelController(engine, middlewares, aiModelService)
 	httpServer := &bootstrap.HttpServer{

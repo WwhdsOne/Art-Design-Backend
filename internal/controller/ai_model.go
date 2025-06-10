@@ -21,6 +21,7 @@ func NewAIModelController(engine *gin.Engine, middleware *middleware.Middlewares
 	{
 		r.POST("/create", aiModelCtrl.createAIModel)
 		r.POST("/page", aiModelCtrl.getAIModelPage)
+		r.POST("/chat-completion", aiModelCtrl.chatCompletion)
 	}
 	return aiModelCtrl
 }
@@ -50,4 +51,16 @@ func (a *AIModelController) getAIModelPage(c *gin.Context) {
 		return
 	}
 	result.OkWithData(res, c)
+}
+
+func (a *AIModelController) chatCompletion(c *gin.Context) {
+	var req request.ChatCompletion
+	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
+		_ = c.Error(err)
+		return
+	}
+	if err := a.aiModelService.ChatCompletion(c, &req); err != nil {
+		_ = c.Error(err)
+		return
+	}
 }

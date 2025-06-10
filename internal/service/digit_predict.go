@@ -6,7 +6,7 @@ import (
 	"Art-Design-Backend/internal/model/response"
 	"Art-Design-Backend/internal/repository"
 	"Art-Design-Backend/pkg/aliyun"
-	"Art-Design-Backend/pkg/client"
+	"Art-Design-Backend/pkg/digit_client"
 	"Art-Design-Backend/pkg/errors"
 	"context"
 	"github.com/gin-gonic/gin"
@@ -17,7 +17,7 @@ import (
 
 type DigitPredictService struct {
 	DigitPredictRepo   *repository.DigitPredictRepository
-	DigitPredictClient *client.DigitPredict
+	DigitPredictClient *digit_client.DigitPredict
 	OssClient          *aliyun.OssClient // 阿里云OSS
 }
 

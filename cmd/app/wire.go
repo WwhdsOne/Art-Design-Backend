@@ -8,6 +8,7 @@ import (
 	"Art-Design-Backend/internal/bootstrap"
 	"Art-Design-Backend/internal/controller"
 	"Art-Design-Backend/internal/repository"
+	"Art-Design-Backend/pkg/ai"
 	"Art-Design-Backend/pkg/container"
 	"Art-Design-Backend/pkg/middleware"
 	"github.com/google/wire"
@@ -29,6 +30,7 @@ func wireApp() *bootstrap.HttpServer {
 		bootstrap.InitJWT,
 		bootstrap.InitOSSClient,
 		bootstrap.InitDigitPredict,
+		ai.NewAIModelClient,
 		container.Container,
 		// 这里解释一下没有serviceProvider的原因:
 		// 	service总是只被对应的controller使用，但是repo可能被多个service使用

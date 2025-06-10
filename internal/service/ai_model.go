@@ -7,6 +7,7 @@ import (
 	"Art-Design-Backend/internal/model/request"
 	"Art-Design-Backend/internal/model/response"
 	"Art-Design-Backend/internal/repository"
+	"Art-Design-Backend/pkg/ai"
 	"Art-Design-Backend/pkg/redisx"
 	"context"
 	"github.com/gin-gonic/gin"
@@ -15,9 +16,10 @@ import (
 )
 
 type AIModelService struct {
-	AIModelRepo *repository.AIModelRepository      // AI模型
-	GormTX      *repository.GormTransactionManager // 事务
-	Redis       *redisx.RedisWrapper               // redis
+	AIModelRepo   *repository.AIModelRepository      // AI模型
+	GormTX        *repository.GormTransactionManager // 事务
+	AIModelClient *ai.AIModelClient                  // 聊天
+	Redis         *redisx.RedisWrapper               // redis
 }
 
 func (a *AIModelService) CreateAIModel(c context.Context, r *request.AIModel) (err error) {
@@ -37,7 +39,7 @@ func (a *AIModelService) CreateAIModel(c context.Context, r *request.AIModel) (e
 	return
 }
 
-func (a *AIModelService) GetAIModelPage(c *gin.Context, q *query.AIModel) (res base.PaginationResp[*response.AIModel], err error) {
+func (a *AIModelService) GetAIModelPage(c context.Context, q *query.AIModel) (res base.PaginationResp[*response.AIModel], err error) {
 	var aiModel []*entity.AIModel
 	var total int64
 	if aiModel, total, err = a.AIModelRepo.GetAIModelPage(c, q); err != nil {
@@ -54,5 +56,25 @@ func (a *AIModelService) GetAIModelPage(c *gin.Context, q *query.AIModel) (res b
 		aiModelRes = append(aiModelRes, &aiModelResp)
 	}
 	res = *base.BuildPageResp[*response.AIModel](aiModelRes, total, q.PaginationReq)
+	return
+}
+
+// todo 1.对话管理 2.模型信息缓存 3. 标签抽取 4. 价格计算
+func (a *AIModelService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (err error) {
+	res, err := a.AIModelRepo.GetAIModelByID(c, int64(r.ID))
+	if err != nil {
+		zap.L().Error("获取AI模型失败", zap.Error(err))
+		return
+	}
+
+	if err = a.AIModelClient.ChatStream(c, res.BaseURL, res.APIKey, ai.DefaultStreamChatRequest(res.Model, []ai.ChatMessage{
+		{
+			Role:    "user",
+			Content: r.Prompt,
+		},
+	})); err != nil {
+		zap.L().Error("AI模型聊天失败", zap.Error(err))
+		return
+	}
 	return
 }

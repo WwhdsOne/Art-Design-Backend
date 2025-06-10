@@ -16,8 +16,9 @@ type AIModel struct {
 	PricePromptCachedPer1M decimal.Decimal `json:"price_prompt_cached_per_1m" binding:"required" label:"命中缓存输入单价"`
 	PriceCompletionPer1M   decimal.Decimal `json:"price_completion_per_1m" binding:"required" label:"输出 token 单价"`
 
-	Currency         string `json:"currency" binding:"required" label:"币种"` // 如 CNY
-	Enabled          bool   `json:"enabled" label:"是否启用"`
-	MaxContextTokens int    `json:"max_context_tokens" binding:"required" label:"最大上下文长度"`
-	ModelType        string `json:"model_type" binding:"required" label:"模型类型"` // chat / embedding / multimodal
+	Currency          string `json:"currency" binding:"required" label:"币种"` // 如 CNY
+	Enabled           bool   `json:"enabled" label:"是否启用"`
+	MaxContextTokens  int    `json:"max_context_tokens" binding:"required" label:"最大上下文长度"`
+	MaxGenerateTokens int    `json:"max_generate_tokens" binding:"required" label:"最大生成长度"`
+	ModelType         string `json:"model_type" binding:"required" label:"模型类型"` // chat / embedding / multimodal
 }

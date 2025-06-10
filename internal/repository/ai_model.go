@@ -20,7 +20,7 @@ func NewAIModelRepository(db *gorm.DB) *AIModelRepository {
 	}
 }
 
-func (r *AIModelRepository) CheckAIDuplicate(model *entity.AIModel) (err error) {
+func (a *AIModelRepository) CheckAIDuplicate(model *entity.AIModel) (err error) {
 	var result struct {
 		ModelExists   bool
 		BaseURLExists bool
@@ -57,7 +57,7 @@ func (r *AIModelRepository) CheckAIDuplicate(model *entity.AIModel) (err error) 
 	queryCondition.WriteString("SELECT ")
 	queryCondition.WriteString(strings.Join(conditions, ", "))
 
-	if err = r.db.Raw(queryCondition.String(), args...).Scan(&result).Error; err != nil {
+	if err = a.db.Raw(queryCondition.String(), args...).Scan(&result).Error; err != nil {
 		return
 	}
 
@@ -72,16 +72,24 @@ func (r *AIModelRepository) CheckAIDuplicate(model *entity.AIModel) (err error) 
 	return
 }
 
-func (r *AIModelRepository) Create(ctx context.Context, e *entity.AIModel) (err error) {
-	if err = DB(ctx, r.db).Create(e).Error; err != nil {
+func (a *AIModelRepository) Create(ctx context.Context, e *entity.AIModel) (err error) {
+	if err = DB(ctx, a.db).Create(e).Error; err != nil {
 		err = errors.NewDBError("创建AI模型失败")
 		return
 	}
 	return
 }
 
-func (r *AIModelRepository) GetAIModelPage(c context.Context, q *query.AIModel) (pageRes []*entity.AIModel, total int64, err error) {
-	db := DB(c, r.db)
+func (a *AIModelRepository) GetAIModelByID(c context.Context, id int64) (res *entity.AIModel, err error) {
+	if err = DB(c, a.db).Where("id = ?", id).First(&res).Error; err != nil {
+		err = errors.NewDBError("查询AI模型失败")
+		return
+	}
+	return
+}
+
+func (a *AIModelRepository) GetAIModelPage(c context.Context, q *query.AIModel) (pageRes []*entity.AIModel, total int64, err error) {
+	db := DB(c, a.db)
 
 	// 构建通用查询条件
 	queryConditions := db.Model(&entity.AIModel{})

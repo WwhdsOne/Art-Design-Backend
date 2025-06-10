@@ -17,8 +17,9 @@ type AIModel struct {
 	PricePromptCachedPer1M decimal.Decimal `json:"price_prompt_cached_per_1m"`
 	PriceCompletionPer1M   decimal.Decimal `json:"price_completion_per_1m"`
 
-	Currency         string `json:"currency"`
-	Enabled          bool   `json:"enabled"`
-	MaxContextTokens int    `json:"max_context_tokens"`
-	ModelType        string `json:"model_type"`
+	Currency          string `json:"currency"`
+	Enabled           bool   `json:"enabled"`
+	MaxContextTokens  int    `json:"max_context_tokens"`
+	MaxGenerateTokens int    `json:"max_generate_tokens"`
+	ModelType         string `json:"model_type"`
 }

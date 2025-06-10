@@ -1,4 +1,4 @@
-package client
+package digit_client
 
 import (
 	"bytes"
