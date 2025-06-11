@@ -40,15 +40,15 @@ func (a *AIModelService) CreateAIModel(c context.Context, r *request.AIModel) (e
 }
 
 // todo 后续添加缓存
-func (a *AIModelService) GetSimpleModelList(c context.Context) (res []*response.AIModel, err error) {
+func (a *AIModelService) GetSimpleModelList(c context.Context) (res []*response.SimpleAIModel, err error) {
 	var aiModel []*entity.AIModel
 	if aiModel, err = a.AIModelRepo.GetSimpleModelList(c); err != nil {
 		zap.L().Error("获取AI模型列表失败", zap.Error(err))
 		return
 	}
-	res = make([]*response.AIModel, 0, len(aiModel))
+	res = make([]*response.SimpleAIModel, 0, len(aiModel))
 	for _, model := range aiModel {
-		var aiModelResp response.AIModel
+		var aiModelResp response.SimpleAIModel
 		if err = copier.Copy(&aiModelResp, model); err != nil {
 			zap.L().Error("AI模型属性复制失败", zap.Error(err))
 			return
