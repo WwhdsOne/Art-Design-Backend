@@ -22,6 +22,7 @@ func NewAIModelController(engine *gin.Engine, middleware *middleware.Middlewares
 		r.POST("/create", aiModelCtrl.createAIModel)
 		r.POST("/page", aiModelCtrl.getAIModelPage)
 		r.POST("/chat-completion", aiModelCtrl.chatCompletion)
+		r.GET("/getSimpleModelList", aiModelCtrl.getSimpleModelList)
 	}
 	return aiModelCtrl
 }
@@ -63,4 +64,13 @@ func (a *AIModelController) chatCompletion(c *gin.Context) {
 		_ = c.Error(err)
 		return
 	}
+}
+
+func (a *AIModelController) getSimpleModelList(c *gin.Context) {
+	res, err := a.aiModelService.GetSimpleModelList(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithData(res, c)
 }

@@ -39,6 +39,25 @@ func (a *AIModelService) CreateAIModel(c context.Context, r *request.AIModel) (e
 	return
 }
 
+// todo 后续添加缓存
+func (a *AIModelService) GetSimpleModelList(c context.Context) (res []*response.AIModel, err error) {
+	var aiModel []*entity.AIModel
+	if aiModel, err = a.AIModelRepo.GetSimpleModelList(c); err != nil {
+		zap.L().Error("获取AI模型列表失败", zap.Error(err))
+		return
+	}
+	res = make([]*response.AIModel, 0, len(aiModel))
+	for _, model := range aiModel {
+		var aiModelResp response.AIModel
+		if err = copier.Copy(&aiModelResp, model); err != nil {
+			zap.L().Error("AI模型属性复制失败", zap.Error(err))
+			return
+		}
+		res = append(res, &aiModelResp)
+	}
+	return
+}
+
 func (a *AIModelService) GetAIModelPage(c context.Context, q *query.AIModel) (res base.PaginationResp[*response.AIModel], err error) {
 	var aiModel []*entity.AIModel
 	var total int64
@@ -66,13 +85,7 @@ func (a *AIModelService) ChatCompletion(c *gin.Context, r *request.ChatCompletio
 		zap.L().Error("获取AI模型失败", zap.Error(err))
 		return
 	}
-
-	if err = a.AIModelClient.ChatStream(c, res.BaseURL, res.APIKey, ai.DefaultStreamChatRequest(res.Model, []ai.ChatMessage{
-		{
-			Role:    "user",
-			Content: r.Prompt,
-		},
-	})); err != nil {
+	if err = a.AIModelClient.ChatStream(c, res.BaseURL, res.APIKey, ai.DefaultStreamChatRequest(res.Model, r.Messages)); err != nil {
 		zap.L().Error("AI模型聊天失败", zap.Error(err))
 		return
 	}

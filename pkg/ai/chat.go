@@ -95,7 +95,6 @@ func (c *AIModelClient) ChatStream(ginCtx *gin.Context, url, token string, reqDa
 
 		// 移除SSE前缀 "data: "
 		line = bytes.TrimPrefix(line, []byte("data: "))
-		line = bytes.TrimSpace(line)
 
 		// 跳过 "[DONE]" 标记
 		if string(line) == "[DONE]" {
@@ -118,10 +117,22 @@ func (c *AIModelClient) ChatStream(ginCtx *gin.Context, url, token string, reqDa
 
 		// 提取content并添加到responseContent
 		if content := streamResponse.Choices[0].Delta.Content; content != "" {
-			if _, err := fmt.Fprintf(w, "data: %s\n\n", content); err != nil {
+			// 构造 JSON 数据
+			jsonData := map[string]string{"content": content}
+
+			// 使用 sonic 序列化
+			jsonBytes, err := sonic.Marshal(jsonData)
+			if err != nil {
+				zap.L().Error("JSON marshal error", zap.Error(err))
+				return false
+			}
+
+			// 发送 JSON 格式的 SSE 数据
+			if _, err := fmt.Fprintf(w, "data: %s\n\n", jsonBytes); err != nil {
 				zap.L().Error("Write error", zap.Error(err))
 				return false
 			}
+
 			// 刷新缓冲区
 			if f, ok := w.(http.Flusher); ok {
 				f.Flush()

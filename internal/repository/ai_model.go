@@ -120,3 +120,11 @@ func (a *AIModelRepository) GetAIModelPage(c context.Context, q *query.AIModel) 
 	}
 	return
 }
+
+func (a *AIModelRepository) GetSimpleModelList(c context.Context) (models []*entity.AIModel, err error) {
+	if err = DB(c, a.db).Select("id", "icon", "model").Where("enabled = ?", true).Find(&models).Error; err != nil {
+		err = errors.NewDBError("获取模型列表失败")
+		return
+	}
+	return
+}
