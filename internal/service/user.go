@@ -52,6 +52,10 @@ func (u *UserService) GetUserById(c *gin.Context) (res response.User, err error)
 		return
 	}
 	user.Roles = roleList
+	// 不能返回空标签，否则前端无法修改
+	if len(user.Tags) == 0 {
+		user.Tags = []string{}
+	}
 	err = copier.Copy(&res, &user)
 	if err != nil {
 		zap.L().Error("复制属性失败", zap.Error(err))
