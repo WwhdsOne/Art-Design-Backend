@@ -84,7 +84,6 @@ func (c *AIModelClient) ChatStream(ginCtx *gin.Context, url, token string, reqDa
 	// 使用 Stream 自动 flush SSE 数据
 	ginCtx.Stream(func(w io.Writer) bool {
 		line, err := reader.ReadBytes('\n')
-		zap.L().Info("Received line", zap.String("line", string(line)))
 		if err != nil {
 			_ = resp.Body.Close() // 确保清理
 			return false          // 停止 stream
@@ -118,7 +117,8 @@ func (c *AIModelClient) ChatStream(ginCtx *gin.Context, url, token string, reqDa
 		// 提取content并添加到responseContent
 		if content := streamResponse.Choices[0].Delta.Content; content != "" {
 			// 构造 JSON 数据
-			jsonData := map[string]string{"content": content}
+			// 使用v作为键减少网络和json开销
+			jsonData := map[string]string{"v": content}
 
 			// 使用 sonic 序列化
 			jsonBytes, err := sonic.Marshal(jsonData)
