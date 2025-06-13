@@ -16,11 +16,10 @@ var (
 
 // JWT 结构体定义
 type JWT struct {
-	SigningKey        []byte        // 密钥
-	Issuer            string        // 签发人
-	Audience          string        // 接受者
-	ExpiresTime       time.Duration // 过期时间
-	RefreshWindowTime time.Duration // 刷新窗口时间
+	SigningKey  []byte        // 密钥
+	Issuer      string        // 签发人
+	Audience    string        // 接受者
+	ExpiresTime time.Duration // 过期时间
 }
 
 // BaseClaims 基础声明结构体
@@ -41,17 +40,8 @@ type CustomClaims struct {
 	jwt.RegisteredClaims // 注册 claims
 }
 
-// IsWithinRefreshWindow 判断是否在刷新时间窗口内
-func IsWithinRefreshWindow(c *CustomClaims) bool {
-	now := time.Now()
-	expireTime := c.ExpiresAt.Time
-	return now.Add(c.RefreshWindowTime).After(expireTime)
-}
-
 // createClaims 创建负载
 func (j *JWT) createClaims(baseClaims BaseClaims) CustomClaims {
-	// 设置刷新窗口时间
-	baseClaims.RefreshWindowTime = j.RefreshWindowTime
 	claims := CustomClaims{
 		BaseClaims: baseClaims,
 		RegisteredClaims: jwt.RegisteredClaims{

@@ -10,7 +10,8 @@ import (
 	"Art-Design-Backend/config"
 	"Art-Design-Backend/internal/bootstrap"
 	"Art-Design-Backend/internal/controller"
-	"Art-Design-Backend/internal/repository"
+	"Art-Design-Backend/internal/repository/cache"
+	"Art-Design-Backend/internal/repository/db"
 	"Art-Design-Backend/internal/service"
 	"Art-Design-Backend/pkg/ai"
 	"Art-Design-Backend/pkg/container"
@@ -24,35 +25,36 @@ import (
 func wireApp() *bootstrap.HttpServer {
 	configConfig := config.LoadConfig()
 	logger := bootstrap.InitLogger(configConfig)
-	db := bootstrap.InitGorm(configConfig, logger)
+	gormDB := bootstrap.InitGorm(configConfig, logger)
 	redisWrapper := bootstrap.InitRedis(configConfig)
 	jwt := bootstrap.InitJWT(configConfig)
 	configMiddleware := config.ProviderMiddlewareConfig()
 	middlewares := &middleware.Middlewares{
-		Db:     db,
+		Db:     gormDB,
 		Redis:  redisWrapper,
 		Jwt:    jwt,
 		Config: configMiddleware,
 	}
 	engine := bootstrap.InitGin(middlewares, logger, configMiddleware)
-	userRepository := repository.NewUserRepository(db)
-	roleRepository := repository.NewRoleRepository(db)
-	userRolesRepository := repository.NewUserRolesRepository(db)
-	gormTransactionManager := repository.NewGormTransactionManager(db)
+	userDB := db.NewUserDB(gormDB)
+	authCache := cache.NewAuthCache(redisWrapper)
+	roleRepository := db.NewRoleRepository(gormDB)
+	userRolesRepository := db.NewUserRolesRepository(gormDB)
+	gormTransactionManager := db.NewGormTransactionManager(gormDB)
 	defaultUserConfig := config.ProvideDefaultUserConfig()
 	authService := &service.AuthService{
-		UserRepo:          userRepository,
+		UserDB:            userDB,
+		AuthCache:         authCache,
 		RoleRepo:          roleRepository,
 		UserRolesRepo:     userRolesRepository,
 		GormTX:            gormTransactionManager,
-		Redis:             redisWrapper,
 		Jwt:               jwt,
 		DefaultUserConfig: defaultUserConfig,
 	}
 	authController := controller.NewAuthController(engine, middlewares, authService)
 	ossClient := bootstrap.InitOSSClient(configConfig)
 	userService := &service.UserService{
-		UserRepo:          userRepository,
+		UserRepo:          userDB,
 		RoleRepo:          roleRepository,
 		UserRolesRepo:     userRolesRepository,
 		GormTX:            gormTransactionManager,
@@ -61,8 +63,8 @@ func wireApp() *bootstrap.HttpServer {
 		DefaultUserConfig: defaultUserConfig,
 	}
 	userController := controller.NewUserController(engine, middlewares, userService)
-	menuRepository := repository.NewMenuRepository(db)
-	roleMenusRepository := repository.NewRoleMenusRepository(db)
+	menuRepository := db.NewMenuRepository(gormDB)
+	roleMenusRepository := db.NewRoleMenusRepository(gormDB)
 	syncMap := container.NewSyncMap()
 	menuService := &service.MenuService{
 		MenuRepo:      menuRepository,
@@ -81,7 +83,7 @@ func wireApp() *bootstrap.HttpServer {
 		Redis:         redisWrapper,
 	}
 	roleController := controller.NewRoleController(engine, middlewares, roleService)
-	digitPredictRepository := repository.NewDigitPredictRepository(db)
+	digitPredictRepository := db.NewDigitPredictRepository(gormDB)
 	digitPredict := bootstrap.InitDigitPredict(configConfig)
 	digitPredictService := &service.DigitPredictService{
 		DigitPredictRepo:   digitPredictRepository,
@@ -89,13 +91,14 @@ func wireApp() *bootstrap.HttpServer {
 		OssClient:          ossClient,
 	}
 	digitPredictController := controller.NewDigitPredictController(engine, middlewares, digitPredictService)
-	aiModelRepository := repository.NewAIModelRepository(db)
+	aiModelRepository := db.NewAIModelRepository(gormDB)
+	aiModelCache := cache.NewAIModelCache(redisWrapper)
 	aiModelClient := ai.NewAIModelClient()
 	aiModelService := &service.AIModelService{
 		AIModelRepo:   aiModelRepository,
+		AIModelCache:  aiModelCache,
 		GormTX:        gormTransactionManager,
 		AIModelClient: aiModelClient,
-		Redis:         redisWrapper,
 	}
 	aiModelController := controller.NewAIModelController(engine, middlewares, aiModelService)
 	httpServer := &bootstrap.HttpServer{

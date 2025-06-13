@@ -1,4 +1,4 @@
-package repository
+package db
 
 import (
 	"Art-Design-Backend/internal/model/entity"

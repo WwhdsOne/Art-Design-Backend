@@ -11,10 +11,9 @@ type Response struct {
 }
 
 const (
-	ERROR         = 500
-	NOAUTH        = 401
-	SHOULDREFRESH = 402
-	SUCCESS       = 200
+	ERROR   = 500
+	NOAUTH  = 401
+	SUCCESS = 200
 )
 
 func Result(code int, data interface{}, msg string, c *gin.Context) {
@@ -48,8 +47,4 @@ func FailWithMessage(message string, c *gin.Context) {
 
 func NoAuth(message string, c *gin.Context) {
 	Result(NOAUTH, map[string]interface{}{}, message, c)
-}
-
-func ShouldRefresh(c *gin.Context) {
-	Result(SHOULDREFRESH, map[string]interface{}{}, "需要刷新Token", c)
 }

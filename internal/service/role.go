@@ -6,7 +6,7 @@ import (
 	"Art-Design-Backend/internal/model/query"
 	"Art-Design-Backend/internal/model/request"
 	"Art-Design-Backend/internal/model/response"
-	"Art-Design-Backend/internal/repository"
+	"Art-Design-Backend/internal/repository/db"
 	"Art-Design-Backend/pkg/constant/rediskey"
 	"Art-Design-Backend/pkg/errors"
 	"Art-Design-Backend/pkg/redisx"
@@ -19,11 +19,11 @@ import (
 )
 
 type RoleService struct {
-	RoleRepo      *repository.RoleRepository         // 用户Repo
-	MenuRepo      *repository.MenuRepository         // 菜单Repo
-	RoleMenusRepo *repository.RoleMenusRepository    // 角色菜单Repo
-	GormTX        *repository.GormTransactionManager // 事务
-	Redis         *redisx.RedisWrapper               // redis
+	RoleRepo      *db.RoleRepository         // 用户Repo
+	MenuRepo      *db.MenuRepository         // 菜单Repo
+	RoleMenusRepo *db.RoleMenusRepository    // 角色菜单Repo
+	GormTX        *db.GormTransactionManager // 事务
+	Redis         *redisx.RedisWrapper       // redis
 }
 
 // invalidateMenuCacheByRoleID 清除与指定角色关联的所有菜单缓存

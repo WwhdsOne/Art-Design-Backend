@@ -1,4 +1,4 @@
-package repository
+package db
 
 import (
 	"Art-Design-Backend/internal/model/entity"
@@ -11,17 +11,17 @@ import (
 	"strings"
 )
 
-type UserRepository struct {
+type UserDB struct {
 	db *gorm.DB // 用户表数据库连接
 }
 
-func NewUserRepository(db *gorm.DB) *UserRepository {
-	return &UserRepository{
+func NewUserDB(db *gorm.DB) *UserDB {
+	return &UserDB{
 		db: db,
 	}
 }
 
-func (u *UserRepository) CheckUserDuplicate(user *entity.User) (err error) {
+func (u *UserDB) CheckUserDuplicate(user *entity.User) (err error) {
 	var result struct {
 		UsernameExists bool
 		EmailExists    bool
@@ -79,7 +79,7 @@ func (u *UserRepository) CheckUserDuplicate(user *entity.User) (err error) {
 	return
 }
 
-func (u *UserRepository) GetLoginUserByUsername(c context.Context, username string) (user *entity.User, err error) {
+func (u *UserDB) GetLoginUserByUsername(c context.Context, username string) (user *entity.User, err error) {
 	if err = DB(c, u.db).
 		Select("id", "password", "status").
 		Where("username = ?", username).
@@ -91,7 +91,7 @@ func (u *UserRepository) GetLoginUserByUsername(c context.Context, username stri
 	return
 }
 
-func (u *UserRepository) GetUserById(c context.Context, id int64) (user *entity.User, err error) {
+func (u *UserDB) GetUserById(c context.Context, id int64) (user *entity.User, err error) {
 	if err = DB(c, u.db).
 		Where("id = ?", id).
 		First(&user).Error; err != nil {
@@ -102,7 +102,7 @@ func (u *UserRepository) GetUserById(c context.Context, id int64) (user *entity.
 	return
 }
 
-func (u *UserRepository) CreateUser(c context.Context, user *entity.User) (err error) {
+func (u *UserDB) CreateUser(c context.Context, user *entity.User) (err error) {
 	if err = DB(c, u.db).Create(user).Error; err != nil {
 		zap.L().Error("新增用户失败")
 		return errors.NewDBError("新增用户失败")
@@ -110,7 +110,7 @@ func (u *UserRepository) CreateUser(c context.Context, user *entity.User) (err e
 	return err
 }
 
-func (u *UserRepository) UpdateUser(c context.Context, user *entity.User) (err error) {
+func (u *UserDB) UpdateUser(c context.Context, user *entity.User) (err error) {
 	if err = DB(c, u.db).Updates(user).Error; err != nil {
 		zap.L().Error("更新用户失败")
 		return errors.NewDBError("更新用户失败")
@@ -118,7 +118,7 @@ func (u *UserRepository) UpdateUser(c context.Context, user *entity.User) (err e
 	return err
 }
 
-func (u *UserRepository) GetUserPage(c context.Context, user *query.User) (userPage []*entity.User, total int64, err error) {
+func (u *UserDB) GetUserPage(c context.Context, user *query.User) (userPage []*entity.User, total int64, err error) {
 	db := DB(c, u.db)
 
 	// 构建通用查询条件

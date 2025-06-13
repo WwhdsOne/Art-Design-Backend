@@ -4,7 +4,7 @@ import (
 	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/internal/model/request"
 	"Art-Design-Backend/internal/model/response"
-	"Art-Design-Backend/internal/repository"
+	"Art-Design-Backend/internal/repository/db"
 	"Art-Design-Backend/pkg/aliyun"
 	"Art-Design-Backend/pkg/digit_client"
 	"Art-Design-Backend/pkg/errors"
@@ -16,7 +16,7 @@ import (
 )
 
 type DigitPredictService struct {
-	DigitPredictRepo   *repository.DigitPredictRepository
+	DigitPredictRepo   *db.DigitPredictRepository
 	DigitPredictClient *digit_client.DigitPredict
 	OssClient          *aliyun.OssClient // 阿里云OSS
 }

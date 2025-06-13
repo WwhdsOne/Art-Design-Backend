@@ -6,9 +6,9 @@ import (
 	"Art-Design-Backend/internal/model/query"
 	"Art-Design-Backend/internal/model/request"
 	"Art-Design-Backend/internal/model/response"
-	"Art-Design-Backend/internal/repository"
+	"Art-Design-Backend/internal/repository/cache"
+	"Art-Design-Backend/internal/repository/db"
 	"Art-Design-Backend/pkg/ai"
-	"Art-Design-Backend/pkg/redisx"
 	"context"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
@@ -16,10 +16,10 @@ import (
 )
 
 type AIModelService struct {
-	AIModelRepo   *repository.AIModelRepository      // AI模型
-	GormTX        *repository.GormTransactionManager // 事务
-	AIModelClient *ai.AIModelClient                  // 聊天
-	Redis         *redisx.RedisWrapper               // redis
+	AIModelRepo   *db.AIModelRepository      // AI模型
+	AIModelCache  *cache.AIModelCache        // 缓存
+	GormTX        *db.GormTransactionManager // 事务
+	AIModelClient *ai.AIModelClient          // 聊天
 }
 
 func (a *AIModelService) CreateAIModel(c context.Context, r *request.AIModel) (err error) {
@@ -38,23 +38,36 @@ func (a *AIModelService) CreateAIModel(c context.Context, r *request.AIModel) (e
 	}
 	return
 }
-
-// todo 后续添加缓存
 func (a *AIModelService) GetSimpleModelList(c context.Context) (res []*response.SimpleAIModel, err error) {
-	var aiModel []*entity.AIModel
-	if aiModel, err = a.AIModelRepo.GetSimpleModelList(c); err != nil {
-		zap.L().Error("获取AI模型列表失败", zap.Error(err))
+	res, err = a.AIModelCache.GetSimpleModelList()
+	if err == nil {
 		return
 	}
-	res = make([]*response.SimpleAIModel, 0, len(aiModel))
-	for _, model := range aiModel {
+	zap.L().Warn("缓存获取失败或为空，尝试访问数据库", zap.Error(err))
+
+	var aiModels []*entity.AIModel
+	if aiModels, err = a.AIModelRepo.GetSimpleModelList(c); err != nil {
+		zap.L().Error("数据库查询失败", zap.Error(err))
+		return nil, err
+	}
+
+	res = make([]*response.SimpleAIModel, 0, len(aiModels))
+	for _, model := range aiModels {
 		var aiModelResp response.SimpleAIModel
 		if err = copier.Copy(&aiModelResp, model); err != nil {
-			zap.L().Error("AI模型属性复制失败", zap.Error(err))
-			return
+			zap.L().Error("AI模型属性复制失败，跳过该条", zap.Error(err))
+			continue
 		}
 		res = append(res, &aiModelResp)
 	}
+
+	// 异步回写缓存（避免闭包共享 err）
+	go func(models []*response.SimpleAIModel) {
+		if err := a.AIModelCache.SetSimpleModelList(models); err != nil {
+			zap.L().Error("设置AI模型列表缓存失败", zap.Error(err))
+		}
+	}(res)
+
 	return
 }
 
@@ -78,14 +91,34 @@ func (a *AIModelService) GetAIModelPage(c context.Context, q *query.AIModel) (re
 	return
 }
 
-// todo 1.对话管理 2.模型信息缓存 3. 标签抽取 4. 价格计算
+// ChatCompletion
+// todo
+// 1. 对话管理
+// 2. 模型信息缓存 ✅
+// 3. 标签抽取
+// 4. 价格计算
 func (a *AIModelService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (err error) {
-	res, err := a.AIModelRepo.GetAIModelByID(c, int64(r.ID))
+	var modelInfo *entity.AIModel
+	modelID := int64(r.ID)
+	modelInfo, err = a.AIModelCache.GetModelInfo(modelID)
 	if err != nil {
-		zap.L().Error("获取AI模型失败", zap.Error(err))
-		return
+		// 缓存中不存在
+		zap.L().Warn("AI模型缓存获取失败", zap.Int64("model_id", modelID), zap.Error(err))
+		modelInfo, err = a.AIModelRepo.GetAIModelByID(c, modelID)
+		if err != nil {
+			zap.L().Error("获取AI模型失败", zap.Int64("model_id", modelID), zap.Error(err))
+			return
+		}
+		go func(m *entity.AIModel) {
+			if err := a.AIModelCache.SetModelInfo(m); err != nil {
+				zap.L().Error("设置AI模型缓存失败", zap.Int64("model_id", m.ID), zap.Error(err))
+			}
+		}(modelInfo)
 	}
-	if err = a.AIModelClient.ChatStream(c, res.BaseURL, res.APIKey, ai.DefaultStreamChatRequest(res.Model, r.Messages)); err != nil {
+	if err = a.AIModelClient.ChatStream(c,
+		modelInfo.BaseURL,
+		modelInfo.APIKey,
+		ai.DefaultStreamChatRequest(modelInfo.Model, r.Messages)); err != nil {
 		zap.L().Error("AI模型聊天失败", zap.Error(err))
 		return
 	}

@@ -43,14 +43,7 @@ func (m *Middlewares) AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// 4. 判断是否需要刷新
-		if jwt.IsWithinRefreshWindow(claims) && c.FullPath() != "/api/auth/logout" {
-			result.ShouldRefresh(c)
-			c.Abort()
-			return
-		}
-
-		// 5. 认证通过，设置 claims 并继续请求
+		// 4. 认证通过，设置 claims 并继续请求
 		c.Set("claims", claims)
 		c.Next()
 	}

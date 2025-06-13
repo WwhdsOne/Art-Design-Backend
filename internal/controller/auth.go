@@ -5,7 +5,6 @@ import (
 	"Art-Design-Backend/internal/service"
 	"Art-Design-Backend/pkg/middleware"
 	"Art-Design-Backend/pkg/result"
-	"Art-Design-Backend/pkg/utils"
 	"github.com/gin-gonic/gin"
 )
 
@@ -24,7 +23,6 @@ func NewAuthController(engine *gin.Engine, middleware *middleware.Middlewares, s
 	}
 	{
 		// 公共路由组（无需认证）
-		r.GET("/refreshToken/:id", authCtrl.refreshToken)
 		r.POST("/register", authCtrl.register)
 		r.POST("/login", authCtrl.login)
 	}
@@ -58,21 +56,6 @@ func (a *AuthController) logout(c *gin.Context) {
 		return
 	}
 	result.OkWithMessage("注销成功", c)
-}
-
-// refreshToken 处理用户刷新 token 请求
-func (a *AuthController) refreshToken(c *gin.Context) {
-	userID, err := utils.ParseID(c)
-	if err != nil {
-		result.FailWithMessage("用户ID解析失败", c)
-		return
-	}
-	token, err := a.authService.RefreshToken(c, userID)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-	result.OkWithData(token, c)
 }
 
 // register 处理用户注册请求

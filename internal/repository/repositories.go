@@ -1,14 +1,20 @@
 package repository
 
-import "github.com/google/wire"
+import (
+	"Art-Design-Backend/internal/repository/cache"
+	"Art-Design-Backend/internal/repository/db"
+	"github.com/google/wire"
+)
 
 var RepositoriesProvider = wire.NewSet(
-	NewUserRepository,
-	NewMenuRepository,
-	NewRoleRepository,
-	NewGormTransactionManager,
-	NewRoleMenusRepository,
-	NewUserRolesRepository,
-	NewDigitPredictRepository,
-	NewAIModelRepository,
+	db.NewUserDB,
+	db.NewMenuRepository,
+	db.NewRoleRepository,
+	db.NewGormTransactionManager,
+	db.NewRoleMenusRepository,
+	db.NewUserRolesRepository,
+	db.NewDigitPredictRepository,
+	db.NewAIModelRepository,
+	cache.NewAIModelCache,
+	cache.NewAuthCache,
 )

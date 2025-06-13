@@ -7,7 +7,7 @@ import (
 	"Art-Design-Backend/internal/model/query"
 	"Art-Design-Backend/internal/model/request"
 	"Art-Design-Backend/internal/model/response"
-	"Art-Design-Backend/internal/repository"
+	"Art-Design-Backend/internal/repository/db"
 	"Art-Design-Backend/pkg/aliyun"
 	"Art-Design-Backend/pkg/authutils"
 	"Art-Design-Backend/pkg/constant/rediskey"
@@ -25,13 +25,13 @@ import (
 )
 
 type UserService struct {
-	UserRepo          *repository.UserRepository         // 用户Repo
-	RoleRepo          *repository.RoleRepository         // 角色Repo
-	UserRolesRepo     *repository.UserRolesRepository    // 用户角色Repo
-	GormTX            *repository.GormTransactionManager // gorm事务管理
-	OssClient         *aliyun.OssClient                  // 阿里云OSS
-	Redis             *redisx.RedisWrapper               // redis
-	DefaultUserConfig *config.DefaultUserConfig          // 默认用户配置
+	UserRepo          *db.UserDB                 // 用户Repo
+	RoleRepo          *db.RoleRepository         // 角色Repo
+	UserRolesRepo     *db.UserRolesRepository    // 用户角色Repo
+	GormTX            *db.GormTransactionManager // gorm事务管理
+	OssClient         *aliyun.OssClient          // 阿里云OSS
+	Redis             *redisx.RedisWrapper       // redis
+	DefaultUserConfig *config.DefaultUserConfig  // 默认用户配置
 }
 
 func (u *UserService) GetUserById(c *gin.Context) (res response.User, err error) {

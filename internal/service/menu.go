@@ -4,7 +4,7 @@ import (
 	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/internal/model/request"
 	"Art-Design-Backend/internal/model/response"
-	"Art-Design-Backend/internal/repository"
+	"Art-Design-Backend/internal/repository/db"
 	"Art-Design-Backend/pkg/authutils"
 	"Art-Design-Backend/pkg/constant/rediskey"
 	myerror "Art-Design-Backend/pkg/errors"
@@ -23,12 +23,12 @@ import (
 )
 
 type MenuService struct {
-	MenuRepo      *repository.MenuRepository      // 用户Repo
-	RoleRepo      *repository.RoleRepository      // 角色 Repo
-	RoleMenusRepo *repository.RoleMenusRepository // 角色菜单关联 Repo
-	UserRolesRepo *repository.UserRolesRepository // 用户角色关联 Repo
-	Redis         *redisx.RedisWrapper            // redis
-	MenuListLocks *sync.Map                       // 根据角色键的菜单列表锁
+	MenuRepo      *db.MenuRepository      // 用户Repo
+	RoleRepo      *db.RoleRepository      // 角色 Repo
+	RoleMenusRepo *db.RoleMenusRepository // 角色菜单关联 Repo
+	UserRolesRepo *db.UserRolesRepository // 用户角色关联 Repo
+	Redis         *redisx.RedisWrapper    // redis
+	MenuListLocks *sync.Map               // 根据角色键的菜单列表锁
 }
 
 func (m *MenuService) getMenuLock(key string) *sync.RWMutex {
