@@ -167,11 +167,11 @@ func (u *UserService) ChangeUserStatus(c *gin.Context, req request.ChangeStatus)
 	if err = u.UserRepo.UpdateUser(c, &userDo); err != nil {
 		return
 	}
-	go func() {
+	go func(id int64) {
 		if err := u.AuthRepo.LogoutByUserID(id); err != nil {
 			zap.L().Error("登出用户失败", zap.Error(err))
 		}
-	}()
+	}(id)
 	return
 }
 
@@ -215,10 +215,10 @@ func (u *UserService) UpdateUserRoleBinding(c *gin.Context, req *request.UserRol
 		return
 	}
 	// 缓存清理移出事务
-	go func() {
-		if err := u.UserRepo.InvalidUserRoleCache(context.TODO(), int64(req.UserId), req.OriginalRoleIds); err != nil {
-			zap.L().Error("用户变更角色信息删除缓存失败", zap.Int64("userID", int64(req.UserId)), zap.Error(err))
+	go func(userID int64, originalRoleIDList []int64) {
+		if err := u.UserRepo.InvalidUserRoleCache(context.TODO(), userID, originalRoleIDList); err != nil {
+			zap.L().Error("用户变更角色信息删除缓存失败", zap.Int64("userID", userID), zap.Error(err))
 		}
-	}()
+	}(int64(req.UserId), req.OriginalRoleIds)
 	return
 }

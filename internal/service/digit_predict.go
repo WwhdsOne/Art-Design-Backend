@@ -45,9 +45,9 @@ func (d *DigitPredictService) SubmitMission(c context.Context, req *request.Digi
 		zap.L().Error("该图片已经识别，请勿重复提交", zap.Int64("id", id))
 		return fmt.Errorf("该图片已经识别，请勿重复提交")
 	}
-	go func() {
+	go func(imageUrl string, id int64) {
 		var result int
-		if result, err = d.DigitPredictClient.Predict(req.Image); err != nil {
+		if result, err = d.DigitPredictClient.Predict(imageUrl); err != nil {
 			zap.L().Error("预测任务失败", zap.Error(err))
 			return
 		}
@@ -56,7 +56,7 @@ func (d *DigitPredictService) SubmitMission(c context.Context, req *request.Digi
 		if err != nil {
 			zap.L().Error("更新任务结果失败", zap.Error(err))
 		}
-	}()
+	}(req.Image, int64(req.ID))
 	return
 }
 

@@ -6,7 +6,6 @@ import (
 	"Art-Design-Backend/pkg/errors"
 	"context"
 	"fmt"
-	"go.uber.org/zap"
 	"gorm.io/gorm"
 	"strings"
 )
@@ -86,8 +85,7 @@ func (u *UserDB) GetLoginUserByUsername(c context.Context, username string) (use
 		Select("id", "password", "status").
 		Where("username = ?", username).
 		First(&user).Error; err != nil {
-		zap.L().Error("根据用户名查询用户失败", zap.Error(err))
-		err = errors.NewDBError("用户不存在")
+		err = errors.WrapDBError(err, "用户不存在")
 		return
 	}
 	return
@@ -97,8 +95,7 @@ func (u *UserDB) GetUserById(c context.Context, id int64) (user *entity.User, er
 	if err = DB(c, u.db).
 		Where("id = ?", id).
 		First(&user).Error; err != nil {
-		zap.L().Error("根据用户id查询用户失败", zap.Error(err))
-		err = errors.NewDBError("用户不存在")
+		err = errors.WrapDBError(err, "用户不存在")
 		return
 	}
 	return
@@ -106,16 +103,14 @@ func (u *UserDB) GetUserById(c context.Context, id int64) (user *entity.User, er
 
 func (u *UserDB) CreateUser(c context.Context, user *entity.User) (err error) {
 	if err = DB(c, u.db).Create(user).Error; err != nil {
-		zap.L().Error("新增用户失败")
-		return errors.NewDBError("新增用户失败")
+		return errors.WrapDBError(err, "新增用户失败")
 	}
 	return err
 }
 
 func (u *UserDB) UpdateUser(c context.Context, user *entity.User) (err error) {
 	if err = DB(c, u.db).Updates(user).Error; err != nil {
-		zap.L().Error("更新用户失败")
-		return errors.NewDBError("更新用户失败")
+		return errors.WrapDBError(err, "更新用户失败")
 	}
 	return err
 }
@@ -149,15 +144,13 @@ func (u *UserDB) GetUserPage(c context.Context, user *query.User) (userPage []*e
 
 	// 查询总数
 	if err = queryConditions.Count(&total).Error; err != nil {
-		zap.L().Error("获取用户分页失败")
-		err = errors.NewDBError("获取用户分页失败")
+		err = errors.WrapDBError(err, "获取用户分页失败")
 		return
 	}
 
 	// 查询分页数据（可根据需要添加 Limit / Offset 支持）
 	if err = queryConditions.Scopes(user.Paginate()).Find(&userPage).Error; err != nil {
-		zap.L().Error("获取用户分页数据失败")
-		err = errors.NewDBError("获取用户分页数据失败")
+		err = errors.WrapDBError(err, "获取用户分页数据失败")
 		return
 	}
 

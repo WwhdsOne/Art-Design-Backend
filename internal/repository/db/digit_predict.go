@@ -4,7 +4,6 @@ import (
 	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/pkg/errors"
 	"context"
-	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
@@ -22,7 +21,6 @@ func (r *DigitPredictDB) GetDigitPredictList(c context.Context, createdBy int64)
 	if err = DB(c, r.db).
 		Where("created_by = ?", createdBy).
 		Find(&digitPredictList).Error; err != nil {
-		zap.L().Error("查询用户预测列表失败", zap.Error(err))
 		err = errors.WrapDBError(err, "查询用户预测列表失败")
 		return
 	}

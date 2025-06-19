@@ -75,8 +75,7 @@ func (m *MenuDB) CheckMenuDuplicate(c context.Context, menu *entity.Menu) (err e
 
 func (m *MenuDB) GetAllMenus(c context.Context) (res []*entity.Menu, err error) {
 	if err = DB(c, m.db).Find(&res).Error; err != nil {
-		zap.L().Error("获取所有菜单失败", zap.Error(err))
-		return nil, errors.NewDBError("获取所有菜单失败")
+		return nil, errors.WrapDBError(err, "获取所有菜单失败")
 	}
 	return
 }
@@ -85,8 +84,7 @@ func (m *MenuDB) GetMenuListByIDList(c context.Context, menuIDList []int64) (men
 	if err = DB(c, m.db).
 		Where("id IN ?", menuIDList).
 		Find(&menuList).Error; err != nil {
-		zap.L().Error("获取菜单失败", zap.Error(err))
-		err = errors.NewDBError("获取菜单失败")
+		err = errors.WrapDBError(err, "获取菜单失败")
 		return
 	}
 	return
@@ -96,8 +94,7 @@ func (m *MenuDB) GetReducedMenuList(c context.Context) (menuList []*entity.Menu,
 	if err = DB(c, m.db).
 		Select("id", "title", "parent_id", "type").
 		Find(&menuList).Error; err != nil {
-		zap.L().Error("获取菜单失败", zap.Error(err))
-		err = errors.NewDBError("获取菜单失败")
+		err = errors.WrapDBError(err, "获取菜单失败")
 		return
 	}
 	return
@@ -123,8 +120,7 @@ func (m *MenuDB) GetChildMenuIDsByParentID(c context.Context, parentID int64) (c
 	if err = DB(c, m.db).Model(&entity.Menu{}).
 		Where("parent_id = ?", parentID).
 		Pluck("id", &childrenIDs).Error; err != nil {
-		zap.L().Error("获取子菜单失败", zap.Error(err))
-		return nil, errors.NewDBError("获取子菜单失败")
+		return nil, errors.WrapDBError(err, "获取子菜单失败")
 	}
 	return
 }
@@ -159,7 +155,6 @@ func (m *MenuDB) GetMenuIDListByRoleID(c context.Context, roleID int64) (menuIDL
 		Model(&entity.RoleMenus{}).
 		Where("role_id = ?", roleID).
 		Pluck("menu_id", &menuIDList).Error; err != nil {
-		zap.L().Error("获取角色菜单关联信息失败", zap.Error(err))
 		err = errors.WrapDBError(err, "获取角色菜单关联信息失败")
 		return
 	}

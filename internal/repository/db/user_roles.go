@@ -4,7 +4,6 @@ import (
 	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/pkg/errors"
 	"context"
-	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
@@ -34,7 +33,6 @@ func (u *UserRolesDB) GetRoleIDListByUserID(c context.Context, userID int64) (ro
 		Model(&entity.UserRoles{}).
 		Where("user_id = ?", userID).
 		Pluck("role_id", &roleIDs).Error; err != nil {
-		zap.L().Error("查询用户角色列表失败", zap.Error(err))
 		err = errors.WrapDBError(err, "查询用户角色列表失败")
 		return
 	}
@@ -61,7 +59,7 @@ func (u *UserRolesDB) GetReducedRoleList(ctx context.Context) (roleList []*entit
 		Select("id", "name").
 		Where("status = 1").
 		Find(&roleList).Error; err != nil {
-		err = errors.NewDBError("获取精简角色列表失败")
+		err = errors.WrapDBError(err, "获取精简角色列表失败")
 		return
 	}
 	return

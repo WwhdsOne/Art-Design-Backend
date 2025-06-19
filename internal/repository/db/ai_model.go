@@ -89,10 +89,10 @@ func (a *AIModelDB) GetAIModelByID(c context.Context, id int64) (res *entity.AIM
 }
 
 func (a *AIModelDB) GetAIModelPage(c context.Context, q *query.AIModel) (pageRes []*entity.AIModel, total int64, err error) {
-	DB := DB(c, a.db)
+	db := DB(c, a.db)
 
 	// 构建通用查询条件
-	queryConditions := DB.Model(&entity.AIModel{})
+	queryConditions := db.Model(&entity.AIModel{})
 
 	if q.Model != nil {
 		queryConditions = queryConditions.Where("model LIKE ?", "%"+*q.Model+"%")
@@ -115,7 +115,7 @@ func (a *AIModelDB) GetAIModelPage(c context.Context, q *query.AIModel) (pageRes
 
 	// 查询分页数据
 	if err = queryConditions.Scopes(q.Paginate()).Find(&pageRes).Error; err != nil {
-		err = errors.NewDBError("获取角色分页失败")
+		err = errors.WrapDBError(err, "获取角色分页失败")
 		return
 	}
 	return

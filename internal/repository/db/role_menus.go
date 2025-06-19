@@ -4,7 +4,6 @@ import (
 	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/pkg/errors"
 	"context"
-	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
@@ -23,8 +22,7 @@ func (r *RoleMenusDB) GetMenuIDListByRoleIDList(c context.Context, roleIDList []
 		Model(&entity.RoleMenus{}).
 		Where("role_id IN ?", roleIDList).
 		Pluck("menu_id", &menuIDList).Error; err != nil {
-		zap.L().Error("获取角色菜单关联信息失败", zap.Error(err))
-		err = errors.NewDBError("获取角色菜单关联信息失败")
+		err = errors.WrapDBError(err, "获取角色菜单关联信息失败")
 		return
 	}
 	return
@@ -60,7 +58,7 @@ func (r *RoleMenusDB) CreateRoleMenus(c context.Context, roleID int64, menuIDLis
 		})
 	}
 	if err = DB(c, r.db).Create(&roleMenus).Error; err != nil {
-		zap.L().Error("创建角色菜单关联失败", zap.Error(err))
+
 		return errors.WrapDBError(err, "创建角色菜单关联失败")
 	}
 	return
@@ -71,7 +69,6 @@ func (r *RoleMenusDB) DeleteRoleMenuRelationByMenuIDs(c context.Context, menuIDL
 	if err = DB(c, r.db).
 		Where("menu_id IN ?", menuIDList).
 		Delete(&entity.RoleMenus{}).Error; err != nil {
-		zap.L().Error("删除角色菜单关联失败", zap.Error(err))
 		return errors.NewDBError("删除角色菜单关联失败")
 	}
 	return

@@ -13,12 +13,12 @@ import (
 )
 
 type MenuCache struct {
-	Redis *redisx.RedisWrapper
+	redis *redisx.RedisWrapper
 }
 
 func NewMenuCache(redis *redisx.RedisWrapper) *MenuCache {
 	return &MenuCache{
-		Redis: redis,
+		redis: redis,
 	}
 }
 
@@ -58,7 +58,7 @@ func (m *MenuCache) InvalidateMenuCacheByRoleID(roleID int64) (err error) {
 	depKey := fmt.Sprintf(rediskey.MenuRoleDependencies+"%d", roleID)
 
 	// 构造删除列表：包括依赖集合本身 和 依赖集合中记录的所有菜单缓存 key
-	err = m.Redis.DelBySetMembers(depKey)
+	err = m.redis.DelBySetMembers(depKey)
 
 	return
 }
@@ -66,10 +66,10 @@ func (m *MenuCache) InvalidateMenuCacheByRoleID(roleID int64) (err error) {
 // InvalidAllMenuCache 批量清除所有菜单缓存
 func (m *MenuCache) InvalidAllMenuCache() (err error) {
 	// 清除所有菜单相关缓存
-	if err = m.Redis.DeleteByPrefix(rediskey.MenuListRole, 100); err != nil {
+	if err = m.redis.DeleteByPrefix(rediskey.MenuListRole, 100); err != nil {
 		return
 	}
-	err = m.Redis.DeleteByPrefix(rediskey.MenuRoleDependencies, 100)
+	err = m.redis.DeleteByPrefix(rediskey.MenuRoleDependencies, 100)
 	return
 }
 
@@ -81,7 +81,7 @@ func buildMenuCacheKey(roleIDList []int64) string {
 }
 func (m *MenuCache) GetMenuListByRoleIDList(roleIDList []int64) (menu []*response.Menu, err error) {
 	key := buildMenuCacheKey(roleIDList)
-	val, err := m.Redis.Get(key)
+	val, err := m.redis.Get(key)
 	if err != nil {
 		return
 	}
@@ -97,12 +97,12 @@ func (m *MenuCache) SetMenuListCache(roleIDList []int64, menuList []*entity.Menu
 		return errors.WrapCacheError(err, "菜单列表序列化失败")
 	}
 
-	if err = m.Redis.Set(key, string(cacheBytes), rediskey.MenuListRoleTTL); err != nil {
+	if err = m.redis.Set(key, string(cacheBytes), rediskey.MenuListRoleTTL); err != nil {
 		return errors.WrapCacheError(err, "菜单列表写入缓存失败")
 	}
 	for _, roleID := range roleIDList {
 		depKey := fmt.Sprintf(rediskey.MenuRoleDependencies+"%d", roleID)
-		if err = m.Redis.SAdd(depKey, key); err != nil {
+		if err = m.redis.SAdd(depKey, key); err != nil {
 			return errors.WrapCacheError(err, "设置角色菜单依赖关系失败")
 		}
 	}

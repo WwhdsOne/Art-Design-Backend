@@ -75,7 +75,7 @@ func (m *MenuRepo) DeleteMenuByIDList(c context.Context, menuIDList []int64) (er
 	}
 	go func() {
 		// 影响权限的必须报错，不能用警告
-		if err = m.menuCache.InvalidAllMenuCache(); err != nil {
+		if err := m.menuCache.InvalidAllMenuCache(); err != nil {
 			zap.L().Error("删除菜单权限缓存失败", zap.Error(err))
 		}
 	}()

@@ -5,6 +5,7 @@ import (
 	"Art-Design-Backend/internal/model/query"
 	"Art-Design-Backend/internal/repository/cache"
 	"Art-Design-Backend/internal/repository/db"
+	myerrors "Art-Design-Backend/pkg/errors"
 	"context"
 	"errors"
 )
@@ -58,7 +59,7 @@ func (u *UserRepo) InvalidUserRoleCache(c context.Context, userID int64, origina
 	if len(errs) > 0 {
 		return errors.Join(errs...)
 	}
-	return
+	return myerrors.WrapCacheError(err, "用户角色缓存信息失效失败")
 }
 
 func (u *UserRepo) GetLoginUserByUsername(c context.Context, username string) (user *entity.User, err error) {

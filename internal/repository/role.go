@@ -78,7 +78,6 @@ func (r *RoleRepo) GetRoleListByUserID(c context.Context, userID int64) (roleLis
 		// 3.2 从数据库读取
 		role, err = r.roleDB.GetEnableRoleByID(c, roleID)
 		if err != nil {
-			zap.L().Error("获取角色列表失败", zap.Error(err))
 			return
 		}
 		// 3.3 角色信息异步写入 Redis

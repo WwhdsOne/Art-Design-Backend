@@ -69,11 +69,11 @@ func (r *RoleService) UpdateRole(c *gin.Context, roleReq *request.Role) (err err
 	if err = r.RoleRepo.UpdateRole(c, &roleDo); err != nil {
 		return
 	}
-	go func() {
-		if cacheErr := r.RoleRepo.InvalidRoleInfoCache(context.Background(), roleDo.ID); cacheErr != nil {
-			zap.L().Error("用户信息缓存删除失败（需补偿）", zap.Int64("roleID", roleDo.ID), zap.Error(cacheErr))
+	go func(roleID int64) {
+		if err := r.RoleRepo.InvalidRoleInfoCache(context.Background(), roleID); err != nil {
+			zap.L().Error("用户信息缓存删除失败（需补偿）", zap.Int64("roleID", roleID), zap.Error(err))
 		}
-	}()
+	}(roleDo.ID)
 	return
 }
 
@@ -90,11 +90,11 @@ func (r *RoleService) DeleteRoleByID(c context.Context, roleID int64) (err error
 	if err != nil {
 		return
 	}
-	go func() {
-		if cacheErr := r.MenuRepo.InvalidateMenuCacheByRoleID(roleID); cacheErr != nil {
-			zap.L().Error("缓存删除失败（需补偿）", zap.Int64("roleID", roleID), zap.Error(cacheErr))
+	go func(roleID int64) {
+		if err := r.MenuRepo.InvalidateMenuCacheByRoleID(roleID); err != nil {
+			zap.L().Error("缓存删除失败（需补偿）", zap.Int64("roleID", roleID), zap.Error(err))
 		}
-	}()
+	}(roleID)
 	return
 }
 
@@ -153,11 +153,11 @@ func (r *RoleService) UpdateRoleMenuBinding(c *gin.Context, req *request.RoleMen
 	}
 
 	// 缓存清理移出事务
-	go func() {
-		if cacheErr := r.MenuRepo.InvalidateMenuCacheByRoleID(int64(req.RoleId)); cacheErr != nil {
-			zap.L().Error("缓存删除失败（需补偿）", zap.Int64("roleID", int64(req.RoleId)), zap.Error(cacheErr))
+	go func(roleID int64) {
+		if err := r.MenuRepo.InvalidateMenuCacheByRoleID(roleID); err != nil {
+			zap.L().Error("缓存删除失败（需补偿）", zap.Int64("roleID", roleID), zap.Error(err))
 		}
-	}()
+	}(int64(req.RoleId))
 
 	return
 }

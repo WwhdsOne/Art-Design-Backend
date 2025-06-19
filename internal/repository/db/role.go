@@ -6,7 +6,6 @@ import (
 	"Art-Design-Backend/pkg/errors"
 	"context"
 	"fmt"
-	"go.uber.org/zap"
 	"gorm.io/gorm"
 	"strings"
 )
@@ -75,8 +74,7 @@ func (r *RoleDB) CheckRoleDuplicate(c context.Context, role *entity.Role) (err e
 }
 func (r *RoleDB) CreateRole(c context.Context, role *entity.Role) (err error) {
 	if err = DB(c, r.db).Create(role).Error; err != nil {
-		zap.L().Error("创建角色失败", zap.Error(err))
-		return errors.NewDBError("创建角色失败")
+		return errors.WrapDBError(err, "创建角色失败")
 	}
 	return
 }
@@ -105,15 +103,13 @@ func (r *RoleDB) GetRolePage(c context.Context, role *query.Role) (rolePage []*e
 
 	// 查询总数
 	if err = queryConditions.Count(&total).Error; err != nil {
-		zap.L().Error("获取角色分页失败")
-		err = errors.NewDBError("获取角色分页失败")
+		err = errors.WrapDBError(err, "获取角色分页失败")
 		return
 	}
 
 	// 查询分页数据
 	if err = queryConditions.Scopes(role.Paginate()).Find(&rolePage).Error; err != nil {
-		zap.L().Error("获取角色分页数据失败")
-		err = errors.NewDBError("获取角色分页数据失败")
+		err = errors.WrapDBError(err, "获取角色分页数据失败")
 		return
 	}
 	return
@@ -121,8 +117,7 @@ func (r *RoleDB) GetRolePage(c context.Context, role *query.Role) (rolePage []*e
 
 func (r *RoleDB) UpdateRole(c context.Context, role *entity.Role) (err error) {
 	if err = DB(c, r.db).Updates(role).Error; err != nil {
-		zap.L().Error("更新角色失败")
-		err = errors.NewDBError("更新角色失败")
+		err = errors.WrapDBError(err, "更新角色失败")
 		return
 	}
 	return
@@ -130,8 +125,7 @@ func (r *RoleDB) UpdateRole(c context.Context, role *entity.Role) (err error) {
 
 func (r *RoleDB) DeleteRoleByID(c context.Context, roleID int64) (err error) {
 	if err = DB(c, r.db).Where("id = ?", roleID).Delete(nil).Error; err != nil {
-		zap.L().Error("删除角色失败")
-		err = errors.NewDBError("删除角色失败")
+		err = errors.WrapDBError(err, "删除角色失败")
 		return
 	}
 	return
@@ -143,8 +137,7 @@ func (r *RoleDB) FilterValidRoleIDs(ctx context.Context, roleIDs []int64) (valid
 		Where("id IN ? AND status = ?", roleIDs, 1). // 1 = 启用状态
 		Pluck("id", &validIDList).Error
 	if err != nil {
-		zap.L().Error("查询有效角色失败", zap.Error(err))
-		err = errors.NewDBError("查询有效角色失败")
+		err = errors.WrapDBError(err, "查询有效角色失败")
 		return
 	}
 	return

@@ -1,6 +1,7 @@
 package db
 
 import (
+	"Art-Design-Backend/pkg/errors"
 	"context"
 	"gorm.io/gorm"
 )
@@ -28,7 +29,7 @@ func DB(ctx context.Context, fallback *gorm.DB) *gorm.DB {
 func (s *GormTransactionManager) Transaction(ctx context.Context, f func(context.Context) error) error {
 	tx := DB(ctx, s.db).Begin()
 	if tx.Error != nil {
-		return tx.Error
+		return errors.WrapDBError(tx.Error, "开启事务失败")
 	}
 	c := context.WithValue(ctx, dbKey{}, tx)
 	err := f(c)

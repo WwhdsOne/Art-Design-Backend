@@ -45,9 +45,11 @@ func (a *AIModelRepo) GetAIModelByID(c context.Context, id int64) (res *entity.A
 	if err != nil {
 		return
 	}
-	go func() {
-		_ = a.aiModelCache.SetModelInfo(res)
-	}()
+	go func(res *entity.AIModel) {
+		if err = a.aiModelCache.SetModelInfo(res); err != nil {
+			zap.L().Warn("设置AI模型缓存失败", zap.Error(err))
+		}
+	}(res)
 	return
 }
 
@@ -73,7 +75,9 @@ func (a *AIModelRepo) GetSimpleModelList(c context.Context) (res []*response.Sim
 	}
 	// 写入缓存
 	go func(model []*response.SimpleAIModel) {
-		_ = a.aiModelCache.SetSimpleModelList(model)
+		if err = a.aiModelCache.SetSimpleModelList(model); err != nil {
+			zap.L().Warn("设置AI模型简洁信息列表缓存失败", zap.Error(err))
+		}
 	}(res)
 	return
 }
