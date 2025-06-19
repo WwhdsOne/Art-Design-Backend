@@ -28,6 +28,14 @@ const (
 	RoleUserDependencies = "ROLE:USER:DEPENDENCIES:"
 )
 
+// AI模型相关
+const (
+	AIModelSimpleList    = "AIMODEL:SIMPLE:LIST"
+	AIModelSimpleListTTL = 86400 * time.Second
+	AIModelInfo          = "AIMODEL:INFO:"
+	AIModelInfoTTL       = 86400 * time.Second
+)
+
 // RateLimiter 访问频率限制
 const (
 	RateLimiter = "RATE:LIMITER:"

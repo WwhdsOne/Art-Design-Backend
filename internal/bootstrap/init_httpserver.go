@@ -7,7 +7,6 @@ import (
 	"context"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -34,11 +33,12 @@ func (h *HttpServer) InitGinServer() {
 		Handler:      h.Engine,
 		ReadTimeout:  utils.ParseDuration(cfg.Server.ReadTimeOut),
 		WriteTimeout: utils.ParseDuration(cfg.Server.WriteTimeOut),
+		IdleTimeout:  utils.ParseDuration(cfg.Server.IdleTimeout),
 	}
 	// 协程启动http服务
 	go func() {
 		if err := httpServer.ListenAndServe(); err != nil {
-			log.Fatal(err)
+			h.Logger.Fatal("服务器启动失败:", zap.Error(err))
 		}
 	}()
 

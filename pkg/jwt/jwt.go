@@ -24,8 +24,7 @@ type JWT struct {
 
 // BaseClaims 基础声明结构体
 type BaseClaims struct {
-	UserID            int64         // 主键 id
-	RefreshWindowTime time.Duration // 刷新窗口时间
+	UserID int64 // 主键 id
 }
 
 func NewBaseClaims(userId int64) BaseClaims {

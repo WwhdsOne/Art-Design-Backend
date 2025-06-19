@@ -4,11 +4,11 @@ import (
 	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/internal/model/request"
 	"Art-Design-Backend/internal/model/response"
-	"Art-Design-Backend/internal/repository/db"
+	"Art-Design-Backend/internal/repository"
 	"Art-Design-Backend/pkg/aliyun"
 	"Art-Design-Backend/pkg/digit_client"
-	"Art-Design-Backend/pkg/errors"
 	"context"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
 	"go.uber.org/zap"
@@ -16,7 +16,7 @@ import (
 )
 
 type DigitPredictService struct {
-	DigitPredictRepo   *db.DigitPredictRepository
+	DigitPredictRepo   *repository.DigitPredictRepo
 	DigitPredictClient *digit_client.DigitPredict
 	OssClient          *aliyun.OssClient // 阿里云OSS
 }
@@ -43,7 +43,7 @@ func (d *DigitPredictService) SubmitMission(c context.Context, req *request.Digi
 	}
 	if labeled {
 		zap.L().Error("该图片已经识别，请勿重复提交", zap.Int64("id", id))
-		return errors.NewBusinessError("该图片已经识别，请勿重复提交")
+		return fmt.Errorf("该图片已经识别，请勿重复提交")
 	}
 	go func() {
 		var result int

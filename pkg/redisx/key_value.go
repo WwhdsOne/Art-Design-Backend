@@ -19,10 +19,8 @@ func (r *RedisWrapper) Set(id, value string, duration time.Duration) (err error)
 
 // Get 方法用于获取 Redis 键对应的值
 func (r *RedisWrapper) Get(key string) (val string, err error) {
-
 	ctx, cancelFunc := context.WithTimeout(context.Background(), r.operationTimeout)
 	defer cancelFunc()
-
 	val, err = r.client.Get(ctx, key).Result()
 	r.statsChan <- statsRecord{Key: key, IsHit: err == nil}
 	if err != nil {

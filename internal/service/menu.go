@@ -4,48 +4,17 @@ import (
 	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/internal/model/request"
 	"Art-Design-Backend/internal/model/response"
-	"Art-Design-Backend/internal/repository/db"
+	"Art-Design-Backend/internal/repository"
 	"Art-Design-Backend/pkg/authutils"
-	"Art-Design-Backend/pkg/constant/rediskey"
-	myerror "Art-Design-Backend/pkg/errors"
-	"Art-Design-Backend/pkg/redisx"
 	"context"
-	"errors"
-	"fmt"
-	"github.com/bytedance/sonic"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
-	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
-	"sort"
-	"strings"
-	"sync"
 )
 
 type MenuService struct {
-	MenuRepo      *db.MenuRepository      // 用户Repo
-	RoleRepo      *db.RoleRepository      // 角色 Repo
-	RoleMenusRepo *db.RoleMenusRepository // 角色菜单关联 Repo
-	UserRolesRepo *db.UserRolesRepository // 用户角色关联 Repo
-	Redis         *redisx.RedisWrapper    // redis
-	MenuListLocks *sync.Map               // 根据角色键的菜单列表锁
-}
-
-func (m *MenuService) getMenuLock(key string) *sync.RWMutex {
-	actual, _ := m.MenuListLocks.LoadOrStore(key, &sync.RWMutex{})
-	return actual.(*sync.RWMutex)
-}
-
-func (m *MenuService) invalidAllMenuCache() (err error) {
-	// 清除所有菜单相关缓存
-	if err = m.Redis.DeleteByPrefix(rediskey.MenuListRole, 100); err != nil {
-		return
-	}
-
-	if err = m.Redis.DeleteByPrefix(rediskey.MenuRoleDependencies, 100); err != nil {
-		return
-	}
-	return
+	MenuRepo *repository.MenuRepo // 菜单Repo
+	RoleRepo *repository.RoleRepo // 角色Repo
 }
 
 // buildMenuTree 构建菜单树结构并挂载按钮权限
@@ -118,7 +87,7 @@ func (m *MenuService) UpdateMenu(c context.Context, r *request.Menu) (err error)
 		zap.L().Error("菜单属性复制失败", zap.Error(err))
 		return
 	}
-	err = m.MenuRepo.CheckMenuDuplicate(&menuDo)
+	err = m.MenuRepo.CheckMenuDuplicate(context.TODO(), &menuDo)
 	if err != nil {
 		zap.L().Error("更新菜单时,菜单名称重复", zap.Error(err))
 		return
@@ -129,13 +98,14 @@ func (m *MenuService) UpdateMenu(c context.Context, r *request.Menu) (err error)
 		return
 	}
 	go func() {
-		if err = m.invalidAllMenuCache(); err != nil {
+		if err = m.MenuRepo.InvalidAllMenuCache(context.TODO()); err != nil {
 			zap.L().Error("更新菜单时,删除菜单缓存失败", zap.Error(err))
 		}
 	}()
 	return
 }
 
+// CreateMenuAuth 创建菜单权限
 func (m *MenuService) CreateMenuAuth(c context.Context, menu *request.MenuAuth) (err error) {
 	var menuDo entity.Menu
 	err = copier.Copy(&menuDo, &menu)
@@ -148,6 +118,32 @@ func (m *MenuService) CreateMenuAuth(c context.Context, menu *request.MenuAuth) 
 		zap.L().Error("创建菜单权限失败", zap.Error(err))
 		return
 	}
+	return
+}
+
+// UpdateMenuAuth 更新菜单权限
+func (m *MenuService) UpdateMenuAuth(c *gin.Context, r *request.MenuAuth) (err error) {
+	var menu entity.Menu
+	err = copier.Copy(&menu, r)
+	if err != nil {
+		zap.L().Error("权限参数复制失败", zap.Error(err))
+		return
+	}
+	err = m.MenuRepo.CheckMenuDuplicate(context.TODO(), &menu)
+	if err != nil {
+		zap.L().Error("菜单权限重复", zap.Error(err))
+		return
+	}
+	err = m.MenuRepo.UpdateMenuAuth(c, &menu)
+	if err != nil {
+		zap.L().Error("更新菜单权限失败", zap.Error(err))
+		return
+	}
+	go func() {
+		if err = m.MenuRepo.InvalidAllMenuCache(context.TODO()); err != nil {
+			zap.L().Error("删除菜单权限缓存失败", zap.Error(err))
+		}
+	}()
 	return
 }
 
@@ -170,131 +166,31 @@ func (m *MenuService) GetAllMenus(c context.Context) (res []*response.Menu, err 
 func (m *MenuService) GetMenuList(c context.Context) (res []*response.Menu, err error) {
 	// Step 1. 获取当前用户 ID
 	userID := authutils.GetUserID(c)
+	// Step 2. 获取当前用户角色列表
+	var roleIDList []int64
+	roleIDList, err = m.RoleRepo.GetRoleIDListByUserID(c, userID)
 
-	// Step 2. 构建用户角色缓存 key
-	userRoleKey := fmt.Sprintf(rediskey.UserRoleList+"%d", userID)
-
-	// Step 3. 尝试从 Redis 获取角色信息
-	val, err := m.Redis.Get(userRoleKey)
-
-	var roleIds []int64
-
-	// Step 4. 缓存未命中或出错
-	if err != nil {
-		if errors.Is(err, redis.Nil) {
-			// Step 4.1 从数据库获取角色 ID
-			roleIds, err = m.UserRolesRepo.GetRoleIDListByUserID(c, userID)
-			if err != nil {
-				zap.L().Error("获取用户角色ID列表失败", zap.Error(err))
-				return
-			}
-			// Step 4.2 验证角色是否启用
-			roleIds, _ = m.RoleRepo.FilterValidRoleIDs(c, roleIds)
-			zap.L().Debug("获取用户角色对应关系缓存未命中", zap.Int64("userID", userID))
-		} else {
-			// Step 4.3 Redis 查询出错（非未命中），返回缓存错误提示
-			zap.L().Error("获取用户角色对应关系缓存失败", zap.Error(err))
-			err = myerror.NewCacheError("缓存获取失败,请刷新页面")
-			return
-		}
-	} else {
-		var roleList []entity.Role
-		// Step 5. 缓存命中，反序列化用户角色列表
-		_ = sonic.Unmarshal([]byte(val), &roleList)
-
-		// Step 6. 提取角色 ID 列表
-		roleIds = make([]int64, 0, len(roleList))
-		for _, role := range roleList {
-			roleIds = append(roleIds, role.ID)
-		}
-	}
-
-	// Step 7. 构建菜单缓存 key
-	buildMenuCacheKey := func(roleIds []int64) string {
-		sort.Slice(roleIds, func(i, j int) bool {
-			return roleIds[i] < roleIds[j]
-		})
-		ids := make([]string, len(roleIds))
-		for i, id := range roleIds {
-			ids[i] = fmt.Sprintf("%d", id)
-		}
-		return rediskey.MenuListRole + strings.Join(ids, "_")
-	}
-
-	// Step 8. 定义函数：尝试从缓存获取菜单数据
-	tryGetCache := func(key string) bool {
-		cacheData, cacheErr := m.Redis.Get(key)
-		if cacheErr == nil {
-			if unmarshalErr := sonic.Unmarshal([]byte(cacheData), &res); unmarshalErr != nil {
-				zap.L().Error("菜单列表缓存解析失败", zap.String("key", key), zap.Error(unmarshalErr))
-				return false
-			}
-			return true // 缓存命中
-		}
-		if errors.Is(cacheErr, redis.Nil) {
-			zap.L().Debug("Redis 获取菜单缓存未命中", zap.String("key", key))
-		} else {
-			zap.L().Error("Redis 获取缓存失败", zap.String("key", key), zap.Error(cacheErr))
-			err = cacheErr
-		}
-		return false
-	}
-
-	// Step 9. 生成菜单缓存 key
-	cacheKey := buildMenuCacheKey(roleIds)
-
-	// Step 10. 获取菜单缓存锁（根据角色组合）
-	lock := m.getMenuLock(cacheKey)
-
-	// Step 11. 加读锁尝试读取缓存
-	lock.RLock()
-	if tryGetCache(cacheKey) || err != nil {
-		lock.RUnlock()
-		return
-	}
-	lock.RUnlock()
-
-	// Step 12. 加写锁准备写缓存（双检锁）
-	lock.Lock()
-	defer lock.Unlock()
-
-	// Step 13. 写前再次检查缓存（双检锁模式）
-	if tryGetCache(cacheKey) || err != nil {
+	// Step 3. 尝试从缓存获取当前角色菜单列表
+	res, err = m.MenuRepo.GetMenuListByRoleIDListFromCache(c, roleIDList)
+	if err == nil {
 		return
 	}
 
-	// Step 14. 查询当前角色对应的菜单 ID 列表
-	menuIDList, err := m.RoleMenusRepo.GetMenuIDListByRoleIDList(c, roleIds)
+	// Step 4. 降级,根据菜单 ID 列表获取菜单实体
+	menuList, err := m.MenuRepo.GetMenuListByRoleIDList(c, roleIDList)
 	if err != nil {
 		return
 	}
 
-	// Step 15. 根据菜单 ID 列表获取菜单实体
-	menuList, err := m.MenuRepo.GetMenuListByIDList(c, menuIDList)
-	if err != nil {
-		return
-	}
-
-	// Step 16. 构建菜单树结构
+	// Step 5. 构建菜单树结构
 	res, err = m.buildMenuTree(menuList)
 
-	// Step 17. 将结果写入 Redis 缓存
-	cacheBytes, _ := sonic.Marshal(&res)
-	err = m.Redis.Set(cacheKey, string(cacheBytes), rediskey.MenuListRoleTTL)
-	if err != nil {
-		zap.L().Error("菜单列表写入缓存失败", zap.Error(err))
-		return
-	}
-
-	// Step 18. 写入菜单依赖映射表（用于后续清缓存）
-	for _, rid := range roleIds {
-		depKey := fmt.Sprintf(rediskey.MenuRoleDependencies+"%d", rid)
-		err = m.Redis.SAdd(depKey, cacheKey)
-		if err != nil {
-			zap.L().Error("菜单列表写入映射表失败", zap.Error(err))
-			return
+	// Step 6. 将结果写入 Redis 缓存
+	go func() {
+		if err = m.MenuRepo.SetMenuListCache(c, roleIDList, menuList); err != nil {
+			zap.L().Warn("写入菜单缓存失败", zap.Error(err))
 		}
-	}
+	}()
 	return
 }
 
@@ -310,27 +206,10 @@ func (m *MenuService) DeleteMenu(c *gin.Context, id int64) (err error) {
 	if len(allMenuIDs) == 0 {
 		return
 	}
-
-	// Step 2. 删除菜单表中记录
-	err = m.MenuRepo.DeleteMenuByIDList(c, allMenuIDs)
-	if err != nil {
+	if err = m.MenuRepo.DeleteMenuByIDList(c, allMenuIDs); err != nil {
 		zap.L().Error("删除菜单失败", zap.Error(err))
 		return
 	}
-
-	// Step 3. 删除角色-菜单映射关系
-	err = m.RoleMenusRepo.DeleteByMenuIDs(c, allMenuIDs)
-	if err != nil {
-		zap.L().Error("删除角色菜单关系失败", zap.Error(err))
-		return
-	}
-
-	// Step 4. 清除所有菜单相关缓存
-	go func() {
-		if err = m.invalidAllMenuCache(); err != nil {
-			zap.L().Error("删除菜单权限缓存失败", zap.Error(err))
-		}
-	}()
 
 	return
 }
@@ -350,30 +229,5 @@ func (m *MenuService) collectMenuIDTree(c context.Context, parentID int64, resul
 			return err
 		}
 	}
-	return
-}
-
-func (m *MenuService) UpdateMenuAuth(c *gin.Context, r *request.MenuAuth) (err error) {
-	var menu entity.Menu
-	err = copier.Copy(&menu, r)
-	if err != nil {
-		zap.L().Error("权限参数复制失败", zap.Error(err))
-		return
-	}
-	err = m.MenuRepo.CheckMenuDuplicate(&menu)
-	if err != nil {
-		zap.L().Error("菜单权限重复", zap.Error(err))
-		return
-	}
-	err = m.MenuRepo.UpdateMenuAuth(c, &menu)
-	if err != nil {
-		zap.L().Error("更新菜单权限失败", zap.Error(err))
-		return
-	}
-	go func() {
-		if err = m.invalidAllMenuCache(); err != nil {
-			zap.L().Error("删除菜单权限缓存失败", zap.Error(err))
-		}
-	}()
 	return
 }

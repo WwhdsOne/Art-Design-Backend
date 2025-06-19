@@ -15,14 +15,6 @@ func GetUserID(c context.Context) int64 {
 	return -1
 }
 
-func GetClaims(c context.Context) *jwt.CustomClaims {
-	value := c.Value("claims")
-	if value != nil {
-		return value.(*jwt.CustomClaims)
-	}
-	return nil
-}
-
 // GetToken 从header中获取authorization
 func GetToken(c *gin.Context) string {
 	token := c.GetHeader("authorization")

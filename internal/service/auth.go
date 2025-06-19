@@ -4,7 +4,7 @@ import (
 	"Art-Design-Backend/config"
 	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/internal/model/request"
-	"Art-Design-Backend/internal/repository/cache"
+	"Art-Design-Backend/internal/repository"
 	"Art-Design-Backend/internal/repository/db"
 	"Art-Design-Backend/pkg/authutils"
 	"Art-Design-Backend/pkg/jwt"
@@ -20,10 +20,9 @@ import (
 )
 
 type AuthService struct {
-	UserDB            *db.UserDB                 // 用户DB
-	AuthCache         *cache.AuthCache           // 权限缓存
-	RoleRepo          *db.RoleRepository         // 角色Repo
-	UserRolesRepo     *db.UserRolesRepository    // 用户角色关联Repo
+	UserRepo          *repository.UserRepo       // 用户Repo
+	AuthRepo          *repository.AuthRepo       // 登录缓存
+	RoleRepo          *repository.RoleRepo       // 角色Repo
 	GormTX            *db.GormTransactionManager // gorm事务管理
 	Jwt               *jwt.JWT                   // jwt相关
 	DefaultUserConfig *config.DefaultUserConfig  // 默认用户配置
@@ -32,7 +31,7 @@ type AuthService struct {
 // Login 登录
 func (s *AuthService) Login(c *gin.Context, u *request.Login) (tokenStr string, err error) {
 	// 只验证启用状态的用户
-	user, err := s.UserDB.GetLoginUserByUsername(c, u.Username)
+	user, err := s.UserRepo.GetLoginUserByUsername(c, u.Username)
 	if err != nil {
 		return
 	}
@@ -60,7 +59,7 @@ func (s *AuthService) createToken(baseClaims jwt.BaseClaims) (tokenStr string, e
 	userID := baseClaims.UserID
 
 	// 2. 获取旧 token（Session）
-	oldToken, err := s.AuthCache.GetTokenByUserID(userID)
+	oldToken, err := s.AuthRepo.GetTokenByUserID(userID)
 	if err != nil && !errors.Is(err, redis.Nil) {
 		zap.L().Error("Redis 获取 Session 错误", zap.Error(err))
 		return
@@ -68,7 +67,7 @@ func (s *AuthService) createToken(baseClaims jwt.BaseClaims) (tokenStr string, e
 
 	// 3. 删除旧 token 映射
 	if oldToken != "" {
-		err = s.AuthCache.DeleteOldSession(userID, oldToken)
+		err = s.AuthRepo.DeleteOldSession(userID, oldToken)
 		if err != nil {
 			zap.L().Error("删除旧 Session 失败", zap.Int64("user_id", userID), zap.String("token", oldToken), zap.Error(err))
 			return
@@ -76,7 +75,7 @@ func (s *AuthService) createToken(baseClaims jwt.BaseClaims) (tokenStr string, e
 	}
 
 	// 4. 设置新 token 映射
-	err = s.AuthCache.SetNewSession(userID, tokenStr, s.Jwt.ExpiresTime)
+	err = s.AuthRepo.SetNewSession(userID, tokenStr, s.Jwt.ExpiresTime)
 	if err != nil {
 		zap.L().Error("设置新 Session 错误", zap.Int64("user_id", userID), zap.String("token", tokenStr), zap.Error(err))
 		return
@@ -98,7 +97,7 @@ func (s *AuthService) LogoutToken(c *gin.Context) (err error) {
 	userID := claims.BaseClaims.UserID
 
 	// 调用 AuthCache 注销 token
-	if err = s.AuthCache.LogoutToken(userID, tokenStr); err != nil {
+	if err = s.AuthRepo.DeleteOldSession(userID, tokenStr); err != nil {
 		zap.L().Error("注销 token 失败", zap.Int64("userID", userID), zap.String("token", tokenStr), zap.Error(err))
 		return
 	}
@@ -109,24 +108,24 @@ func (s *AuthService) LogoutToken(c *gin.Context) (err error) {
 // Register 注册
 func (s *AuthService) Register(c *gin.Context, userReq *request.RegisterUser) (err error) {
 	var user entity.User
-	err = copier.Copy(&user, &userReq)
+	_ = copier.Copy(&user, &userReq)
 	// 处理密码（非指针字段）
 	password, _ := bcrypt.GenerateFromPassword([]byte(userReq.Password), bcrypt.DefaultCost)
 	user.Password = string(password)
 	// 随机设置头像
 	user.Avatar = s.DefaultUserConfig.Avatars[utils.GenerateRandomNumber(0, len(s.DefaultUserConfig.Avatars))]
 	// 判重
-	if err = s.UserDB.CheckUserDuplicate(&user); err != nil {
+	if err = s.UserRepo.CheckUserDuplicate(context.TODO(), &user); err != nil {
 		return
 	}
 	// 启用事务插入用户表和用户角色关联表
 	err = s.GormTX.Transaction(c, func(ctx context.Context) (err error) {
-		if err = s.UserDB.CreateUser(ctx, &user); err != nil {
+		if err = s.UserRepo.CreateUser(ctx, &user); err != nil {
 			return
 		}
 		// id是新用户的主键ID
 		// todo后续可能会换成动态获取
-		if err = s.UserRolesRepo.AddRolesToUser(ctx, user.ID, []int64{42838646763553030}); err != nil {
+		if err = s.RoleRepo.AddRolesToUser(ctx, user.ID, []int64{42838646763553030}); err != nil {
 			return
 		}
 		return

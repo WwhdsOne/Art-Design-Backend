@@ -11,17 +11,17 @@ import (
 	"strings"
 )
 
-type RoleRepository struct {
+type RoleDB struct {
 	db *gorm.DB // 用户表数据库连接
 }
 
-func NewRoleRepository(db *gorm.DB) *RoleRepository {
-	return &RoleRepository{
+func NewRoleDB(db *gorm.DB) *RoleDB {
+	return &RoleDB{
 		db: db,
 	}
 }
 
-func (r *RoleRepository) CheckRoleDuplicate(c context.Context, role *entity.Role) (err error) {
+func (r *RoleDB) CheckRoleDuplicate(c context.Context, role *entity.Role) (err error) {
 	var result struct {
 		NameExists bool
 		CodeExists bool
@@ -59,7 +59,7 @@ func (r *RoleRepository) CheckRoleDuplicate(c context.Context, role *entity.Role
 	queryCondition.WriteString(strings.Join(conditions, ","))
 
 	// 执行查询
-	if err = r.db.WithContext(c).Raw(queryCondition.String(), args...).Scan(&result).Error; err != nil {
+	if err = DB(c, r.db).Raw(queryCondition.String(), args...).Scan(&result).Error; err != nil {
 		return err
 	}
 
@@ -73,7 +73,7 @@ func (r *RoleRepository) CheckRoleDuplicate(c context.Context, role *entity.Role
 
 	return nil
 }
-func (r *RoleRepository) CreateRole(c context.Context, role *entity.Role) (err error) {
+func (r *RoleDB) CreateRole(c context.Context, role *entity.Role) (err error) {
 	if err = DB(c, r.db).Create(role).Error; err != nil {
 		zap.L().Error("创建角色失败", zap.Error(err))
 		return errors.NewDBError("创建角色失败")
@@ -81,7 +81,8 @@ func (r *RoleRepository) CreateRole(c context.Context, role *entity.Role) (err e
 	return
 }
 
-func (r *RoleRepository) GetRoleByID(c context.Context, roleID int64) (role *entity.Role, err error) {
+// GetEnableRoleByID 查询有效角色
+func (r *RoleDB) GetEnableRoleByID(c context.Context, roleID int64) (role *entity.Role, err error) {
 	if err = DB(c, r.db).
 		Where("id = ?", roleID).
 		Where("status = 1").
@@ -92,7 +93,7 @@ func (r *RoleRepository) GetRoleByID(c context.Context, roleID int64) (role *ent
 	return
 }
 
-func (r *RoleRepository) GetRolePage(c context.Context, role *query.Role) (rolePage []*entity.Role, total int64, err error) {
+func (r *RoleDB) GetRolePage(c context.Context, role *query.Role) (rolePage []*entity.Role, total int64, err error) {
 	db := DB(c, r.db)
 
 	// 构建通用查询条件
@@ -118,7 +119,7 @@ func (r *RoleRepository) GetRolePage(c context.Context, role *query.Role) (roleP
 	return
 }
 
-func (r *RoleRepository) UpdateRole(c context.Context, role *entity.Role) (err error) {
+func (r *RoleDB) UpdateRole(c context.Context, role *entity.Role) (err error) {
 	if err = DB(c, r.db).Updates(role).Error; err != nil {
 		zap.L().Error("更新角色失败")
 		err = errors.NewDBError("更新角色失败")
@@ -127,7 +128,7 @@ func (r *RoleRepository) UpdateRole(c context.Context, role *entity.Role) (err e
 	return
 }
 
-func (r *RoleRepository) DeleteRoleByID(c context.Context, roleID int64) (err error) {
+func (r *RoleDB) DeleteRoleByID(c context.Context, roleID int64) (err error) {
 	if err = DB(c, r.db).Where("id = ?", roleID).Delete(nil).Error; err != nil {
 		zap.L().Error("删除角色失败")
 		err = errors.NewDBError("删除角色失败")
@@ -136,7 +137,7 @@ func (r *RoleRepository) DeleteRoleByID(c context.Context, roleID int64) (err er
 	return
 }
 
-func (r *RoleRepository) FilterValidRoleIDs(ctx context.Context, roleIDs []int64) (validIDList []int64, err error) {
+func (r *RoleDB) FilterValidRoleIDs(ctx context.Context, roleIDs []int64) (validIDList []int64, err error) {
 	err = DB(ctx, r.db).
 		Model(&entity.Role{}).
 		Where("id IN ? AND status = ?", roleIDs, 1). // 1 = 启用状态
@@ -144,6 +145,17 @@ func (r *RoleRepository) FilterValidRoleIDs(ctx context.Context, roleIDs []int64
 	if err != nil {
 		zap.L().Error("查询有效角色失败", zap.Error(err))
 		err = errors.NewDBError("查询有效角色失败")
+		return
+	}
+	return
+}
+
+func (r *RoleDB) GetReducedRoleList(ctx context.Context) (roleList []*entity.Role, err error) {
+	if err = DB(ctx, r.db).
+		Select("id", "name").
+		Where("status = 1").
+		Find(&roleList).Error; err != nil {
+		err = errors.NewDBError("获取精简角色列表失败")
 		return
 	}
 	return

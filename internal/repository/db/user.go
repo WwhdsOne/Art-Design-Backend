@@ -21,7 +21,7 @@ func NewUserDB(db *gorm.DB) *UserDB {
 	}
 }
 
-func (u *UserDB) CheckUserDuplicate(user *entity.User) (err error) {
+func (u *UserDB) CheckUserDuplicate(c context.Context, user *entity.User) (err error) {
 	var result struct {
 		UsernameExists bool
 		EmailExists    bool
@@ -65,7 +65,9 @@ func (u *UserDB) CheckUserDuplicate(user *entity.User) (err error) {
 	queryConditions.WriteString(strings.Join(conditions, ","))
 
 	// 执行查询
-	u.db.Raw(queryConditions.String(), args...).Scan(&result)
+	if err = DB(c, u.db).Raw(queryConditions.String(), args...).Scan(&result).Error; err != nil {
+		return errors.WrapDBError(err, "检查用户重复属性失败")
+	}
 
 	// 检查结果
 	switch {

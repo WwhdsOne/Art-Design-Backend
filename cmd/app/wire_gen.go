@@ -10,11 +10,11 @@ import (
 	"Art-Design-Backend/config"
 	"Art-Design-Backend/internal/bootstrap"
 	"Art-Design-Backend/internal/controller"
+	"Art-Design-Backend/internal/repository"
 	"Art-Design-Backend/internal/repository/cache"
 	"Art-Design-Backend/internal/repository/db"
 	"Art-Design-Backend/internal/service"
 	"Art-Design-Backend/pkg/ai"
-	"Art-Design-Backend/pkg/container"
 	"Art-Design-Backend/pkg/middleware"
 )
 
@@ -29,24 +29,24 @@ func wireApp() *bootstrap.HttpServer {
 	redisWrapper := bootstrap.InitRedis(configConfig)
 	jwt := bootstrap.InitJWT(configConfig)
 	configMiddleware := config.ProviderMiddlewareConfig()
-	middlewares := &middleware.Middlewares{
-		Db:     gormDB,
-		Redis:  redisWrapper,
-		Jwt:    jwt,
-		Config: configMiddleware,
-	}
+	middlewares := middleware.NewMiddlewares(gormDB, redisWrapper, jwt, configMiddleware)
 	engine := bootstrap.InitGin(middlewares, logger, configMiddleware)
 	userDB := db.NewUserDB(gormDB)
+	userCache := cache.NewUserCache(redisWrapper)
+	roleCache := cache.NewRoleCache(redisWrapper)
+	userRepo := repository.NewUserRepo(userDB, userCache, roleCache)
 	authCache := cache.NewAuthCache(redisWrapper)
-	roleRepository := db.NewRoleRepository(gormDB)
-	userRolesRepository := db.NewUserRolesRepository(gormDB)
+	authRepo := repository.NewAuthRepo(authCache)
+	roleDB := db.NewRoleDB(gormDB)
+	roleMenusDB := db.NewRoleMenusDB(gormDB)
+	userRolesDB := db.NewUserRolesDB(gormDB)
+	roleRepo := repository.NewRoleRepo(roleDB, roleMenusDB, roleCache, userCache, userRolesDB)
 	gormTransactionManager := db.NewGormTransactionManager(gormDB)
 	defaultUserConfig := config.ProvideDefaultUserConfig()
 	authService := &service.AuthService{
-		UserDB:            userDB,
-		AuthCache:         authCache,
-		RoleRepo:          roleRepository,
-		UserRolesRepo:     userRolesRepository,
+		UserRepo:          userRepo,
+		AuthRepo:          authRepo,
+		RoleRepo:          roleRepo,
 		GormTX:            gormTransactionManager,
 		Jwt:               jwt,
 		DefaultUserConfig: defaultUserConfig,
@@ -54,51 +54,45 @@ func wireApp() *bootstrap.HttpServer {
 	authController := controller.NewAuthController(engine, middlewares, authService)
 	ossClient := bootstrap.InitOSSClient(configConfig)
 	userService := &service.UserService{
-		UserRepo:          userDB,
-		RoleRepo:          roleRepository,
-		UserRolesRepo:     userRolesRepository,
+		RoleRepo:          roleRepo,
+		UserRepo:          userRepo,
+		AuthRepo:          authRepo,
 		GormTX:            gormTransactionManager,
 		OssClient:         ossClient,
-		Redis:             redisWrapper,
 		DefaultUserConfig: defaultUserConfig,
 	}
 	userController := controller.NewUserController(engine, middlewares, userService)
-	menuRepository := db.NewMenuRepository(gormDB)
-	roleMenusRepository := db.NewRoleMenusRepository(gormDB)
-	syncMap := container.NewSyncMap()
+	menuDB := db.NewMenuDB(gormDB)
+	menuCache := cache.NewMenuCache(redisWrapper)
+	menuRepo := repository.NewMenuRepo(menuDB, menuCache, roleMenusDB)
 	menuService := &service.MenuService{
-		MenuRepo:      menuRepository,
-		RoleRepo:      roleRepository,
-		RoleMenusRepo: roleMenusRepository,
-		UserRolesRepo: userRolesRepository,
-		Redis:         redisWrapper,
-		MenuListLocks: syncMap,
+		MenuRepo: menuRepo,
+		RoleRepo: roleRepo,
 	}
 	menuController := controller.NewMenuController(engine, middlewares, menuService)
 	roleService := &service.RoleService{
-		RoleRepo:      roleRepository,
-		MenuRepo:      menuRepository,
-		RoleMenusRepo: roleMenusRepository,
-		GormTX:        gormTransactionManager,
-		Redis:         redisWrapper,
+		RoleRepo: roleRepo,
+		MenuRepo: menuRepo,
+		GormTX:   gormTransactionManager,
 	}
 	roleController := controller.NewRoleController(engine, middlewares, roleService)
-	digitPredictRepository := db.NewDigitPredictRepository(gormDB)
+	digitPredictDB := db.NewDigitPredictDB(gormDB)
+	digitPredictRepo := repository.NewDigitPredictRepo(digitPredictDB)
 	digitPredict := bootstrap.InitDigitPredict(configConfig)
 	digitPredictService := &service.DigitPredictService{
-		DigitPredictRepo:   digitPredictRepository,
+		DigitPredictRepo:   digitPredictRepo,
 		DigitPredictClient: digitPredict,
 		OssClient:          ossClient,
 	}
 	digitPredictController := controller.NewDigitPredictController(engine, middlewares, digitPredictService)
-	aiModelRepository := db.NewAIModelRepository(gormDB)
+	aiModelDB := db.NewAIModelDB(gormDB)
 	aiModelCache := cache.NewAIModelCache(redisWrapper)
+	aiModelRepo := repository.NewAIModelRepo(aiModelDB, aiModelCache)
 	aiModelClient := ai.NewAIModelClient()
 	aiModelService := &service.AIModelService{
-		AIModelRepo:   aiModelRepository,
-		AIModelCache:  aiModelCache,
-		GormTX:        gormTransactionManager,
+		AIModelRepo:   aiModelRepo,
 		AIModelClient: aiModelClient,
+		GormTX:        gormTransactionManager,
 	}
 	aiModelController := controller.NewAIModelController(engine, middlewares, aiModelService)
 	httpServer := &bootstrap.HttpServer{

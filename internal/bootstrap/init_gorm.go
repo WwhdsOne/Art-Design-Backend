@@ -46,7 +46,6 @@ func (p *snowflakeIDPlugin) initialize(db *gorm.DB) (err error) {
 	err = db.Callback().Create().
 		Before("gorm:create").
 		Register("generate_snowflake_id", p.generateID)
-
 	return
 }
 

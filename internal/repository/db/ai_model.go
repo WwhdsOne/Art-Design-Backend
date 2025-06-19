@@ -10,17 +10,17 @@ import (
 	"strings"
 )
 
-type AIModelRepository struct {
+type AIModelDB struct {
 	db *gorm.DB
 }
 
-func NewAIModelRepository(db *gorm.DB) *AIModelRepository {
-	return &AIModelRepository{
+func NewAIModelDB(db *gorm.DB) *AIModelDB {
+	return &AIModelDB{
 		db: db,
 	}
 }
 
-func (a *AIModelRepository) CheckAIDuplicate(model *entity.AIModel) (err error) {
+func (a *AIModelDB) CheckAIDuplicate(c context.Context, model *entity.AIModel) (err error) {
 	var result struct {
 		ModelExists   bool
 		BaseURLExists bool
@@ -57,7 +57,7 @@ func (a *AIModelRepository) CheckAIDuplicate(model *entity.AIModel) (err error) 
 	queryCondition.WriteString("SELECT ")
 	queryCondition.WriteString(strings.Join(conditions, ", "))
 
-	if err = a.db.Raw(queryCondition.String(), args...).Scan(&result).Error; err != nil {
+	if err = DB(c, a.db).Raw(queryCondition.String(), args...).Scan(&result).Error; err != nil {
 		return
 	}
 
@@ -72,15 +72,15 @@ func (a *AIModelRepository) CheckAIDuplicate(model *entity.AIModel) (err error) 
 	return
 }
 
-func (a *AIModelRepository) Create(ctx context.Context, e *entity.AIModel) (err error) {
-	if err = DB(ctx, a.db).Create(e).Error; err != nil {
+func (a *AIModelDB) Create(c context.Context, e *entity.AIModel) (err error) {
+	if err = DB(c, a.db).Create(e).Error; err != nil {
 		err = errors.NewDBError("创建AI模型失败")
 		return
 	}
 	return
 }
 
-func (a *AIModelRepository) GetAIModelByID(c context.Context, id int64) (res *entity.AIModel, err error) {
+func (a *AIModelDB) GetAIModelByID(c context.Context, id int64) (res *entity.AIModel, err error) {
 	if err = DB(c, a.db).Where("id = ?", id).First(&res).Error; err != nil {
 		err = errors.NewDBError("查询AI模型失败")
 		return
@@ -88,11 +88,11 @@ func (a *AIModelRepository) GetAIModelByID(c context.Context, id int64) (res *en
 	return
 }
 
-func (a *AIModelRepository) GetAIModelPage(c context.Context, q *query.AIModel) (pageRes []*entity.AIModel, total int64, err error) {
-	db := DB(c, a.db)
+func (a *AIModelDB) GetAIModelPage(c context.Context, q *query.AIModel) (pageRes []*entity.AIModel, total int64, err error) {
+	DB := DB(c, a.db)
 
 	// 构建通用查询条件
-	queryConditions := db.Model(&entity.AIModel{})
+	queryConditions := DB.Model(&entity.AIModel{})
 
 	if q.Model != nil {
 		queryConditions = queryConditions.Where("model LIKE ?", "%"+*q.Model+"%")
@@ -121,7 +121,7 @@ func (a *AIModelRepository) GetAIModelPage(c context.Context, q *query.AIModel) 
 	return
 }
 
-func (a *AIModelRepository) GetSimpleModelList(c context.Context) (models []*entity.AIModel, err error) {
+func (a *AIModelDB) GetSimpleModelList(c context.Context) (models []*entity.AIModel, err error) {
 	if err = DB(c, a.db).Select("id", "icon", "model").Where("enabled = ?", true).Find(&models).Error; err != nil {
 		err = errors.NewDBError("获取模型列表失败")
 		return

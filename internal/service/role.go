@@ -6,78 +6,18 @@ import (
 	"Art-Design-Backend/internal/model/query"
 	"Art-Design-Backend/internal/model/request"
 	"Art-Design-Backend/internal/model/response"
+	"Art-Design-Backend/internal/repository"
 	"Art-Design-Backend/internal/repository/db"
-	"Art-Design-Backend/pkg/constant/rediskey"
-	"Art-Design-Backend/pkg/errors"
-	"Art-Design-Backend/pkg/redisx"
 	"context"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
 	"go.uber.org/zap"
-	"strconv"
 )
 
 type RoleService struct {
-	RoleRepo      *db.RoleRepository         // 用户Repo
-	MenuRepo      *db.MenuRepository         // 菜单Repo
-	RoleMenusRepo *db.RoleMenusRepository    // 角色菜单Repo
-	GormTX        *db.GormTransactionManager // 事务
-	Redis         *redisx.RedisWrapper       // redis
-}
-
-// invalidateMenuCacheByRoleID 清除与指定角色关联的所有菜单缓存
-//
-// 缓存设计说明：
-// 1. 用户菜单缓存策略：
-//   - 每个用户的菜单缓存键格式: "MENU:LIST:ROLE:{roleID1}_{roleID2}_{...}"
-//     (例如：用户拥有角色1和2 → "MENU:LIST:ROLE:1_2"
-//     用户拥有角色1,2和3 → "MENU:LIST:ROLE:1_2_3")
-//
-// 2. 反向依赖关系表：
-//
-//   - 数据结构：Redis Set
-//
-//   - 键格式:   "MENU:ROLE:DEPENDENCIES:{roleID}"
-//
-//   - 值内容：  所有包含该roleID的用户菜单缓存键集合
-//     (例如："MENU:ROLE:DEPENDENCIES:1" 包含 ["MENU:LIST:ROLE:1_2", "MENU:LIST:ROLE:1_3"])
-//
-//     3. 缓存失效机制：
-//     当角色权限变更时：
-//     a) 根据 roleID 从 "MENU:ROLE:DEPENDENCIES:{roleID}" 获取所有关联缓存键
-//     b) 批量删除这些用户菜单缓存
-//     c) 最后清理该角色的依赖记录
-//
-// 示例流程：
-//   - 用户A(角色1,2) → 缓存键: "MENU:LIST:ROLE:1_2"
-//   - 用户B(角色1,3) → 缓存键: "MENU:LIST:ROLE:1_3"
-//   - Redis中会建立：
-//     "MENU:ROLE:DEPENDENCIES:1" → ["MENU:LIST:ROLE:1_2", "MENU:LIST:ROLE:1_3"]
-//     "MENU:ROLE:DEPENDENCIES:2" → ["MENU:LIST:ROLE:1_2"]
-//     "MENU:ROLE:DEPENDENCIES:3" → ["MENU:LIST:ROLE:1_3"]
-//   - 当角色1权限变更时，自动清除两个用户的菜单缓存，以及角色1的依赖缓存表。
-func (r *RoleService) invalidateMenuCacheByRoleID(roleID int64) (err error) {
-	// 获取记录角色所关联的菜单缓存 key 的依赖集合 key（Set 类型）
-	depKey := fmt.Sprintf(rediskey.MenuRoleDependencies+"%d", roleID)
-
-	// 构造删除列表：包括依赖集合本身 和 依赖集合中记录的所有菜单缓存 key
-	err = r.Redis.DelBySetMembers(depKey)
-
-	return
-}
-
-// invalidRoleInfoCache 删除角色信息缓存
-// 同时也删除映射表缓存
-func (r *RoleService) invalidRoleInfoCache(roleID int64) (err error) {
-	// 删除角色信息缓存
-	key := rediskey.RoleInfo + strconv.FormatInt(roleID, 10)
-	err = r.Redis.DelBySetMembers(key)
-	if err != nil {
-		err = errors.NewCacheError("删除角色信息缓存失败")
-		return
-	}
-	return
+	RoleRepo *repository.RoleRepo       // 角色Repo
+	MenuRepo *repository.MenuRepo       // 菜单Repo
+	GormTX   *db.GormTransactionManager // 事务
 }
 
 func (r *RoleService) CreateRole(c context.Context, role *request.Role) (err error) {
@@ -130,28 +70,28 @@ func (r *RoleService) UpdateRole(c *gin.Context, roleReq *request.Role) (err err
 		return
 	}
 	go func() {
-		if cacheErr := r.invalidRoleInfoCache(roleDo.ID); cacheErr != nil {
+		if cacheErr := r.RoleRepo.InvalidRoleInfoCache(context.Background(), roleDo.ID); cacheErr != nil {
 			zap.L().Error("用户信息缓存删除失败（需补偿）", zap.Int64("roleID", roleDo.ID), zap.Error(cacheErr))
 		}
 	}()
 	return
 }
 
-func (r *RoleService) DeleteRoleByID(c *gin.Context, roleID int64) (err error) {
-	err = r.GormTX.Transaction(c, func(ctx context.Context) error {
+func (r *RoleService) DeleteRoleByID(c context.Context, roleID int64) (err error) {
+	err = r.GormTX.Transaction(c, func(ctx context.Context) (err error) {
 		if err = r.RoleRepo.DeleteRoleByID(ctx, roleID); err != nil {
-			return err
+			return
 		}
-		if err = r.RoleMenusRepo.DeleteByRoleID(ctx, roleID); err != nil {
-			return err
+		if err = r.RoleRepo.DeleteMenuRelationsByRoleID(ctx, roleID); err != nil {
+			return
 		}
-		return nil
+		return
 	})
 	if err != nil {
 		return
 	}
 	go func() {
-		if cacheErr := r.invalidateMenuCacheByRoleID(roleID); cacheErr != nil {
+		if cacheErr := r.MenuRepo.InvalidateMenuCacheByRoleID(roleID); cacheErr != nil {
 			zap.L().Error("缓存删除失败（需补偿）", zap.Int64("roleID", roleID), zap.Error(cacheErr))
 		}
 	}()
@@ -164,7 +104,7 @@ func (r *RoleService) GetRoleMenuBinding(c *gin.Context, roleID int64) (res *res
 	if err != nil {
 		return
 	}
-	hasMenuIDList, err := r.RoleMenusRepo.GetMenuIDListByRoleID(c, roleID)
+	hasMenuIDList, err := r.MenuRepo.GetMenuIDListByRoleID(c, roleID)
 	// 先用 map 存储所有菜单，方便查找
 	menuMap := make(map[int64]*response.SimpleMenu)
 	for _, menuDo := range menuList {
@@ -200,10 +140,10 @@ func (r *RoleService) GetRoleMenuBinding(c *gin.Context, roleID int64) (res *res
 
 func (r *RoleService) UpdateRoleMenuBinding(c *gin.Context, req *request.RoleMenuBinding) (err error) {
 	err = r.GormTX.Transaction(c, func(ctx context.Context) error {
-		if err = r.RoleMenusRepo.DeleteByRoleID(ctx, int64(req.RoleId)); err != nil {
+		if err = r.RoleRepo.DeleteMenuRelationsByRoleID(ctx, int64(req.RoleId)); err != nil {
 			return err
 		}
-		if err = r.RoleMenusRepo.CreateRoleMenus(ctx, int64(req.RoleId), req.MenuIds); err != nil {
+		if err = r.RoleRepo.CreateRoleMenus(ctx, int64(req.RoleId), req.MenuIds); err != nil {
 			return err
 		}
 		return nil
@@ -214,7 +154,7 @@ func (r *RoleService) UpdateRoleMenuBinding(c *gin.Context, req *request.RoleMen
 
 	// 缓存清理移出事务
 	go func() {
-		if cacheErr := r.invalidateMenuCacheByRoleID(int64(req.RoleId)); cacheErr != nil {
+		if cacheErr := r.MenuRepo.InvalidateMenuCacheByRoleID(int64(req.RoleId)); cacheErr != nil {
 			zap.L().Error("缓存删除失败（需补偿）", zap.Int64("roleID", int64(req.RoleId)), zap.Error(cacheErr))
 		}
 	}()

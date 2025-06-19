@@ -13,3 +13,17 @@ type Middlewares struct {
 	Jwt    *jwt.JWT             // jwt
 	Config *config.Middleware   // 配置
 }
+
+func NewMiddlewares(
+	db *gorm.DB,
+	redis *redisx.RedisWrapper,
+	jwt *jwt.JWT,
+	c *config.Middleware,
+) *Middlewares {
+	return &Middlewares{
+		Db:     db,
+		Redis:  redis,
+		Jwt:    jwt,
+		Config: c,
+	}
+}

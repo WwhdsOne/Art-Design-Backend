@@ -6,15 +6,32 @@ import (
 	"github.com/google/wire"
 )
 
-var RepositoriesProvider = wire.NewSet(
-	db.NewUserDB,
-	db.NewMenuRepository,
-	db.NewRoleRepository,
-	db.NewGormTransactionManager,
-	db.NewRoleMenusRepository,
-	db.NewUserRolesRepository,
-	db.NewDigitPredictRepository,
-	db.NewAIModelRepository,
-	cache.NewAIModelCache,
+var RedisCacheProvider = wire.NewSet(
 	cache.NewAuthCache,
+	cache.NewRoleCache,
+	cache.NewMenuCache,
+	cache.NewUserCache,
+	cache.NewAIModelCache,
+)
+
+var DBProvider = wire.NewSet(
+	db.NewUserDB,
+	db.NewMenuDB,
+	db.NewRoleDB,
+	db.NewGormTransactionManager,
+	db.NewRoleMenusDB,
+	db.NewUserRolesDB,
+	db.NewDigitPredictDB,
+	db.NewAIModelDB,
+)
+
+var RepositoriesProvider = wire.NewSet(
+	DBProvider,
+	RedisCacheProvider,
+	NewUserRepo,
+	NewAIModelRepo,
+	NewRoleRepo,
+	NewMenuRepo,
+	NewAuthRepo,
+	NewDigitPredictRepo,
 )
