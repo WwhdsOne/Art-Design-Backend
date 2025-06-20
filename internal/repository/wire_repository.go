@@ -6,7 +6,7 @@ import (
 	"github.com/google/wire"
 )
 
-var RedisCacheProvider = wire.NewSet(
+var RedisCacheSet = wire.NewSet(
 	cache.NewAuthCache,
 	cache.NewRoleCache,
 	cache.NewMenuCache,
@@ -14,7 +14,7 @@ var RedisCacheProvider = wire.NewSet(
 	cache.NewAIModelCache,
 )
 
-var DBProvider = wire.NewSet(
+var DBSet = wire.NewSet(
 	db.NewUserDB,
 	db.NewMenuDB,
 	db.NewRoleDB,
@@ -25,9 +25,9 @@ var DBProvider = wire.NewSet(
 	db.NewAIModelDB,
 )
 
-var RepositoriesProvider = wire.NewSet(
-	DBProvider,
-	RedisCacheProvider,
+var RepositorySet = wire.NewSet(
+	DBSet,
+	RedisCacheSet,
 	wire.Struct(new(UserRepo), "*"),
 	wire.Struct(new(AIModelRepo), "*"),
 	wire.Struct(new(RoleRepo), "*"),

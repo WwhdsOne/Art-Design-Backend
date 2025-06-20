@@ -14,8 +14,6 @@ import (
 	"Art-Design-Backend/internal/repository/cache"
 	"Art-Design-Backend/internal/repository/db"
 	"Art-Design-Backend/internal/service"
-	"Art-Design-Backend/pkg/ai"
-	"Art-Design-Backend/pkg/middleware"
 )
 
 // Injectors from wire.go:
@@ -28,9 +26,9 @@ func wireApp() *bootstrap.HttpServer {
 	gormDB := bootstrap.InitGorm(configConfig, logger)
 	redisWrapper := bootstrap.InitRedis(configConfig)
 	jwt := bootstrap.InitJWT(configConfig)
-	configMiddleware := config.ProviderMiddlewareConfig()
-	middlewares := middleware.NewMiddlewares(gormDB, redisWrapper, jwt, configMiddleware)
-	engine := bootstrap.InitGin(middlewares, logger, configMiddleware)
+	middlewares := bootstrap.InitMiddleware(configConfig, gormDB, redisWrapper, jwt)
+	middleware := config.ProviderMiddlewareConfig()
+	engine := bootstrap.InitGin(middlewares, logger, middleware)
 	userDB := db.NewUserDB(gormDB)
 	userCache := cache.NewUserCache(redisWrapper)
 	roleCache := cache.NewRoleCache(redisWrapper)
@@ -109,7 +107,7 @@ func wireApp() *bootstrap.HttpServer {
 		AIModelDB:    aiModelDB,
 		AIModelCache: aiModelCache,
 	}
-	aiModelClient := ai.NewAIModelClient()
+	aiModelClient := bootstrap.InitAIModelClient()
 	aiModelService := &service.AIModelService{
 		AIModelRepo:   aiModelRepo,
 		AIModelClient: aiModelClient,

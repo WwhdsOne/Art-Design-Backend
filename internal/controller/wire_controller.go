@@ -5,41 +5,41 @@ import (
 	"github.com/google/wire"
 )
 
-var ControllersProvider = wire.NewSet(
-	AuthCtrlProvider,
-	UserCtrlProvider,
-	MenuCtrlProvider,
-	RoleCtrlProvider,
-	DigitPredictProvider,
-	AIModelCtrlProvider,
+var ControllerSet = wire.NewSet(
+	AuthCtrlSet,
+	UserCtrlSet,
+	MenuCtrlSet,
+	RoleCtrlSet,
+	DigitPredictSet,
+	AIModelCtrlSet,
 )
 
-var AuthCtrlProvider = wire.NewSet(
+var AuthCtrlSet = wire.NewSet(
 	NewAuthController,
 	wire.Struct(new(service.AuthService), "*"),
 )
 
-var UserCtrlProvider = wire.NewSet(
+var UserCtrlSet = wire.NewSet(
 	NewUserController,
 	wire.Struct(new(service.UserService), "*"),
 )
 
-var MenuCtrlProvider = wire.NewSet(
+var MenuCtrlSet = wire.NewSet(
 	NewMenuController,
 	wire.Struct(new(service.MenuService), "*"),
 )
 
-var RoleCtrlProvider = wire.NewSet(
+var RoleCtrlSet = wire.NewSet(
 	NewRoleController,
 	wire.Struct(new(service.RoleService), "*"),
 )
 
-var DigitPredictProvider = wire.NewSet(
+var DigitPredictSet = wire.NewSet(
 	NewDigitPredictController,
 	wire.Struct(new(service.DigitPredictService), "*"),
 )
 
-var AIModelCtrlProvider = wire.NewSet(
+var AIModelCtrlSet = wire.NewSet(
 	NewAIModelController,
 	wire.Struct(new(service.AIModelService), "*"),
 )
