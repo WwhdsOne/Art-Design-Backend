@@ -72,12 +72,15 @@ func (a *AIModelService) ChatCompletion(c *gin.Context, r *request.ChatCompletio
 		zap.L().Error("获取AI模型失败", zap.Int64("model_id", modelID), zap.Error(err))
 		return
 	}
-	if err = a.AIModelClient.ChatStream(c,
-		modelInfo.BaseURL,
-		modelInfo.APIKey,
-		ai.DefaultStreamChatRequest(modelInfo.Model, r.Messages)); err != nil {
+
+	reqData := ai.DefaultStreamChatRequest(modelInfo.Model, r.Messages)
+
+	// 直接调用新版 ChatStreamWithWriter
+	err = a.AIModelClient.ChatStreamWithWriter(c.Request.Context(), c.Writer, modelInfo.BaseURL, modelInfo.APIKey, reqData)
+	if err != nil {
 		zap.L().Error("AI模型聊天失败", zap.Error(err))
-		return
+		return err
 	}
-	return
+
+	return nil
 }
