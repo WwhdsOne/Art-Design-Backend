@@ -53,14 +53,3 @@ func (u *UserRolesDB) AddRolesToUser(c context.Context, userID int64, roleIDList
 	}
 	return
 }
-
-func (u *UserRolesDB) GetReducedRoleList(ctx context.Context) (roleList []*entity.Role, err error) {
-	if err = DB(ctx, u.db).
-		Select("id", "name").
-		Where("status = 1").
-		Find(&roleList).Error; err != nil {
-		err = errors.WrapDBError(err, "获取精简角色列表失败")
-		return
-	}
-	return
-}

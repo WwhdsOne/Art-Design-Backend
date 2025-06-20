@@ -98,7 +98,7 @@ func (m *MenuService) UpdateMenu(c context.Context, r *request.Menu) (err error)
 		return
 	}
 	go func() {
-		if err := m.MenuRepo.InvalidAllMenuCache(context.TODO()); err != nil {
+		if err := m.MenuRepo.InvalidAllMenuCache(); err != nil {
 			zap.L().Error("更新菜单时,删除菜单缓存失败", zap.Error(err))
 		}
 	}()
@@ -140,7 +140,7 @@ func (m *MenuService) UpdateMenuAuth(c *gin.Context, r *request.MenuAuth) (err e
 		return
 	}
 	go func() {
-		if err := m.MenuRepo.InvalidAllMenuCache(context.TODO()); err != nil {
+		if err := m.MenuRepo.InvalidAllMenuCache(); err != nil {
 			zap.L().Error("删除菜单权限缓存失败", zap.Error(err))
 		}
 	}()
@@ -171,7 +171,7 @@ func (m *MenuService) GetMenuList(c context.Context) (res []*response.Menu, err 
 	roleIDList, err = m.RoleRepo.GetRoleIDListByUserID(c, userID)
 
 	// Step 3. 尝试从缓存获取当前角色菜单列表
-	res, err = m.MenuRepo.GetMenuListByRoleIDListFromCache(c, roleIDList)
+	res, err = m.MenuRepo.GetMenuListByRoleIDListFromCache(roleIDList)
 	if err == nil {
 		return
 	}

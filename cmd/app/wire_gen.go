@@ -34,13 +34,25 @@ func wireApp() *bootstrap.HttpServer {
 	userDB := db.NewUserDB(gormDB)
 	userCache := cache.NewUserCache(redisWrapper)
 	roleCache := cache.NewRoleCache(redisWrapper)
-	userRepo := repository.NewUserRepo(userDB, userCache, roleCache)
+	userRepo := &repository.UserRepo{
+		UserDB:    userDB,
+		UserCache: userCache,
+		RoleCache: roleCache,
+	}
 	authCache := cache.NewAuthCache(redisWrapper)
-	authRepo := repository.NewAuthRepo(authCache)
+	authRepo := &repository.AuthRepo{
+		AuthCache: authCache,
+	}
 	roleDB := db.NewRoleDB(gormDB)
 	roleMenusDB := db.NewRoleMenusDB(gormDB)
 	userRolesDB := db.NewUserRolesDB(gormDB)
-	roleRepo := repository.NewRoleRepo(roleDB, roleMenusDB, roleCache, userCache, userRolesDB)
+	roleRepo := &repository.RoleRepo{
+		RoleDB:      roleDB,
+		RoleMenusDB: roleMenusDB,
+		RoleCache:   roleCache,
+		UserCache:   userCache,
+		UserRolesDB: userRolesDB,
+	}
 	gormTransactionManager := db.NewGormTransactionManager(gormDB)
 	defaultUserConfig := config.ProvideDefaultUserConfig()
 	authService := &service.AuthService{
@@ -62,9 +74,13 @@ func wireApp() *bootstrap.HttpServer {
 		DefaultUserConfig: defaultUserConfig,
 	}
 	userController := controller.NewUserController(engine, middlewares, userService)
-	menuDB := db.NewMenuDB(gormDB)
 	menuCache := cache.NewMenuCache(redisWrapper)
-	menuRepo := repository.NewMenuRepo(menuDB, menuCache, roleMenusDB)
+	menuDB := db.NewMenuDB(gormDB)
+	menuRepo := &repository.MenuRepo{
+		MenuCache:   menuCache,
+		MenuDB:      menuDB,
+		RoleMenusDB: roleMenusDB,
+	}
 	menuService := &service.MenuService{
 		MenuRepo: menuRepo,
 		RoleRepo: roleRepo,
@@ -77,7 +93,9 @@ func wireApp() *bootstrap.HttpServer {
 	}
 	roleController := controller.NewRoleController(engine, middlewares, roleService)
 	digitPredictDB := db.NewDigitPredictDB(gormDB)
-	digitPredictRepo := repository.NewDigitPredictRepo(digitPredictDB)
+	digitPredictRepo := &repository.DigitPredictRepo{
+		DigitPredictDB: digitPredictDB,
+	}
 	digitPredict := bootstrap.InitDigitPredict(configConfig)
 	digitPredictService := &service.DigitPredictService{
 		DigitPredictRepo:   digitPredictRepo,
@@ -87,7 +105,10 @@ func wireApp() *bootstrap.HttpServer {
 	digitPredictController := controller.NewDigitPredictController(engine, middlewares, digitPredictService)
 	aiModelDB := db.NewAIModelDB(gormDB)
 	aiModelCache := cache.NewAIModelCache(redisWrapper)
-	aiModelRepo := repository.NewAIModelRepo(aiModelDB, aiModelCache)
+	aiModelRepo := &repository.AIModelRepo{
+		AIModelDB:    aiModelDB,
+		AIModelCache: aiModelCache,
+	}
 	aiModelClient := ai.NewAIModelClient()
 	aiModelService := &service.AIModelService{
 		AIModelRepo:   aiModelRepo,

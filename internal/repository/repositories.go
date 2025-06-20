@@ -28,10 +28,10 @@ var DBProvider = wire.NewSet(
 var RepositoriesProvider = wire.NewSet(
 	DBProvider,
 	RedisCacheProvider,
-	NewUserRepo,
-	NewAIModelRepo,
-	NewRoleRepo,
-	NewMenuRepo,
-	NewAuthRepo,
-	NewDigitPredictRepo,
+	wire.Struct(new(UserRepo), "*"),
+	wire.Struct(new(AIModelRepo), "*"),
+	wire.Struct(new(RoleRepo), "*"),
+	wire.Struct(new(MenuRepo), "*"),
+	wire.Struct(new(AuthRepo), "*"),
+	wire.Struct(new(DigitPredictRepo), "*"),
 )

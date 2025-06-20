@@ -79,7 +79,7 @@ func buildMenuCacheKey(roleIDList []int64) string {
 	})
 	return fmt.Sprintf(rediskey.MenuListRole+"%s", strings.Join(strings.Split(fmt.Sprint(roleIDList), " "), "_"))
 }
-func (m *MenuCache) GetMenuListByRoleIDList(roleIDList []int64) (menu []*response.Menu, err error) {
+func (m *MenuCache) GetMenuListByRoleIDListFromCache(roleIDList []int64) (menu []*response.Menu, err error) {
 	key := buildMenuCacheKey(roleIDList)
 	val, err := m.redis.Get(key)
 	if err != nil {

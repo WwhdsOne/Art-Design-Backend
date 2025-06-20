@@ -70,7 +70,7 @@ func (r *RoleService) UpdateRole(c *gin.Context, roleReq *request.Role) (err err
 		return
 	}
 	go func(roleID int64) {
-		if err := r.RoleRepo.InvalidRoleInfoCache(context.Background(), roleID); err != nil {
+		if err := r.RoleRepo.InvalidRoleInfoCache(roleID); err != nil {
 			zap.L().Error("用户信息缓存删除失败（需补偿）", zap.Int64("roleID", roleID), zap.Error(err))
 		}
 	}(roleDo.ID)

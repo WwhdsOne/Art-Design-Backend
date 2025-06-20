@@ -149,14 +149,3 @@ func (m *MenuDB) GetMenuIDListByRoleIDList(c context.Context, roleIDList []int64
 	}
 	return
 }
-
-func (m *MenuDB) GetMenuIDListByRoleID(c context.Context, roleID int64) (menuIDList []int64, err error) {
-	if err = DB(c, m.db).
-		Model(&entity.RoleMenus{}).
-		Where("role_id = ?", roleID).
-		Pluck("menu_id", &menuIDList).Error; err != nil {
-		err = errors.WrapDBError(err, "获取角色菜单关联信息失败")
-		return
-	}
-	return
-}

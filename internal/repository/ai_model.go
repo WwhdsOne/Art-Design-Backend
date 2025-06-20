@@ -2,7 +2,6 @@ package repository
 
 import (
 	"Art-Design-Backend/internal/model/entity"
-	"Art-Design-Backend/internal/model/query"
 	"Art-Design-Backend/internal/model/response"
 	"Art-Design-Backend/internal/repository/cache"
 	"Art-Design-Backend/internal/repository/db"
@@ -14,55 +13,33 @@ import (
 )
 
 type AIModelRepo struct {
-	aiModelDB    *db.AIModelDB
-	aiModelCache *cache.AIModelCache
-}
-
-func NewAIModelRepo(
-	aiModelDB *db.AIModelDB,
-	aiModelCache *cache.AIModelCache,
-) *AIModelRepo {
-	return &AIModelRepo{
-		aiModelDB:    aiModelDB,
-		aiModelCache: aiModelCache,
-	}
-}
-
-func (a *AIModelRepo) CheckAIDuplicate(c context.Context, model *entity.AIModel) (err error) {
-	return a.aiModelDB.CheckAIDuplicate(c, model)
-}
-
-func (a *AIModelRepo) Create(c context.Context, e *entity.AIModel) (err error) {
-	return a.aiModelDB.Create(c, e)
+	*db.AIModelDB
+	*cache.AIModelCache
 }
 
 func (a *AIModelRepo) GetAIModelByID(c context.Context, id int64) (res *entity.AIModel, err error) {
-	res, err = a.aiModelCache.GetModelInfo(id)
+	res, err = a.AIModelCache.GetModelInfo(id)
 	if err != nil {
 		zap.L().Warn("获取AI模型缓存失败", zap.Error(err))
 	}
-	res, err = a.aiModelDB.GetAIModelByID(c, id)
+	res, err = a.AIModelDB.GetAIModelByID(c, id)
 	if err != nil {
 		return
 	}
 	go func(res *entity.AIModel) {
-		if err = a.aiModelCache.SetModelInfo(res); err != nil {
+		if err = a.AIModelCache.SetModelInfo(res); err != nil {
 			zap.L().Warn("设置AI模型缓存失败", zap.Error(err))
 		}
 	}(res)
 	return
 }
 
-func (a *AIModelRepo) GetAIModelPage(c context.Context, q *query.AIModel) (pageRes []*entity.AIModel, total int64, err error) {
-	return a.aiModelDB.GetAIModelPage(c, q)
-}
-
 func (a *AIModelRepo) GetSimpleModelList(c context.Context) (res []*response.SimpleAIModel, err error) {
-	res, err = a.aiModelCache.GetSimpleModelList()
+	res, err = a.AIModelCache.GetSimpleModelList()
 	if err != nil && !errors.Is(err, redis.Nil) {
 		zap.L().Warn("获取AI模型简洁信息列表缓存失败", zap.Error(err))
 	}
-	list, err := a.aiModelDB.GetSimpleModelList(c)
+	list, err := a.AIModelDB.GetSimpleModelList(c)
 	if err != nil {
 		return
 	}
@@ -75,7 +52,7 @@ func (a *AIModelRepo) GetSimpleModelList(c context.Context) (res []*response.Sim
 	}
 	// 写入缓存
 	go func(model []*response.SimpleAIModel) {
-		if err = a.aiModelCache.SetSimpleModelList(model); err != nil {
+		if err = a.AIModelCache.SetSimpleModelList(model); err != nil {
 			zap.L().Warn("设置AI模型简洁信息列表缓存失败", zap.Error(err))
 		}
 	}(res)
