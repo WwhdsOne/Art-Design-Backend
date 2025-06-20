@@ -5,84 +5,138 @@
 # 项目结构
 
 ```shell
-.
-├── cmd/                        # 应用程序入口
-│   └── app/
-│       ├── main.go            # 主程序入口
-│       ├── run_server.go      # 启动服务逻辑
-│       ├── wire.go            # Wire 注入定义
-│       └── wire_gen.go        # Wire 自动生成文件（勿手动修改）
-├── config/                    # 配置加载与初始化
-│   ├── config.go              # 全局配置结构定义
-├── internal/                  # 内部应用逻辑（核心业务）
-│   ├── bootstrap/             # 各模块初始化
-│   ├── controller/            # 控制器（HTTP 接口）
-│   ├── model/                 # 数据模型（Entity、Request、Response）
-│   ├── repository/            # 数据访问层
-│   └── service/               # 业务逻辑层
-├── pkg/                       # 可复用的独立工具库
-│   ├── aliyun/oss_client.go   # OSS 客户端封装
-│   ├── authutils/             # 认证辅助函数
-│   ├── client/                # 外部服务客户端
-│   ├── constant/              # 常量定义（Redis Key、表名等）
-│   ├── container/             # 并发工具等封装
-│   ├── errors/                # 错误定义与分类
-│   ├── jwt/                   # JWT 工具
-│   ├── middleware/            # Gin 中间件集合
-│   ├── redisx/                # Redis 操作封装
-│   ├── result/                # 通用返回结构
-│   └── utils/                 # 工具函数库
-├── scripts/                   # 脚本工具（如构建脚本）
-│   └── build.sh               # 构建脚本
-├── Dockerfile                # Docker 构建配置
-├── go.mod / go.sum           # Go Modules 依赖
-├── LICENSE                   # 授权协议
-├── README.md                 # 项目说明
-├── commitlint.config.js      # Git 提交规范配置
-├── package.json              # husky相关依赖
+├── cmd                         # 应用程序入口目录（通常包含 main.go）
+│   └── app                     # 具体的应用主程序
+├── config                      # 配置加载逻辑（如初始化配置结构体等）
+├── configs                     # 配置文件目录（如 .yaml、.json 等）
+├── internal                    # 内部模块（按领域或功能划分）
+│   ├── bootstrap               # 项目启动流程，如初始化数据库、日志、依赖注入等
+│   ├── controller              # 控制器层（HTTP 接口逻辑）
+│   ├── model                   # 模型定义层
+│   │   ├── base                # 通用基础模型（如 BaseModel）
+│   │   ├── entity              # 与数据库结构对应的实体定义
+│   │   ├── query               # 查询结构体定义（用于参数组合、查询构造）
+│   │   ├── request             # 接收前端请求的结构体
+│   │   └── response            # 返回给前端的响应结构体
+│   ├── repository              # 仓储层（数据访问逻辑）
+│   │   ├── cache               # 缓存访问逻辑（通常是 Redis）
+│   │   └── db                  # 数据库访问逻辑（通常是 GORM/SQL）
+│   └── service                 # 服务层（业务逻辑实现）
+├── pkg                         # 可复用的通用模块（第三方或自研工具）
+│   ├── ai                      # AI 模块（如模型推理、调用接口）
+│   ├── aliyun                 # 阿里云 SDK 封装（如短信、OSS）
+│   ├── authutils               # 鉴权工具包
+│   ├── constant                # 常量定义
+│   │   ├── rediskey            # Redis 键名常量
+│   │   └── tablename           # 表名常量
+│   ├── digit_client            # 数字识别客户端（如识图接口等）
+│   ├── errors                  # 自定义错误类型
+│   ├── jwt                     # JWT 生成与解析
+│   ├── middleware              # Gin 中间件集合
+│   ├── redisx                  # Redis 封装（连接池、通用方法）
+│   ├── result                  # 通用响应结构体（如统一的 Response 封装）
+│   └── utils                   # 工具函数（如字符串处理、时间格式化等）
+└── scripts                     # 启动脚本、部署脚本、数据库初始化等
 ```
 
 # 完整技术栈
 
 ```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffdfd3', 'edgeLabelBackground':'#fff', 'fontFamily': '"Microsoft YaHei", sans-serif'}}}%%
 graph TD
-    %% 全局样式
-    classDef frontend fill:#e1f5fe,stroke:#039be5,color:#01579b;
-    classDef backend fill:#e8f5e9,stroke:#43a047,color:#1b5e20;
-    classDef deploy fill:#f3e5f5,stroke:#8e24aa,color:#4a148c;
-    classDef db fill:#fff3e0,stroke:#fb8c00,color:#e65100;
-
-    %% 前端模块
-    subgraph 前端
-        direction TB
-        FrontendStack["Vue 3 + Element Plus + Pinia + Router + Vite + Axios"]
-        class FrontendStack frontend
+    subgraph 外部服务
+        A[PostgreSQL]
+        B[Redis]
+        C[阿里云OSS]
+        D[AI模型服务]
     end
 
-    %% 后端模块
-    subgraph 后端
-        direction TB
-        BackendCore["Go + Gin + Wire + Zap"]
-        Middleware["中间件 (JWT / 限流 / 日志 / 错误处理)"]
-        Storage["GORM (PostgreSQL) / go-redis (Redis)"]
-        Infra["校验器 / JSON库 / 日期库 / OSS"]
-        class BackendCore,Middleware,Storage,Infra backend
+    subgraph ArtDesignBackend
+        subgraph 基础设施层
+            Config[配置管理]
+            Logger[Zap日志系统]
+            DB[GORM数据库]
+            Cache[Redis客户端]
+            OSS[OSS客户端]
+            AIClient[AI服务客户端]
+        end
+
+        subgraph 核心层
+            subgraph 领域层
+                Models[领域模型]
+                Repositories[数据仓库]
+                Services[业务服务]
+            end
+
+            subgraph 接口层
+                Controllers[控制器]
+                Routes[路由管理]
+                Middleware[中间件]
+            end
+        end
+
+        subgraph 支撑层
+            Utils[工具包]
+            Auth[JWT认证]
+            Wire[依赖注入]
+            Gen[wire生成器]
+        end
     end
 
-    %% CI/CD 模块
-    subgraph 部署
-        direction TB
-        CICD["GitHub Actions + Docker"]
-        class CICD deploy
-    end
+    %% 依赖关系
+    Config -->|配置| DB
+    Config -->|配置| Cache
+    Config -->|配置| OSS
+    Config -->|配置| AIClient
+    Config -->|配置| Logger
+    
+    DB -->|持久化| A
+    Cache -->|缓存| B
+    OSS -->|文件存储| C
+    AIClient -->|调用| D
 
-    %% 连接关系
-    FrontendStack -->|HTTP| BackendCore
-    BackendCore --> Middleware
-    BackendCore --> Storage
-    BackendCore --> Infra
-    CICD --> BackendCore
+    Controllers -->|调用| Services
+    Services -->|依赖| Repositories
+    Repositories -->|操作| DB
+    Repositories -->|操作| Cache
+    
+    Middleware -->|鉴权| Auth
+    Middleware -->|日志| Logger
+    
+    %% Wire依赖注入关系
+    Wire -->|自动装配| Controllers
+    Wire -->|自动装配| Services
+    Wire -->|自动装配| Repositories
+    Wire -->|自动装配| DB
+    Wire -->|自动装配| Cache
+    Wire -->|自动装配| OSS
+    Wire -->|自动装配| AIClient
+    Wire -->|自动装配| Auth
+    
+    Gen -.->|生成代码| Wire
+    
+    Utils --> 核心层
+    Utils --> 基础设施层
+    
+    %% 框架依赖
+    Routes --> Gin
+    Controllers --> Gin
+    Middleware --> Gin
+    Auth --> JWT
 
+    classDef external fill:#f9d5bb,stroke:#666;
+    classDef infra fill:#d5e8d4,stroke:#338833;
+    classDef core fill:#e1d5e7,stroke:#884488;
+    classDef support fill:#fff2cc,stroke:#dd8800;
+    classDef framework fill:#dae8fc,stroke:#3366cc;
+    classDef generator fill:#ffcccc,stroke:#ff6666;
+    
+    class A,B,C,D external;
+    class Config,Logger,DB,Cache,OSS,AIClient infra;
+    class Models,Repositories,Services,Controllers,Routes,Middleware core;
+    class Utils,Auth,Wire support;
+    class Gin,JWT framework;
+    class Gen generator;
 ```
 
 # 注意事项
@@ -92,4 +146,6 @@ graph TD
 ```shell
 go get -u ./... && go mod tidy && go tool github.com/google/wire/cmd/wire ./...
 ```
+
+
 

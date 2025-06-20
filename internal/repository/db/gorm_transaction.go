@@ -26,16 +26,20 @@ func DB(ctx context.Context, fallback *gorm.DB) *gorm.DB {
 	return db.(*gorm.DB).WithContext(ctx)
 }
 
-func (s *GormTransactionManager) Transaction(ctx context.Context, f func(context.Context) error) error {
+func (s *GormTransactionManager) Transaction(ctx context.Context, f func(context.Context) error) (err error) {
 	tx := DB(ctx, s.db).Begin()
 	if tx.Error != nil {
 		return errors.WrapDBError(tx.Error, "开启事务失败")
 	}
 	c := context.WithValue(ctx, dbKey{}, tx)
-	err := f(c)
+	err = f(c)
 	if err != nil {
 		tx.Rollback()
 		return err
 	}
-	return tx.Commit().Error
+	err = tx.Commit().Error
+	if err != nil {
+		return errors.WrapDBError(err, "提交事务失败")
+	}
+	return
 }

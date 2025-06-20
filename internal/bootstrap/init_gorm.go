@@ -2,7 +2,6 @@ package bootstrap
 
 import (
 	"Art-Design-Backend/config"
-	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/pkg/utils"
 	"context"
 	"fmt"
@@ -11,11 +10,10 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 	"reflect"
+	"strings"
+	"sync"
 	"time"
 )
-
-// snowflakeIdFieldsMap 存储类型和对应的ID字段名
-var snowflakeIdFieldsMap = make(map[reflect.Type]string)
 
 // AutoMigrate 自动迁移
 func AutoMigrate(db *gorm.DB) {
@@ -33,6 +31,9 @@ func AutoMigrate(db *gorm.DB) {
 	//db.AutoMigrate(&entity.AIModel{})
 }
 
+// snowflakeIdFieldsMap 存储类型和对应的ID字段名
+var snowflakeIdFieldsMap sync.Map // key: reflect.Type, value: string
+
 // snowflakeIDPlugin GORM插件实现
 type snowflakeIDPlugin struct{}
 
@@ -49,38 +50,56 @@ func (p *snowflakeIDPlugin) initialize(db *gorm.DB) (err error) {
 	return
 }
 
-// registerIDField 注册需要自动生成ID的模型和字段（基于类型而非具体值）
-func registerIDField(model interface{}, fieldName string) {
-	// 获取模型的类型（如果是指针，则取指向的类型）
-	t := reflect.TypeOf(model)
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
+func detectSnowflakeIDField(t reflect.Type) string {
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		// 优先识别 `gorm:"primaryKey"` 或 `gorm:"autoSnowflake"` 之类的标记
+		if field.Type.Kind() == reflect.Int64 {
+			if gormTag := field.Tag.Get("gorm"); strings.Contains(gormTag, "primaryKey") {
+				return field.Name
+			}
+			if strings.EqualFold(field.Name, "ID") {
+				return field.Name
+			}
+		}
 	}
-	// 存储类型和对应的ID字段名
-	snowflakeIdFieldsMap[t] = fieldName
+	return ""
+}
+
+func (p *snowflakeIDPlugin) setID(db *gorm.DB, fieldName string) {
+	modelValue := reflect.ValueOf(db.Statement.Model)
+	if modelValue.Kind() == reflect.Ptr {
+		modelValue = modelValue.Elem()
+	}
+
+	field := modelValue.FieldByName(fieldName)
+	if !field.IsValid() || !field.CanSet() || field.Kind() != reflect.Int64 {
+		return
+	}
+	if field.Int() == 0 {
+		field.SetInt(utils.GenerateSnowflakeId())
+	}
 }
 
 func (p *snowflakeIDPlugin) generateID(db *gorm.DB) {
-
-	// 获取模型类型
-	modelType := reflect.TypeOf(db.Statement.Model)
+	model := db.Statement.Model
+	modelType := reflect.TypeOf(model)
 	if modelType.Kind() == reflect.Ptr {
 		modelType = modelType.Elem()
 	}
 
-	// 如果存在
-	if loadedFieldName, exist := snowflakeIdFieldsMap[modelType]; exist {
-		// 获取字段
-		fieldName := loadedFieldName
-		modelValue := reflect.ValueOf(db.Statement.Model).Elem()
-		field := modelValue.FieldByName(fieldName)
-		// 如果字段为0，则设置雪花ID
-		if field.Int() == 0 {
-			field.SetInt(utils.GenerateSnowflakeId())
-		}
+	// 缓存中查找字段
+	if fieldNameRaw, ok := snowflakeIdFieldsMap.Load(modelType); ok {
+		p.setID(db, fieldNameRaw.(string))
+		return
 	}
-	// 不存在直接返回
-	return
+
+	// 没找到就首次分析结构体，记录字段
+	fieldName := detectSnowflakeIDField(modelType)
+	if fieldName != "" {
+		snowflakeIdFieldsMap.Store(modelType, fieldName)
+		p.setID(db, fieldName)
+	}
 }
 
 // zapGormLogger 实现 gorm.Logger.Interface
@@ -161,16 +180,6 @@ func InitGorm(cfg *config.Config, log *zap.Logger) (DB *gorm.DB) {
 	if err != nil {
 		log.Fatal("数据库连接失败")
 		return
-	}
-
-	// 注册模型应当自动填充雪花ID的字段
-	{
-		registerIDField(&entity.Role{}, "ID")
-		registerIDField(&entity.User{}, "ID")
-		registerIDField(&entity.OperationLog{}, "ID")
-		registerIDField(&entity.Menu{}, "ID")
-		registerIDField(&entity.DigitPredict{}, "ID")
-		registerIDField(&entity.AIModel{}, "ID")
 	}
 
 	// 雪花ID插件
