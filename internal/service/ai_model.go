@@ -24,7 +24,7 @@ type AIModelService struct {
 func (a *AIModelService) CreateAIModel(c context.Context, r *request.AIModel) (err error) {
 	var aiModel entity.AIModel
 	_ = copier.Copy(&aiModel, &r)
-	if err = a.AIModelRepo.CheckAIDuplicate(context.TODO(), &aiModel); err != nil {
+	if err = a.AIModelRepo.CheckAIDuplicate(c, &aiModel); err != nil {
 		zap.L().Error("AI模型已存在", zap.Error(err))
 		return
 	}

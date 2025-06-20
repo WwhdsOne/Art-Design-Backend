@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"github.com/gin-gonic/gin"
 	"github.com/mssola/useragent"
+	"github.com/patrickmn/go-cache"
 	"go.uber.org/zap"
 	"io"
 	"time"
@@ -23,20 +24,20 @@ type uaParsed struct {
 func (m *Middlewares) OperationLoggerMiddleware() gin.HandlerFunc {
 	loggerChan := make(chan *entity.OperationLog, m.Config.OperationLog.LogChannelBufferSize)
 
-	maxUACacheSize := m.Config.OperationLog.MaxUACacheSize
-	// UA 缓存（map + FIFO keys）
-	uaCache := make(map[string]*uaParsed)
-	uaKeys := make([]string, 0, maxUACacheSize)
+	// 使用 go-cache：ttl = 永久（不主动过期），清理间隔也可以设长一点
+	uaCache := cache.New(1*time.Hour, 10*time.Minute)
 
-	// 后台异步处理日志写入
+	// 异步日志写入逻辑
 	go func() {
-		for log := range loggerChan {
-			uaStr := log.UserAgent
+		for logItem := range loggerChan {
+			uaStr := logItem.UserAgent
 			var parsed *uaParsed
 
-			if val, ok := uaCache[uaStr]; ok {
-				parsed = val
+			// 优先读取缓存
+			if val, found := uaCache.Get(uaStr); found {
+				parsed = val.(*uaParsed)
 			} else {
+				// 解析 UA 并缓存
 				ua := useragent.New(uaStr)
 				browser, version := ua.Browser()
 				parsed = &uaParsed{
@@ -45,25 +46,17 @@ func (m *Middlewares) OperationLoggerMiddleware() gin.HandlerFunc {
 					OS:       ua.OS(),
 					Platform: ua.Platform(),
 				}
-
-				// 缓存维护
-				if len(uaKeys) >= maxUACacheSize {
-					oldest := uaKeys[0]
-					uaKeys = uaKeys[1:]
-					delete(uaCache, oldest)
-				}
-				uaKeys = append(uaKeys, uaStr)
-				uaCache[uaStr] = parsed
+				uaCache.Set(uaStr, parsed, cache.DefaultExpiration)
 			}
 
-			// 写入解析结果
-			log.Browser = parsed.Browser
-			log.BrowserVersion = parsed.Version
-			log.OS = parsed.OS
-			log.Platform = parsed.Platform
+			// 写入解析信息
+			logItem.Browser = parsed.Browser
+			logItem.BrowserVersion = parsed.Version
+			logItem.OS = parsed.OS
+			logItem.Platform = parsed.Platform
 
 			// 写入数据库
-			if err := m.Db.Create(log).Error; err != nil {
+			if err := m.Db.Create(logItem).Error; err != nil {
 				zap.L().Error("保存操作日志失败", zap.Error(err))
 			}
 		}

@@ -115,7 +115,7 @@ func (s *AuthService) Register(c *gin.Context, userReq *request.RegisterUser) (e
 	// 随机设置头像
 	user.Avatar = s.DefaultUserConfig.Avatars[utils.GenerateRandomNumber(0, len(s.DefaultUserConfig.Avatars))]
 	// 判重
-	if err = s.UserRepo.CheckUserDuplicate(context.TODO(), &user); err != nil {
+	if err = s.UserRepo.CheckUserDuplicate(c, &user); err != nil {
 		return
 	}
 	// 启用事务插入用户表和用户角色关联表

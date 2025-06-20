@@ -92,7 +92,7 @@ func (u *UserService) UpdateUserBaseInfo(c context.Context, userReq *request.Use
 	if userReq.Phone != "" {
 		userDo.Phone = &userReq.Phone
 	}
-	if err = u.UserRepo.CheckUserDuplicate(context.TODO(), &userDo); err != nil {
+	if err = u.UserRepo.CheckUserDuplicate(c, &userDo); err != nil {
 		return
 	}
 	if err = u.UserRepo.UpdateUser(c, &userDo); err != nil {
@@ -216,7 +216,7 @@ func (u *UserService) UpdateUserRoleBinding(c *gin.Context, req *request.UserRol
 	}
 	// 缓存清理移出事务
 	go func(userID int64, originalRoleIDList []int64) {
-		if err := u.UserRepo.InvalidUserRoleCache(context.TODO(), userID, originalRoleIDList); err != nil {
+		if err := u.UserRepo.InvalidUserRoleCache(c, userID, originalRoleIDList); err != nil {
 			zap.L().Error("用户变更角色信息删除缓存失败", zap.Int64("userID", userID), zap.Error(err))
 		}
 	}(int64(req.UserId), req.OriginalRoleIds)

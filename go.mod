@@ -17,6 +17,7 @@ require (
 	github.com/google/wire v0.6.0
 	github.com/jinzhu/copier v0.4.0
 	github.com/mssola/useragent v1.0.0
+	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/redis/go-redis/v9 v9.10.0
 	github.com/shopspring/decimal v1.4.0
 	github.com/sony/sonyflake v1.2.1

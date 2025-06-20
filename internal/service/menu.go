@@ -87,7 +87,7 @@ func (m *MenuService) UpdateMenu(c context.Context, r *request.Menu) (err error)
 		zap.L().Error("菜单属性复制失败", zap.Error(err))
 		return
 	}
-	err = m.MenuRepo.CheckMenuDuplicate(context.TODO(), &menuDo)
+	err = m.MenuRepo.CheckMenuDuplicate(c, &menuDo)
 	if err != nil {
 		zap.L().Error("更新菜单时,菜单名称重复", zap.Error(err))
 		return
@@ -129,7 +129,7 @@ func (m *MenuService) UpdateMenuAuth(c *gin.Context, r *request.MenuAuth) (err e
 		zap.L().Error("权限参数复制失败", zap.Error(err))
 		return
 	}
-	err = m.MenuRepo.CheckMenuDuplicate(context.TODO(), &menu)
+	err = m.MenuRepo.CheckMenuDuplicate(c, &menu)
 	if err != nil {
 		zap.L().Error("菜单权限重复", zap.Error(err))
 		return
