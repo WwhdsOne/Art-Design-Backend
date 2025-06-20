@@ -1,13 +1,13 @@
 package entity
 
 import (
-	"Art-Design-Backend/internal/model/base"
+	"Art-Design-Backend/internal/model/common"
 	"Art-Design-Backend/pkg/constant/tablename"
 )
 
 // Role 定义角色模型
 type Role struct {
-	base.BaseModel
+	common.BaseModel
 	Name        string `gorm:"type:varchar(30);not null;unique;comment:角色名称"`
 	Code        string `gorm:"type:varchar(30);not null;unique;comment:角色编码"`
 	Description string `gorm:"type:varchar(256);comment:角色描述"`

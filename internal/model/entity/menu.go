@@ -1,12 +1,12 @@
 package entity
 
 import (
-	"Art-Design-Backend/internal/model/base"
+	"Art-Design-Backend/internal/model/common"
 	"Art-Design-Backend/pkg/constant/tablename"
 )
 
 type Menu struct {
-	base.BaseModel
+	common.BaseModel
 	Name      *string `gorm:"type:varchar(30);unique;comment:组件名称"`
 	Type      int8    `gorm:"type:smallint;not null;default:1;comment:类型（1：目录；2：菜单；3：按钮）"`
 	Path      *string `gorm:"type:varchar(255);unique;comment:路由地址"`

@@ -1,8 +1,8 @@
 package query
 
-import "Art-Design-Backend/internal/model/base"
+import "Art-Design-Backend/internal/model/common"
 
 type Role struct {
 	Name string `json:"name"`
-	base.PaginationReq
+	common.PaginationReq
 }

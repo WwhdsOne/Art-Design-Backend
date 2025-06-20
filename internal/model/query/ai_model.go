@@ -1,11 +1,11 @@
 package query
 
 import (
-	"Art-Design-Backend/internal/model/base"
+	"Art-Design-Backend/internal/model/common"
 )
 
 type AIModel struct {
-	base.PaginationReq
+	common.PaginationReq
 	Model     *string `json:"model"`
 	Provider  *string `json:"provider"`
 	Enabled   *bool   `json:"enabled"`

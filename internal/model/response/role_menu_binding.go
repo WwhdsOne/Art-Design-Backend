@@ -1,8 +1,8 @@
 package response
 
-import "Art-Design-Backend/internal/model/base"
+import "Art-Design-Backend/internal/model/common"
 
 type RoleMenuBinding struct {
-	Menus      []*SimpleMenu      `json:"menus"`
-	HasMenuIDs base.LongStringIDs `json:"has_menu_ids"`
+	Menus      []*SimpleMenu        `json:"menus"`
+	HasMenuIDs common.LongStringIDs `json:"has_menu_ids"`
 }

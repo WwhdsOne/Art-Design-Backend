@@ -2,7 +2,7 @@ package service
 
 import (
 	"Art-Design-Backend/config"
-	"Art-Design-Backend/internal/model/base"
+	"Art-Design-Backend/internal/model/common"
 	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/internal/model/query"
 	"Art-Design-Backend/internal/model/request"
@@ -55,7 +55,7 @@ func (u *UserService) GetUserById(c context.Context) (res response.User, err err
 	return
 }
 
-func (u *UserService) GetUserPage(c context.Context, query *query.User) (resp *base.PaginationResp[response.User], err error) {
+func (u *UserService) GetUserPage(c context.Context, query *query.User) (resp *common.PaginationResp[response.User], err error) {
 	users, total, err := u.UserRepo.GetUserPage(c, query)
 	if err != nil {
 		return
@@ -76,7 +76,7 @@ func (u *UserService) GetUserPage(c context.Context, query *query.User) (resp *b
 		userResponses = append(userResponses, userResp)
 	}
 
-	resp = base.BuildPageResp[response.User](userResponses, total, query.PaginationReq)
+	resp = common.BuildPageResp[response.User](userResponses, total, query.PaginationReq)
 	return
 }
 

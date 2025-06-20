@@ -1,13 +1,13 @@
 package entity
 
 import (
-	"Art-Design-Backend/internal/model/base"
+	"Art-Design-Backend/internal/model/common"
 	"Art-Design-Backend/pkg/constant/tablename"
 )
 
 // User 结构体定义了用户的基本信息
 type User struct {
-	base.BaseModel
+	common.BaseModel
 	Username     string   `gorm:"type:varchar(32);uniqueIndex;not null;comment:用户名"`
 	RealName     string   `gorm:"type:varchar(50);comment:真实姓名"`
 	Nickname     string   `gorm:"type:varchar(24);not null;comment:昵称"`

@@ -1,7 +1,7 @@
 package service
 
 import (
-	"Art-Design-Backend/internal/model/base"
+	"Art-Design-Backend/internal/model/common"
 	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/internal/model/query"
 	"Art-Design-Backend/internal/model/request"
@@ -38,7 +38,7 @@ func (r *RoleService) CreateRole(c context.Context, role *request.Role) (err err
 	return
 }
 
-func (r *RoleService) GetRolePage(c *gin.Context, roleQuery *query.Role) (rolePageRes *base.PaginationResp[response.Role], err error) {
+func (r *RoleService) GetRolePage(c *gin.Context, roleQuery *query.Role) (rolePageRes *common.PaginationResp[response.Role], err error) {
 	rolePage, total, err := r.RoleRepo.GetRolePage(c, roleQuery)
 	if err != nil {
 		return
@@ -52,7 +52,7 @@ func (r *RoleService) GetRolePage(c *gin.Context, roleQuery *query.Role) (rolePa
 		}
 		roleList = append(roleList, roleResp)
 	}
-	rolePageRes = base.BuildPageResp[response.Role](roleList, total, roleQuery.PaginationReq)
+	rolePageRes = common.BuildPageResp[response.Role](roleList, total, roleQuery.PaginationReq)
 	return
 }
 

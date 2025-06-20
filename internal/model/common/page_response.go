@@ -1,4 +1,4 @@
-package base
+package common
 
 type PaginationResp[T any] struct {
 	Size  int `json:"size"`

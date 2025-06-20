@@ -1,13 +1,13 @@
 package entity
 
 import (
-	"Art-Design-Backend/internal/model/base"
+	"Art-Design-Backend/internal/model/common"
 	"Art-Design-Backend/pkg/constant/tablename"
 	"github.com/shopspring/decimal"
 )
 
 type AIModel struct {
-	base.BaseModel
+	common.BaseModel
 
 	Model    string `gorm:"type:varchar(100);not null;comment:模型名称，例如 gpt-4"`
 	Provider string `gorm:"type:varchar(100);not null;comment:模型提供商，例如 openai"`

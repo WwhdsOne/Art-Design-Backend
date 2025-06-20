@@ -1,7 +1,7 @@
 package service
 
 import (
-	"Art-Design-Backend/internal/model/base"
+	"Art-Design-Backend/internal/model/common"
 	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/internal/model/query"
 	"Art-Design-Backend/internal/model/request"
@@ -42,7 +42,7 @@ func (a *AIModelService) GetSimpleModelList(c context.Context) (res []*response.
 	return
 }
 
-func (a *AIModelService) GetAIModelPage(c context.Context, q *query.AIModel) (res *base.PaginationResp[*response.AIModel], err error) {
+func (a *AIModelService) GetAIModelPage(c context.Context, q *query.AIModel) (res *common.PaginationResp[*response.AIModel], err error) {
 	var aiModel []*entity.AIModel
 	var total int64
 	if aiModel, total, err = a.AIModelRepo.GetAIModelPage(c, q); err != nil {
@@ -55,7 +55,7 @@ func (a *AIModelService) GetAIModelPage(c context.Context, q *query.AIModel) (re
 		_ = copier.Copy(&aiModelResp, model)
 		aiModelRes = append(aiModelRes, &aiModelResp)
 	}
-	res = base.BuildPageResp[*response.AIModel](aiModelRes, total, q.PaginationReq)
+	res = common.BuildPageResp[*response.AIModel](aiModelRes, total, q.PaginationReq)
 	return
 }
 

@@ -1,6 +1,7 @@
 package redisx
 
 import (
+	"Art-Design-Backend/pkg/errors"
 	"context"
 	"go.uber.org/zap"
 )
@@ -62,10 +63,9 @@ func (r *RedisWrapper) DelBySetMembers(setKey string) (err error) {
 	// 执行 Lua 脚本
 	_, err = r.Eval(script, []string{setKey})
 	if err != nil {
-		zap.L().Error("根据集合成员删除键失败", zap.String("setKey", setKey), zap.Error(err))
+		err = errors.WrapCacheError(err, "根据集合成员删除键失败")
 		return
 	}
 
-	zap.L().Info("根据集合成员删除键成功", zap.String("setKey", setKey))
 	return
 }

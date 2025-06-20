@@ -1,7 +1,7 @@
 package query
 
 import (
-	"Art-Design-Backend/internal/model/base"
+	"Art-Design-Backend/internal/model/common"
 )
 
 type User struct {
@@ -11,5 +11,5 @@ type User struct {
 	Username string `json:"username"`
 	Gender   int8   `json:"gender"`
 	Status   int8   `json:"status"`
-	base.PaginationReq
+	common.PaginationReq
 }

@@ -1,14 +1,14 @@
 package request
 
-import "Art-Design-Backend/internal/model/base"
+import "Art-Design-Backend/internal/model/common"
 
 type Menu struct {
-	ID        *base.LongStringID `json:"id" label:"菜单ID"`
-	Type      int8               `json:"type" binding:"required" label:"菜单类型"`
-	Name      string             `json:"name" binding:"required,min=2,max=20" label:"组件名称"`
-	Path      string             `json:"path" label:"路由地址"`
-	Component string             `json:"component" label:"组件路径"`
-	ParentID  base.LongStringID  `json:"parentID" binding:"required" label:"上级菜单ID"`
+	ID        *common.LongStringID `json:"id" label:"菜单ID"`
+	Type      int8                 `json:"type" binding:"required" label:"菜单类型"`
+	Name      string               `json:"name" binding:"required,min=2,max=20" label:"组件名称"`
+	Path      string               `json:"path" label:"路由地址"`
+	Component string               `json:"component" label:"组件路径"`
+	ParentID  common.LongStringID  `json:"parentID" binding:"required" label:"上级菜单ID"`
 	Meta      `json:"meta"`
 	Sort      int `json:"sort" label:"排序"`
 }

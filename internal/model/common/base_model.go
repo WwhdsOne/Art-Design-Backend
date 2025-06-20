@@ -1,4 +1,4 @@
-package base
+package common
 
 import (
 	"Art-Design-Backend/pkg/authutils"

@@ -1,8 +1,8 @@
 package request
 
-import "Art-Design-Backend/internal/model/base"
+import "Art-Design-Backend/internal/model/common"
 
 type DigitPredict struct {
-	ID    base.LongStringID `json:"id" label:"ID" binding:"required"`
-	Image string            `json:"image" label:"图片URL" binding:"required"`
+	ID    common.LongStringID `json:"id" label:"ID" binding:"required"`
+	Image string              `json:"image" label:"图片URL" binding:"required"`
 }
