@@ -1,26 +1,28 @@
 package config
 
 import (
-	"bytes"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"time"
 
-	"github.com/hashicorp/consul/api"
-	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
-	Server       Server            `mapstructure:"server"`
-	PostgreSql   PostgreSQLConfig  `mapstructure:"postgre_sql"`
-	Redis        Redis             `mapstructure:"redis"`
-	JWT          JWT               `mapstructure:"jwt"`
-	Zap          Zap               `mapstructure:"zap"`
-	OSS          OSS               `mapstructure:"oss"`
-	DigitPredict DigitPredict      `mapstructure:"digit_predict"`
-	DefaultUser  DefaultUserConfig `mapstructure:"default_user"`
-	Middleware   Middleware        `mapstructure:"middleware"`
+	Server       Server            `yaml:"server" mapstructure:"server"`
+	PostgreSql   PostgreSQLConfig  `yaml:"postgre_sql" mapstructure:"postgre_sql"`
+	Redis        Redis             `yaml:"redis" mapstructure:"redis"`
+	JWT          JWT               `yaml:"jwt" mapstructure:"jwt"`
+	Zap          Zap               `yaml:"zap" mapstructure:"zap"`
+	OSS          OSS               `yaml:"oss" mapstructure:"oss"`
+	DigitPredict DigitPredict      `yaml:"digit_predict" mapstructure:"digit_predict"`
+	DefaultUser  DefaultUserConfig `yaml:"default_user" mapstructure:"default_user"`
+	Middleware   Middleware        `yaml:"middleware" mapstructure:"middleware"`
 }
 
 var globalConfig *Config
@@ -33,85 +35,89 @@ func ProviderMiddlewareConfig() *Middleware {
 	return &globalConfig.Middleware
 }
 
-func GetConfig() *Config {
-	return globalConfig
-}
-
 func setGlobalConfig(cfg *Config) {
 	globalConfig = cfg
 }
 
-func parseYAMLToConfig(data []byte) (*Config, error) {
-	v := viper.New()
-	v.SetConfigType("yaml")
+var lastIndex string
 
-	if err := v.ReadConfig(bytes.NewBuffer(data)); err != nil {
-		return nil, fmt.Errorf("读取配置失败: %w", err)
-	}
-
-	cfg := &Config{}
-	if err := v.Unmarshal(cfg); err != nil {
-		return nil, fmt.Errorf("反序列化失败: %w", err)
-	}
-
-	return cfg, nil
+type consulKV struct {
+	Value string `json:"Value"` // base64 编码内容
 }
 
 func LoadConfig() *Config {
-	config := api.DefaultConfig()
-	if addr := os.Getenv("CONSUL_ADDR"); addr != "" {
-		config.Address = addr
-		log.Println("使用自定义 Consul 地址:", addr)
-	} else {
-		log.Fatalf("未设置 CONSUL_ADDR 环境变量")
+	consulAddr := os.Getenv("CONSUL_ADDR")
+	if consulAddr == "" {
+		log.Fatal("❌ 未设置 CONSUL_ADDR 环境变量")
+	}
+	configKey := os.Getenv("CONSUL_CONFIG_KEY")
+	if configKey == "" {
+		log.Fatal("❌ 未设置 CONSUL_CONFIG_KEY 环境变量")
 	}
 
-	client, err := api.NewClient(config)
+	url := fmt.Sprintf("http://%s/v1/kv/%s", consulAddr, configKey)
+	resp, err := http.Get(url)
 	if err != nil {
-		log.Fatalf("无法连接 Consul: %v", err)
+		log.Fatalf("❌ 获取配置失败: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		log.Fatalf("❌ Consul 返回错误状态码: %d", resp.StatusCode)
 	}
 
-	key := os.Getenv("CONSUL_CONFIG_KEY")
-	if key == "" {
-		log.Fatal("未设置 CONSUL_CONFIG_KEY 环境变量")
-	}
-	kv := client.KV()
-
-	kvPair, _, err := kv.Get(key, nil)
-	if err != nil || kvPair == nil {
-		log.Fatalf("首次加载配置失败（Consul 无此 key）: %v", err)
-	}
-
-	cfg, err := parseYAMLToConfig(kvPair.Value)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatalf("YAML 解析失败: %v", err)
+		log.Fatalf("❌ 读取配置响应失败: %v", err)
+	}
+
+	var kvs []consulKV
+	if err := json.Unmarshal(data, &kvs); err != nil || len(kvs) == 0 {
+		log.Fatalf("❌ 配置格式错误: %v", err)
+	}
+
+	decoded, err := base64.StdEncoding.DecodeString(kvs[0].Value)
+	if err != nil {
+		log.Fatalf("❌ base64 解码失败: %v", err)
+	}
+
+	cfg := &Config{}
+	if err := yaml.Unmarshal(decoded, cfg); err != nil {
+		log.Fatalf("❌ YAML 解析失败: %v", err)
 	}
 
 	setGlobalConfig(cfg)
 	log.Println("✅ 初始配置加载成功")
+	lastIndex = resp.Header.Get("X-Consul-Index")
 
-	go watchConsulConfig(kv, key, kvPair.ModifyIndex)
+	go watchConsulConfig(consulAddr, configKey)
 
-	return GetConfig()
+	return cfg
 }
 
-func watchConsulConfig(kv *api.KV, key string, lastIndex uint64) {
+func watchConsulConfig(consulAddr, key string) {
+
 	for {
-		kvPair, meta, err := kv.Get(key, &api.QueryOptions{
-			WaitIndex: lastIndex,
-			WaitTime:  5 * time.Minute,
-		})
+		url := fmt.Sprintf("http://%s/v1/kv/%s?wait=5m&index=%s", consulAddr, key, lastIndex)
+		resp, err := http.Get(url)
 		if err != nil {
-			log.Printf("监听配置失败: %v", err)
+			log.Printf("监听失败: %v", err)
 			time.Sleep(10 * time.Second)
 			continue
 		}
 
-		if kvPair == nil || meta.LastIndex == lastIndex {
+		index := resp.Header.Get("X-Consul-Index")
+		if index == "" || index == lastIndex {
+			// 无变化，继续等待
+			resp.Body.Close()
 			continue
 		}
 
-		// 配置变化，打印日志
+		// 发生变化，更新 lastIndex
+		lastIndex = index
+
+		resp.Body.Close()
+
 		log.Println("🔁 检测到配置变更，程序即将退出以重启生效")
 		os.Exit(0)
 	}
