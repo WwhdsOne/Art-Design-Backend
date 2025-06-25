@@ -29,20 +29,23 @@ func AutoMigrate(db *gorm.DB) {
 	//db.AutoMigrate(&entity.DigitPredict{})
 	//// 6. AI模型
 	//db.AutoMigrate(&entity.AIModel{})
+	//// 7. AI模型供应商
+	//db.AutoMigrate(&entity.AIProvider{})
 }
 
-// snowflakeIdFieldsMap 存储类型和对应的ID字段名
+// snowflakeIdFieldsMap 存储类型和对应的ID字段名（缓存，提高效率）
 var snowflakeIdFieldsMap sync.Map // key: reflect.Type, value: string
 
-// snowflakeIDPlugin GORM插件实现
+// snowflakeIDPlugin GORM插件实现，用于自动填充雪花ID
 type snowflakeIDPlugin struct{}
 
+// Name 插件名称（GORM要求实现）
 func (p *snowflakeIDPlugin) Name() string {
 	return "snowflake_id_plugin"
 }
 
-// initialize 初始化数据库
-// 雪花ID生成插件
+// initialize 注册插件钩子函数
+// 在创建前（Before Create）触发 generateID
 func (p *snowflakeIDPlugin) initialize(db *gorm.DB) (err error) {
 	err = db.Callback().Create().
 		Before("gorm:create").
@@ -50,14 +53,25 @@ func (p *snowflakeIDPlugin) initialize(db *gorm.DB) (err error) {
 	return
 }
 
+// detectSnowflakeIDField 递归查找结构体中的主键字段名（如ID），用于自动生成雪花ID
 func detectSnowflakeIDField(t reflect.Type) string {
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
-		// 优先识别 `gorm:"primaryKey"` 或 `gorm:"autoSnowflake"` 之类的标记
+
+		// 如果是匿名嵌套字段（如 BaseModel），递归查找
+		if field.Anonymous && field.Type.Kind() == reflect.Struct {
+			if nestedField := detectSnowflakeIDField(field.Type); nestedField != "" {
+				return nestedField
+			}
+		}
+
+		// 查找 int64 类型的主键字段
 		if field.Type.Kind() == reflect.Int64 {
-			if gormTag := field.Tag.Get("gorm"); strings.Contains(gormTag, "primaryKey") {
+			gormTag := field.Tag.Get("gorm")
+			if strings.Contains(gormTag, "primaryKey") {
 				return field.Name
 			}
+			// 如果字段名是 ID（大小写不敏感），也认定为主键
 			if strings.EqualFold(field.Name, "ID") {
 				return field.Name
 			}
@@ -66,40 +80,77 @@ func detectSnowflakeIDField(t reflect.Type) string {
 	return ""
 }
 
-func (p *snowflakeIDPlugin) setID(db *gorm.DB, fieldName string) {
-	modelValue := reflect.ValueOf(db.Statement.Model)
-	if modelValue.Kind() == reflect.Ptr {
-		modelValue = modelValue.Elem()
+// getFieldByName 获取字段值，支持递归嵌套结构体中查找字段
+func getFieldByName(v reflect.Value, name string) reflect.Value {
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
 	}
+	if !v.IsValid() {
+		return reflect.Value{}
+	}
+	field := v.FieldByName(name)
+	if field.IsValid() {
+		return field
+	}
+	// 查找匿名字段中的目标字段
+	for i := 0; i < v.NumField(); i++ {
+		structField := v.Type().Field(i)
+		if structField.Anonymous && v.Field(i).Kind() == reflect.Struct {
+			if f := getFieldByName(v.Field(i), name); f.IsValid() {
+				return f
+			}
+		}
+	}
+	return reflect.Value{}
+}
 
-	field := modelValue.FieldByName(fieldName)
+// setID 设置字段值为雪花ID，仅在字段为 int64 且值为 0 时设置
+func (p *snowflakeIDPlugin) setID(db *gorm.DB, fieldName string) {
+	field := getFieldByName(reflect.ValueOf(db.Statement.Model), fieldName)
 	if !field.IsValid() || !field.CanSet() || field.Kind() != reflect.Int64 {
 		return
 	}
 	if field.Int() == 0 {
-		field.SetInt(utils.GenerateSnowflakeId())
+		field.SetInt(utils.GenerateSnowflakeId()) // 设置生成的雪花ID
 	}
 }
 
+// generateID 插入前自动生成雪花ID（插件核心逻辑）
 func (p *snowflakeIDPlugin) generateID(db *gorm.DB) {
 	model := db.Statement.Model
 	modelType := reflect.TypeOf(model)
+
+	// 如果是切片类型（批量插入），取元素类型
+	if modelType.Kind() == reflect.Slice {
+		modelType = modelType.Elem()
+	}
+	// 如果是指针类型，取实际结构体类型
 	if modelType.Kind() == reflect.Ptr {
 		modelType = modelType.Elem()
 	}
-
-	// 缓存中查找字段
-	if fieldNameRaw, ok := snowflakeIdFieldsMap.Load(modelType); ok {
-		p.setID(db, fieldNameRaw.(string))
+	// 不是结构体则跳过
+	if modelType.Kind() != reflect.Struct {
 		return
 	}
 
-	// 没找到就首次分析结构体，记录字段
-	fieldName := detectSnowflakeIDField(modelType)
-	if fieldName != "" {
+	var fieldName string
+
+	// 从缓存中查找是否已记录字段名
+	if fieldNameRaw, ok := snowflakeIdFieldsMap.Load(modelType); ok {
+		fieldName = fieldNameRaw.(string)
+	} else {
+		// 首次分析结构体字段，找出主键字段名
+		fieldName = detectSnowflakeIDField(modelType)
 		snowflakeIdFieldsMap.Store(modelType, fieldName)
-		p.setID(db, fieldName)
 	}
+
+	// 找不到主键ID字段，跳过处理（比如联表结构体）
+	if fieldName == "" {
+		return
+	}
+
+	// 设置主键字段为雪花ID
+	p.setID(db, fieldName)
 }
 
 // zapGormLogger 实现 gorm.Logger.Interface

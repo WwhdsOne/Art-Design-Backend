@@ -12,5 +12,5 @@ type DigitPredict struct {
 }
 
 func (d *DigitPredict) TableName() string {
-	return tablename.DigitPredict
+	return tablename.DigitPredictTableName
 }

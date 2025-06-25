@@ -108,12 +108,17 @@ func wireApp() *bootstrap.HttpServer {
 		AIModelCache: aiModelCache,
 	}
 	aiModelClient := bootstrap.InitAIModelClient()
-	aiModelService := &service.AIModelService{
-		AIModelRepo:   aiModelRepo,
-		AIModelClient: aiModelClient,
-		GormTX:        gormTransactionManager,
+	aiProviderDB := db.NewAIProviderDB(gormDB)
+	aiProviderRepo := &repository.AIProviderRepo{
+		AIProviderDB: aiProviderDB,
 	}
-	aiModelController := controller.NewAIModelController(engine, middlewares, aiModelService)
+	aiService := &service.AIService{
+		AIModelRepo:    aiModelRepo,
+		AIModelClient:  aiModelClient,
+		AIProviderRepo: aiProviderRepo,
+		GormTX:         gormTransactionManager,
+	}
+	aiController := controller.NewAIController(engine, middlewares, aiService)
 	httpServer := &bootstrap.HttpServer{
 		Engine:                 engine,
 		Logger:                 logger,
@@ -122,7 +127,7 @@ func wireApp() *bootstrap.HttpServer {
 		MenuController:         menuController,
 		RoleController:         roleController,
 		DigitPredictController: digitPredictController,
-		AIModelController:      aiModelController,
+		AIController:           aiController,
 		Config:                 configConfig,
 	}
 	return httpServer

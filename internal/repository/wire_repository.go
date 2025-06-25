@@ -23,6 +23,7 @@ var DBSet = wire.NewSet(
 	db.NewUserRolesDB,
 	db.NewDigitPredictDB,
 	db.NewAIModelDB,
+	db.NewAIProviderDB,
 )
 
 var RepositorySet = wire.NewSet(
@@ -34,4 +35,5 @@ var RepositorySet = wire.NewSet(
 	wire.Struct(new(MenuRepo), "*"),
 	wire.Struct(new(AuthRepo), "*"),
 	wire.Struct(new(DigitPredictRepo), "*"),
+	wire.Struct(new(AIProviderRepo), "*"),
 )

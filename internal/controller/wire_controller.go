@@ -40,6 +40,6 @@ var DigitPredictSet = wire.NewSet(
 )
 
 var AIModelCtrlSet = wire.NewSet(
-	NewAIModelController,
-	wire.Struct(new(service.AIModelService), "*"),
+	NewAIController,
+	wire.Struct(new(service.AIService), "*"),
 )

@@ -41,10 +41,6 @@ func (a *AIModelDB) CheckAIDuplicate(c context.Context, model *entity.AIModel) (
 		conditions = append(conditions, "EXISTS(SELECT 1 FROM ai_model WHERE model = ? "+excludeID+") AS model_exists")
 		args = append(args, model.Model)
 	}
-	if model.BaseURL != "" {
-		conditions = append(conditions, "EXISTS(SELECT 1 FROM ai_model WHERE base_url = ? "+excludeID+") AS base_url_exists")
-		args = append(args, model.BaseURL)
-	}
 	if model.ModelID != "" {
 		conditions = append(conditions, "EXISTS(SELECT 1 FROM ai_model WHERE model_id = ? "+excludeID+") AS model_id_exists")
 		args = append(args, model.ModelID)
@@ -64,8 +60,6 @@ func (a *AIModelDB) CheckAIDuplicate(c context.Context, model *entity.AIModel) (
 	switch {
 	case result.ModelExists:
 		err = errors.NewDBError("模型名称重复")
-	case result.BaseURLExists:
-		err = errors.NewDBError("API 地址重复")
 	case result.ModelIDExists:
 		err = errors.NewDBError("模型接口标识重复")
 	}
@@ -123,7 +117,7 @@ func (a *AIModelDB) GetAIModelPage(c context.Context, q *query.AIModel) (pageRes
 
 func (a *AIModelDB) GetSimpleModelList(c context.Context) (models []*entity.AIModel, err error) {
 	if err = DB(c, a.db).Select("id", "icon", "model").Where("enabled = ?", true).Find(&models).Error; err != nil {
-		err = errors.NewDBError("获取模型列表失败")
+		err = errors.WrapDBError(err, "获取模型简洁列表失败")
 		return
 	}
 	return
