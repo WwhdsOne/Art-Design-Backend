@@ -17,11 +17,16 @@ type AIProviderRepo struct {
 
 func (a *AIProviderRepo) GetAIProviderByIDWithCache(c context.Context, id int64) (res *entity.AIProvider, err error) {
 	res, err = a.GetProviderCacheByID(id)
-	if err != nil && !errors.Is(err, redis.Nil) {
-		zap.L().Warn("根据ID查询供应商缓存失败", zap.Error(err))
-	} else {
+	if err == nil {
+		// 缓存命中，直接返回
 		return
 	}
+	if !errors.Is(err, redis.Nil) {
+		// 缓存出错，但不是未命中，记录日志
+		zap.L().Warn("根据ID查询供应商缓存失败", zap.Error(err))
+	}
+
+	// 缓存未命中，继续查数据库
 	provider, err := a.GetProviderByID(c, id)
 	if err != nil {
 		return

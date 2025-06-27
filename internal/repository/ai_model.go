@@ -36,11 +36,16 @@ func (a *AIModelRepo) GetAIModelByID(c context.Context, id int64) (res *entity.A
 
 func (a *AIModelRepo) GetSimpleModelList(c context.Context) (res []*response.SimpleAIModel, err error) {
 	res, err = a.AIModelCache.GetSimpleModelList()
-	if err != nil && !errors.Is(err, redis.Nil) {
-		zap.L().Warn("获取AI模型简洁信息列表缓存失败", zap.Error(err))
-	} else {
+	if err == nil {
+		// 命中缓存，返回结果
 		return
 	}
+	if !errors.Is(err, redis.Nil) {
+		// 如果不是缓存未命中，而是真正的错误，记录日志
+		zap.L().Warn("获取AI模型简洁信息列表缓存失败", zap.Error(err))
+	}
+
+	// 缓存未命中，继续执行后续逻辑
 	list, err := a.AIModelDB.GetSimpleModelList(c)
 	if err != nil {
 		return
