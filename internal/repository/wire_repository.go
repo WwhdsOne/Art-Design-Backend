@@ -12,6 +12,7 @@ var RedisCacheSet = wire.NewSet(
 	cache.NewMenuCache,
 	cache.NewUserCache,
 	cache.NewAIModelCache,
+	cache.NewAIProviderCache,
 )
 
 var DBSet = wire.NewSet(

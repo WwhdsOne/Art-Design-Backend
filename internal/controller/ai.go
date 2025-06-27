@@ -14,25 +14,27 @@ type AIController struct {
 }
 
 func NewAIController(engine *gin.Engine, middleware *middleware.Middlewares, service *service.AIService) *AIController {
-	aiModelCtrl := &AIController{
+	aiCtrl := &AIController{
 		aiService: service,
 	}
 	r := engine.Group("/api").Group("/ai")
 	{
 		aiModelGroup := r.Group("/model")
 		aiModelGroup.Use(middleware.AuthMiddleware())
-		aiModelGroup.POST("/create", aiModelCtrl.createAIModel)
-		aiModelGroup.POST("/page", aiModelCtrl.getAIModelPage)
-		//r.POST("/chat-completion", aiModelCtrl.chatCompletion)
-		aiModelGroup.GET("/getSimpleModelList", aiModelCtrl.getSimpleModelList)
+		aiModelGroup.POST("/create", aiCtrl.createAIModel)
+		aiModelGroup.POST("/page", aiCtrl.getAIModelPage)
+		aiModelGroup.POST("/chat-completion", aiCtrl.chatCompletion)
+		aiModelGroup.GET("/getSimpleModelList", aiCtrl.getSimpleModelList)
+		aiModelGroup.POST("/uploadIcon", aiCtrl.uploadAIModelIcon)
 	}
 	{
 		aiProviderGroup := r.Group("/provider")
 		aiProviderGroup.Use(middleware.AuthMiddleware())
-		aiProviderGroup.POST("/create", aiModelCtrl.createAIProvider)
-		aiProviderGroup.POST("/page", aiModelCtrl.getAIProviderPage)
+		aiProviderGroup.POST("/create", aiCtrl.createAIProvider)
+		aiProviderGroup.POST("/page", aiCtrl.getAIProviderPage)
+		aiProviderGroup.GET("/simpleList", aiCtrl.getSimpleProviderList)
 	}
-	return aiModelCtrl
+	return aiCtrl
 }
 
 func (a *AIController) createAIProvider(c *gin.Context) {
@@ -62,6 +64,37 @@ func (a *AIController) getAIProviderPage(c *gin.Context) {
 	result.OkWithData(res, c)
 }
 
+func (a *AIController) uploadAIModelIcon(c *gin.Context) {
+	// 获取上传的文件
+	file, err := c.FormFile("file")
+	if err != nil {
+		result.FailWithMessage("请选择要上传的文件", c)
+		return
+	}
+
+	// 打开上传的文件流
+	src, err := file.Open()
+	if err != nil {
+		result.FailWithMessage("无法打开上传的文件", c)
+		return
+	}
+	defer src.Close()
+
+	// 检查文件大小是否超过 2MB
+	if file.Size > 2<<20 { // 2 MB
+		result.FailWithMessage("文件大小不能超过 1MB", c)
+		return
+	}
+
+	modelIconURL, err := a.aiService.UploadModelIcon(c, file.Filename, src)
+	if err != nil {
+		result.FailWithMessage("模型图标上传失败: "+err.Error(), c)
+		return
+	}
+
+	result.OkWithData(modelIconURL, c)
+}
+
 func (a *AIController) createAIModel(c *gin.Context) {
 	var req request.AIModel
 	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
@@ -89,20 +122,29 @@ func (a *AIController) getAIModelPage(c *gin.Context) {
 	result.OkWithData(res, c)
 }
 
-//func (a *AIController) chatCompletion(c *gin.Context) {
-//	var req request.ChatCompletion
-//	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
-//		_ = c.Error(err)
-//		return
-//	}
-//	if err := a.aiService.ChatCompletion(c, &req); err != nil {
-//		_ = c.Error(err)
-//		return
-//	}
-//}
+func (a *AIController) chatCompletion(c *gin.Context) {
+	var req request.ChatCompletion
+	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
+		_ = c.Error(err)
+		return
+	}
+	if err := a.aiService.ChatCompletion(c, &req); err != nil {
+		_ = c.Error(err)
+		return
+	}
+}
 
 func (a *AIController) getSimpleModelList(c *gin.Context) {
 	res, err := a.aiService.GetSimpleModelList(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithData(res, c)
+}
+
+func (a *AIController) getSimpleProviderList(c *gin.Context) {
+	res, err := a.aiService.GetSimpleProviderList(c)
 	if err != nil {
 		_ = c.Error(err)
 		return

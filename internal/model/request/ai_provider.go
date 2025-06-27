@@ -4,7 +4,7 @@ import "Art-Design-Backend/internal/model/common"
 
 type AIProvider struct {
 	// 供应商ID
-	ID common.LongStringID `json:"id" label:"供应商ID" binding:"required"`
+	ID common.LongStringID `json:"id" label:"供应商ID"`
 
 	// 供应商名称，例如 openai、anthropic、cohere 等
 	Name string `json:"name" label:"供应商名称" binding:"required,min=2,max=100"`

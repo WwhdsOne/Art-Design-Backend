@@ -38,6 +38,8 @@ func (a *AIModelRepo) GetSimpleModelList(c context.Context) (res []*response.Sim
 	res, err = a.AIModelCache.GetSimpleModelList()
 	if err != nil && !errors.Is(err, redis.Nil) {
 		zap.L().Warn("获取AI模型简洁信息列表缓存失败", zap.Error(err))
+	} else {
+		return
 	}
 	list, err := a.AIModelDB.GetSimpleModelList(c)
 	if err != nil {

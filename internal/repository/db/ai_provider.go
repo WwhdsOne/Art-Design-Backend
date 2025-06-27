@@ -36,7 +36,7 @@ func (a *AIProviderDB) CheckAIDuplicate(c context.Context, provider *entity.AIPr
 	conditions := make([]string, 0)
 
 	if provider.Name != "" {
-		conditions = append(conditions, "EXISTS(SELECT 1 FROM ai_model WHERE name = ? "+excludeID+") AS name_exists")
+		conditions = append(conditions, "EXISTS(SELECT 1 FROM ai_provider WHERE name = ? "+excludeID+") AS name_exists")
 		args = append(args, provider.Name)
 	}
 
@@ -84,6 +84,30 @@ func (a *AIProviderDB) GetAIProviderPage(c context.Context, q *query.AIProvider)
 
 	if err = queryConditions.Scopes(q.Paginate()).Find(&res).Error; err != nil {
 		err = errors.WrapDBError(err, "获取AI供应商分页失败")
+		return
+	}
+	return
+}
+
+func (a *AIProviderDB) GetSimpleProviderList(c context.Context) (providerList []*entity.AIProvider, err error) {
+	if err = DB(c, a.db).Select("id", "name").Find(&providerList).Error; err != nil {
+		err = errors.WrapDBError(err, "获取AI供应商列表失败")
+		return
+	}
+	return
+}
+
+func (a *AIProviderDB) GetProviderNameByIDList(c context.Context, idList []int64) (providerList []*entity.AIProvider, err error) {
+	if err = DB(c, a.db).Where("id in ?", idList).Find(&providerList).Error; err != nil {
+		err = errors.WrapDBError(err, "获取AI供应商名称列表失败")
+		return
+	}
+	return
+}
+
+func (a *AIProviderDB) GetProviderByID(c context.Context, id int64) (provider *entity.AIProvider, err error) {
+	if err = DB(c, a.db).Where("id = ?", id).Where("enabled = ?", true).First(&provider).Error; err != nil {
+		err = errors.WrapDBError(err, "获取AI供应商失败")
 		return
 	}
 	return

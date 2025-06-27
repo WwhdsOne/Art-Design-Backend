@@ -11,13 +11,8 @@ import (
 	"net/http"
 )
 
-func buildChatUrl(baseUrl string) string {
-	return fmt.Sprintf("%s/chat/completions", baseUrl)
-}
-
 // ChatRequest 普通非流式请求，返回完整响应体 []byte 或错误
 func (c *AIModelClient) ChatRequest(ctx context.Context, url, token string, reqData ChatRequest) ([]byte, error) {
-	url = buildChatUrl(url)
 	reqData.Stream = true
 	body, err := sonic.Marshal(reqData)
 	if err != nil {
@@ -47,7 +42,6 @@ func (c *AIModelClient) ChatRequest(ctx context.Context, url, token string, reqD
 
 // ChatStreamWithWriter 流式请求，将远程 SSE 响应数据实时推送给 ginCtx，供前端实时消费
 func (c *AIModelClient) ChatStreamWithWriter(ctx context.Context, w http.ResponseWriter, url, token string, reqData ChatRequest) (err error) {
-	url = buildChatUrl(url)
 	reqData.Stream = true
 
 	body, err := sonic.Marshal(reqData)

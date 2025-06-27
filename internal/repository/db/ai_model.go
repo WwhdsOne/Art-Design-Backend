@@ -68,7 +68,7 @@ func (a *AIModelDB) CheckAIDuplicate(c context.Context, model *entity.AIModel) (
 
 func (a *AIModelDB) Create(c context.Context, e *entity.AIModel) (err error) {
 	if err = DB(c, a.db).Create(e).Error; err != nil {
-		err = errors.NewDBError("创建AI模型失败")
+		err = errors.WrapDBError(err, "创建AI模型失败")
 		return
 	}
 	return
@@ -76,7 +76,7 @@ func (a *AIModelDB) Create(c context.Context, e *entity.AIModel) (err error) {
 
 func (a *AIModelDB) GetAIModelByID(c context.Context, id int64) (res *entity.AIModel, err error) {
 	if err = DB(c, a.db).Where("id = ?", id).First(&res).Error; err != nil {
-		err = errors.NewDBError("查询AI模型失败")
+		err = errors.WrapDBError(err, "查询AI模型失败")
 		return
 	}
 	return
@@ -103,7 +103,7 @@ func (a *AIModelDB) GetAIModelPage(c context.Context, q *query.AIModel) (pageRes
 
 	// 查询总数
 	if err = queryConditions.Count(&total).Error; err != nil {
-		err = errors.NewDBError("获取角色分页失败")
+		err = errors.WrapDBError(err, "获取角色分页失败")
 		return
 	}
 

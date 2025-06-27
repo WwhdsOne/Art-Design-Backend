@@ -4,7 +4,6 @@ import (
 	"Art-Design-Backend/pkg/utils"
 	"context"
 	"github.com/aliyun/alibabacloud-oss-go-sdk-v2/oss"
-	"go.uber.org/zap"
 	"io"
 	"path/filepath"
 )
@@ -17,8 +16,8 @@ type OssClient struct {
 	Folders    map[string]string // 文件夹
 }
 
-func (o *OssClient) UploadAvatar(c context.Context, filename string, reader io.Reader) (fileUrl string, err error) {
-	folder := o.Folders["avatar"]
+func (o *OssClient) uploadToFolder(c context.Context, folderKey, filename string, reader io.Reader) (fileUrl string, err error) {
+	folder := o.Folders[folderKey]
 	uploadFileName := utils.StdUUID() + filepath.Ext(filename)
 	request := oss.PutObjectRequest{
 		Bucket: oss.Ptr(o.BucketName),
@@ -26,27 +25,20 @@ func (o *OssClient) UploadAvatar(c context.Context, filename string, reader io.R
 		Body:   reader,
 	}
 	if _, err = o.Client.PutObject(c, &request); err != nil {
-		zap.L().Error("上传头像失败", zap.Error(err))
 		return
 	}
-	// 拼接完整的URL
 	fileUrl = "https://" + o.BucketName + "." + o.Endpoint + "/" + folder + "/" + uploadFileName
 	return
 }
 
-func (o *OssClient) UploadDigitImage(c context.Context, filename string, reader io.Reader) (fileUrl string, err error) {
-	folder := o.Folders["mnist"]
-	uploadFileName := utils.StdUUID() + filepath.Ext(filename)
-	request := oss.PutObjectRequest{
-		Bucket: oss.Ptr(o.BucketName),
-		Key:    oss.Ptr(folder + "/" + uploadFileName),
-		Body:   reader,
-	}
-	if _, err = o.Client.PutObject(c, &request); err != nil {
-		zap.L().Error("上传头像失败", zap.Error(err))
-		return
-	}
-	// 拼接完整的URL
-	fileUrl = "https://" + o.BucketName + "." + o.Endpoint + "/" + folder + "/" + uploadFileName
-	return
+func (o *OssClient) UploadAvatar(c context.Context, filename string, reader io.Reader) (string, error) {
+	return o.uploadToFolder(c, "avatar", filename, reader)
+}
+
+func (o *OssClient) UploadDigitImage(c context.Context, filename string, reader io.Reader) (string, error) {
+	return o.uploadToFolder(c, "mnist", filename, reader)
+}
+
+func (o *OssClient) UploadModelIcon(c context.Context, filename string, reader io.Reader) (string, error) {
+	return o.uploadToFolder(c, "model_icon", filename, reader)
 }

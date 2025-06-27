@@ -38,6 +38,8 @@ func (r *RoleRepo) GetRoleListByUserID(c context.Context, userID int64) (roleLis
 	roleList, err = r.UserCache.GetUserRoleList(userID)
 	if err == nil {
 		return
+	} else {
+		zap.L().Warn("获取用户角色列表缓存失败", zap.Error(err))
 	}
 
 	// 2. 查询角色ID列表

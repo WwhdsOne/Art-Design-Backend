@@ -7,7 +7,6 @@ import (
 	"Art-Design-Backend/pkg/middleware"
 	"Art-Design-Backend/pkg/result"
 	"Art-Design-Backend/pkg/utils"
-	"fmt"
 	"github.com/gin-gonic/gin"
 )
 
@@ -89,7 +88,6 @@ func (u *UserController) uploadAvatar(c *gin.Context) {
 	// 获取上传的文件
 	file, err := c.FormFile("file")
 	if err != nil {
-		fmt.Println(err)
 		result.FailWithMessage("请选择要上传的文件", c)
 		return
 	}

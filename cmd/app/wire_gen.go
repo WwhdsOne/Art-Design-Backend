@@ -109,13 +109,16 @@ func wireApp() *bootstrap.HttpServer {
 	}
 	aiModelClient := bootstrap.InitAIModelClient()
 	aiProviderDB := db.NewAIProviderDB(gormDB)
+	aiProviderCache := cache.NewAIProviderCache(redisWrapper)
 	aiProviderRepo := &repository.AIProviderRepo{
-		AIProviderDB: aiProviderDB,
+		AIProviderDB:    aiProviderDB,
+		AIProviderCache: aiProviderCache,
 	}
 	aiService := &service.AIService{
 		AIModelRepo:    aiModelRepo,
 		AIModelClient:  aiModelClient,
 		AIProviderRepo: aiProviderRepo,
+		OssClient:      ossClient,
 		GormTX:         gormTransactionManager,
 	}
 	aiController := controller.NewAIController(engine, middlewares, aiService)

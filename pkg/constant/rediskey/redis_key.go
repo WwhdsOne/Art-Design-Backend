@@ -30,10 +30,12 @@ const (
 
 // AI模型相关
 const (
-	AIModelSimpleList    = "AIMODEL:SIMPLE:LIST"
+	AIModelSimpleList    = "AIMODEL:SIMPLE:LIST:"
 	AIModelSimpleListTTL = 86400 * time.Second
 	AIModelInfo          = "AIMODEL:INFO:"
 	AIModelInfoTTL       = 86400 * time.Second
+	AIProviderInfo       = "AIPROVIDER:INFO:"
+	AIProviderInfoTTL    = 86400 * time.Second
 )
 
 // RateLimiter 访问频率限制
