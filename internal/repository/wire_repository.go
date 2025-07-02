@@ -25,6 +25,10 @@ var DBSet = wire.NewSet(
 	db.NewDigitPredictDB,
 	db.NewAIModelDB,
 	db.NewAIProviderDB,
+	db.NewAIAgentDB,
+	db.NewAgentFileDB,
+	db.NewFileChunkDB,
+	db.NewChunkVectorDB,
 )
 
 var RepositorySet = wire.NewSet(
@@ -37,4 +41,5 @@ var RepositorySet = wire.NewSet(
 	wire.Struct(new(AuthRepo), "*"),
 	wire.Struct(new(DigitPredictRepo), "*"),
 	wire.Struct(new(AIProviderRepo), "*"),
+	wire.Struct(new(AIAgentRepo), "*"),
 )

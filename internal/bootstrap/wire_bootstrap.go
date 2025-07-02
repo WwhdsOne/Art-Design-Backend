@@ -12,4 +12,5 @@ var InitSet = wire.NewSet(
 	InitGin,
 	InitOSSClient,
 	InitJWT,
+	InitSlicer,
 )

@@ -19,22 +19,35 @@ type AIModelRepo struct {
 
 func (a *AIModelRepo) GetAIModelByID(c context.Context, id int64) (res *entity.AIModel, err error) {
 	res, err = a.AIModelCache.GetModelInfo(id)
-	if err != nil {
-		zap.L().Warn("获取AI模型缓存失败", zap.Error(err))
-	}
-	res, err = a.AIModelDB.GetAIModelByID(c, id)
-	if err != nil {
+	if err == nil {
+		// 缓存命中，直接返回
 		return
 	}
-	go func(res *entity.AIModel) {
-		if err = a.AIModelCache.SetModelInfo(res); err != nil {
-			zap.L().Warn("设置AI模型缓存失败", zap.Error(err))
+	if !errors.Is(err, redis.Nil) {
+		// 缓存出错，但不是未命中，记录日志
+		zap.L().Warn("获取AI模型缓存失败", zap.Error(err))
+	}
+
+	// 缓存未命中，查数据库
+	res, err = a.AIModelDB.GetAIModelByID(c, id)
+	if err != nil {
+		return nil, err
+	}
+
+	// 异步回填缓存
+	go func(model *entity.AIModel) {
+		if model == nil {
+			return
+		}
+		if cacheErr := a.AIModelCache.SetModelInfo(model); cacheErr != nil {
+			zap.L().Warn("设置AI模型缓存失败", zap.Error(cacheErr))
 		}
 	}(res)
-	return
+
+	return res, nil
 }
 
-func (a *AIModelRepo) GetSimpleModelList(c context.Context) (res []*response.SimpleAIModel, err error) {
+func (a *AIModelRepo) GetSimpleChatModelList(c context.Context) (res []*response.SimpleAIModel, err error) {
 	res, err = a.AIModelCache.GetSimpleModelList()
 	if err == nil {
 		// 命中缓存，返回结果
@@ -46,7 +59,7 @@ func (a *AIModelRepo) GetSimpleModelList(c context.Context) (res []*response.Sim
 	}
 
 	// 缓存未命中，继续执行后续逻辑
-	list, err := a.AIModelDB.GetSimpleModelList(c)
+	list, err := a.AIModelDB.GetSimpleChatModelList(c)
 	if err != nil {
 		return
 	}

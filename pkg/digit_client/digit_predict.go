@@ -8,7 +8,7 @@ import (
 )
 
 type DigitPredict struct {
-	PredictUrl string
+	PredictURL string
 }
 
 func (c *DigitPredict) Predict(imageUrl string) (result int, err error) {
@@ -20,7 +20,7 @@ func (c *DigitPredict) Predict(imageUrl string) (result int, err error) {
 		return
 	}
 
-	resp, err := http.Post(c.PredictUrl, "application/json", bytes.NewBuffer(requestData))
+	resp, err := http.Post(c.PredictURL, "application/json", bytes.NewBuffer(requestData))
 	if err != nil {
 		return
 	}

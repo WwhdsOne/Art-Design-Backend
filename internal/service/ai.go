@@ -10,9 +10,12 @@ import (
 	"Art-Design-Backend/internal/repository/db"
 	"Art-Design-Backend/pkg/ai"
 	"Art-Design-Backend/pkg/aliyun"
+	"Art-Design-Backend/pkg/slicer_client"
 	"context"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
+	"github.com/pgvector/pgvector-go"
 	"go.uber.org/zap"
 	"mime/multipart"
 )
@@ -21,7 +24,9 @@ type AIService struct {
 	AIModelRepo    *repository.AIModelRepo    // 模型Repo
 	AIModelClient  *ai.AIModelClient          // 聊天
 	AIProviderRepo *repository.AIProviderRepo // 模型供应商Repo
+	AIAgentRepo    *repository.AIAgentRepo    // 智能助手Repo
 	OssClient      *aliyun.OssClient          // 阿里云OSS
+	Slicer         *slicer_client.Slicer      // 文档切片
 	GormTX         *db.GormTransactionManager // 事务
 }
 
@@ -68,10 +73,10 @@ func (a *AIService) CreateAIModel(c context.Context, r *request.AIModel) (err er
 	}
 	return
 }
-func (a *AIService) GetSimpleModelList(c context.Context) (res []*response.SimpleAIModel, err error) {
-	res, err = a.AIModelRepo.GetSimpleModelList(c)
+func (a *AIService) GetSimpleChatModelList(c context.Context) (res []*response.SimpleAIModel, err error) {
+	res, err = a.AIModelRepo.GetSimpleChatModelList(c)
 	if err != nil {
-		zap.L().Error("GetSimpleModelList 失败", zap.Error(err))
+		zap.L().Error("GetSimpleChatModelList 失败", zap.Error(err))
 		return
 	}
 	return
@@ -166,7 +171,6 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 		zap.L().Error("获取AI模型供应商失败", zap.Int64("provider_id", modelInfo.ProviderID), zap.Error(err))
 		return
 	}
-
 	// 直接调用新版 ChatStreamWithWriter
 	err = a.AIModelClient.ChatStreamWithWriter(
 		c.Request.Context(), c.Writer,
@@ -178,6 +182,135 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 		zap.L().Error("AI模型聊天失败", zap.Error(err))
 		return
 	}
+	return
+}
 
+func (a *AIService) UploadAndVectorizeDocument(
+	c context.Context,
+	file multipart.File,
+	filename string,
+	agentID int64,
+) error {
+	// Step 1: 上传文档到 OSS
+	documentURL, err := a.OssClient.UploadAgentDocument(c, filename, file)
+	if err != nil {
+		zap.L().Error("上传文档失败", zap.Error(err))
+		return fmt.Errorf("上传文档失败: %w", err)
+	}
+
+	// Step 2: 创建 AgentFile 记录
+	agentFile := &entity.AgentFile{
+		AgentID: agentID,
+		FileURL: documentURL,
+	}
+	if err = a.AIAgentRepo.CreateAgentFile(c, agentFile); err != nil {
+		zap.L().Error("保存 AgentFile 失败", zap.Error(err))
+		return fmt.Errorf("保存 AgentFile 失败: %w", err)
+	}
+
+	// Step 3: 文档分块
+	chunks, err := a.Slicer.GetChunksFromSlicer(documentURL)
+	if err != nil {
+		zap.L().Error("文档分块失败", zap.Error(err))
+		return fmt.Errorf("文档分块失败: %w", err)
+	}
+	if len(chunks) == 0 {
+		return fmt.Errorf("文档内容为空，无法切分")
+	}
+
+	// Step 4: 保存分块内容
+	chunkList := make([]*entity.FileChunk, 0, len(chunks))
+	for i, chunk := range chunks {
+		chunkEntity := &entity.FileChunk{
+			FileID:     agentFile.ID,
+			ChunkIndex: i,
+			Content:    chunk,
+		}
+		if err = a.AIAgentRepo.CreateFileChunk(c, chunkEntity); err != nil {
+			zap.L().Error("创建文件块失败", zap.Int("index", i), zap.Error(err))
+			return fmt.Errorf("创建文件块失败(index %d): %w", i, err)
+		}
+		chunkList = append(chunkList, chunkEntity)
+	}
+
+	// Step 5: 获取 Embedding（使用指定 provider,千问）
+	const providerID = int64(51088793876300041)
+	provider, err := a.AIProviderRepo.GetAIProviderByIDWithCache(c, providerID)
+	if err != nil {
+		zap.L().Error("获取嵌入模型供应商失败", zap.Error(err))
+		return fmt.Errorf("获取嵌入模型供应商失败: %w", err)
+	}
+	embeddings, err := a.AIModelClient.Embed(c, provider.APIKey, chunks)
+	if err != nil {
+		zap.L().Error("获取文本向量失败", zap.Error(err))
+		return fmt.Errorf("获取文本向量失败: %w", err)
+	}
+	if len(embeddings) != len(chunkList) {
+		zap.L().Error("向量数量与分块数量不一致",
+			zap.Int("chunks", len(chunkList)),
+			zap.Int("vectors", len(embeddings)))
+		return fmt.Errorf("向量数量与分块数量不一致")
+	}
+
+	// Step 6: 保存向量
+	for i, chunk := range chunkList {
+		chunkVector := &entity.ChunkVector{
+			ChunkID: chunk.ID,
+			Vector:  pgvector.NewVector(embeddings[i]),
+		}
+		if err = a.AIAgentRepo.CreateChunkVector(c, chunkVector); err != nil {
+			zap.L().Error("保存向量失败", zap.Int64("chunkID", chunk.ID), zap.Error(err))
+			return fmt.Errorf("保存向量失败(chunkID %d): %w", chunk.ID, err)
+		}
+	}
+
+	// ✅ 输出日志
+	zap.L().Info("文档上传与向量化完成",
+		zap.Int64("agentID", agentID),
+		zap.Int("chunkCount", len(chunks)),
+		zap.String("file", filename),
+	)
+	return nil
+}
+
+func (a *AIService) CreateAgent(c *gin.Context, r *request.AIAgent) (err error) {
+	agent := &entity.AIAgent{}
+	_ = copier.Copy(agent, r)
+	if err = a.AIAgentRepo.Create(c, agent); err != nil {
+		zap.L().Error("创建AI模型失败", zap.Error(err))
+		return
+	}
+	return
+}
+
+func (a *AIService) GetAIAgentPage(c *gin.Context, q *query.AIAgent) (res *common.PaginationResp[*response.AIAgent], err error) {
+	agents, total, err := a.AIAgentRepo.GetAIAgentPage(c, q)
+	if err != nil {
+		zap.L().Error("获取AI模型分页失败", zap.Error(err))
+		return
+	}
+	agentRes := make([]*response.AIAgent, 0, len(agents))
+	for _, agent := range agents {
+		agentResp := &response.AIAgent{}
+		_ = copier.Copy(agentResp, agent)
+		agentRes = append(agentRes, agentResp)
+	}
+	res = common.BuildPageResp[*response.AIAgent](agentRes, total, q.PaginationReq)
+	return
+}
+
+func (a *AIService) GetSimpleAgentList(c context.Context) (res []*response.SimpleAIAgent, err error) {
+	var agentList []*entity.AIAgent
+	agentList, err = a.AIAgentRepo.GetSimpleAgentList(c)
+	if err != nil {
+		zap.L().Error("获取智能体列表失败", zap.Error(err))
+		return
+	}
+	res = make([]*response.SimpleAIAgent, 0, len(agentList))
+	for _, agent := range agentList {
+		agentResp := &response.SimpleAIAgent{}
+		_ = copier.Copy(agentResp, agent)
+		res = append(res, agentResp)
+	}
 	return
 }

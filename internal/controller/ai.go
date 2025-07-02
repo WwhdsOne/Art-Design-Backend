@@ -6,6 +6,7 @@ import (
 	"Art-Design-Backend/internal/service"
 	"Art-Design-Backend/pkg/middleware"
 	"Art-Design-Backend/pkg/result"
+	"Art-Design-Backend/pkg/utils"
 	"github.com/gin-gonic/gin"
 )
 
@@ -24,7 +25,7 @@ func NewAIController(engine *gin.Engine, middleware *middleware.Middlewares, ser
 		aiModelGroup.POST("/create", aiCtrl.createAIModel)
 		aiModelGroup.POST("/page", aiCtrl.getAIModelPage)
 		aiModelGroup.POST("/chat-completion", aiCtrl.chatCompletion)
-		aiModelGroup.GET("/getSimpleModelList", aiCtrl.getSimpleModelList)
+		aiModelGroup.GET("/simpleList", aiCtrl.getSimpleModelList)
 		aiModelGroup.POST("/uploadIcon", aiCtrl.uploadAIModelIcon)
 	}
 	{
@@ -33,6 +34,14 @@ func NewAIController(engine *gin.Engine, middleware *middleware.Middlewares, ser
 		aiProviderGroup.POST("/create", aiCtrl.createAIProvider)
 		aiProviderGroup.POST("/page", aiCtrl.getAIProviderPage)
 		aiProviderGroup.GET("/simpleList", aiCtrl.getSimpleProviderList)
+	}
+	{
+		agentGroup := r.Group("/agent")
+		agentGroup.Use(middleware.AuthMiddleware())
+		agentGroup.POST("/uploadAgentDocument/:id", aiCtrl.UploadAgentDocument)
+		agentGroup.POST("/create", aiCtrl.CreateAgent)
+		agentGroup.POST("/page", aiCtrl.GetAIAgentPage)
+		agentGroup.GET("/simpleList", aiCtrl.getSimpleAgentList)
 	}
 	return aiCtrl
 }
@@ -135,7 +144,7 @@ func (a *AIController) chatCompletion(c *gin.Context) {
 }
 
 func (a *AIController) getSimpleModelList(c *gin.Context) {
-	res, err := a.aiService.GetSimpleModelList(c)
+	res, err := a.aiService.GetSimpleChatModelList(c)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -145,6 +154,67 @@ func (a *AIController) getSimpleModelList(c *gin.Context) {
 
 func (a *AIController) getSimpleProviderList(c *gin.Context) {
 	res, err := a.aiService.GetSimpleProviderList(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithData(res, c)
+}
+
+func (a *AIController) UploadAgentDocument(c *gin.Context) {
+	file, header, err := c.Request.FormFile("file")
+	if err != nil {
+		result.FailWithMessage("请选择要上传的文件", c)
+		return
+	}
+	defer file.Close()
+
+	if header.Size > 100<<20 {
+		result.FailWithMessage("文件不能超过 100MB", c)
+		return
+	}
+
+	filename := header.Filename
+	agentID, err := utils.ParseID(c)
+
+	err = a.aiService.UploadAndVectorizeDocument(c, file, filename, agentID)
+	if err != nil {
+		result.FailWithMessage("文件上传失败: "+err.Error(), c)
+		return
+	}
+
+	result.OkWithMessage("上传成功", c)
+}
+
+func (a *AIController) CreateAgent(c *gin.Context) {
+	var req request.AIAgent
+	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
+		_ = c.Error(err)
+		return
+	}
+	if err := a.aiService.CreateAgent(c, &req); err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithMessage("创建成功", c)
+}
+
+func (a *AIController) getSimpleAgentList(c *gin.Context) {
+	res, err := a.aiService.GetSimpleAgentList(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithData(res, c)
+}
+
+func (a *AIController) GetAIAgentPage(c *gin.Context) {
+	var req query.AIAgent
+	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
+		_ = c.Error(err)
+		return
+	}
+	res, err := a.aiService.GetAIAgentPage(c, &req)
 	if err != nil {
 		_ = c.Error(err)
 		return

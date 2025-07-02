@@ -114,11 +114,24 @@ func wireApp() *bootstrap.HttpServer {
 		AIProviderDB:    aiProviderDB,
 		AIProviderCache: aiProviderCache,
 	}
+	aiAgentDB := db.NewAIAgentDB(gormDB)
+	agentFileDB := db.NewAgentFileDB(gormDB)
+	fileChunkDB := db.NewFileChunkDB(gormDB)
+	chunkVectorDB := db.NewChunkVectorDB(gormDB)
+	aiAgentRepo := &repository.AIAgentRepo{
+		AIAgentDB:     aiAgentDB,
+		AgentFileDB:   agentFileDB,
+		FileChunkDB:   fileChunkDB,
+		ChunkVectorDB: chunkVectorDB,
+	}
+	slicer := bootstrap.InitSlicer(configConfig)
 	aiService := &service.AIService{
 		AIModelRepo:    aiModelRepo,
 		AIModelClient:  aiModelClient,
 		AIProviderRepo: aiProviderRepo,
+		AIAgentRepo:    aiAgentRepo,
 		OssClient:      ossClient,
+		Slicer:         slicer,
 		GormTX:         gormTransactionManager,
 	}
 	aiController := controller.NewAIController(engine, middlewares, aiService)

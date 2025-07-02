@@ -103,20 +103,22 @@ func (a *AIModelDB) GetAIModelPage(c context.Context, q *query.AIModel) (pageRes
 
 	// 查询总数
 	if err = queryConditions.Count(&total).Error; err != nil {
-		err = errors.WrapDBError(err, "获取角色分页失败")
+		err = errors.WrapDBError(err, "获取模型分页失败")
 		return
 	}
 
 	// 查询分页数据
 	if err = queryConditions.Scopes(q.Paginate()).Find(&pageRes).Error; err != nil {
-		err = errors.WrapDBError(err, "获取角色分页失败")
+		err = errors.WrapDBError(err, "获取模型分页失败")
 		return
 	}
 	return
 }
 
-func (a *AIModelDB) GetSimpleModelList(c context.Context) (models []*entity.AIModel, err error) {
-	if err = DB(c, a.db).Select("id", "icon", "model").Where("enabled = ?", true).Find(&models).Error; err != nil {
+func (a *AIModelDB) GetSimpleChatModelList(c context.Context) (models []*entity.AIModel, err error) {
+	if err = DB(c, a.db).Select("id", "icon", "model").
+		Where("enabled = ?", true).
+		Where("model_type = ?", "chat").Find(&models).Error; err != nil {
 		err = errors.WrapDBError(err, "获取模型简洁列表失败")
 		return
 	}

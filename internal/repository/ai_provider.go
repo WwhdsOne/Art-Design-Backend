@@ -24,10 +24,12 @@ func (a *AIProviderRepo) GetAIProviderByIDWithCache(c context.Context, id int64)
 	if !errors.Is(err, redis.Nil) {
 		// 缓存出错，但不是未命中，记录日志
 		zap.L().Warn("根据ID查询供应商缓存失败", zap.Error(err))
+	} else {
+		zap.L().Warn("未命中供应商缓存")
 	}
 
 	// 缓存未命中，继续查数据库
-	provider, err := a.GetProviderByID(c, id)
+	res, err = a.GetProviderByID(c, id)
 	if err != nil {
 		return
 	}
@@ -35,6 +37,6 @@ func (a *AIProviderRepo) GetAIProviderByIDWithCache(c context.Context, id int64)
 		if err := a.SetProviderCacheByID(provider); err != nil {
 			zap.L().Warn("设置供应商缓存失败", zap.Error(err))
 		}
-	}(provider)
+	}(res)
 	return
 }

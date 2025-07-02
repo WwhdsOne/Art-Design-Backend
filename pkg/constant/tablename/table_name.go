@@ -10,4 +10,5 @@ var (
 	DigitPredictTableName = "digit_predict"
 	AIModelTableName      = "ai_model"
 	AIProviderTableName   = "ai_provider"
+	AIAgentTableName      = "ai_agent"
 )

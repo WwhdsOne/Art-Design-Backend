@@ -42,3 +42,7 @@ func (o *OssClient) UploadDigitImage(c context.Context, filename string, reader 
 func (o *OssClient) UploadModelIcon(c context.Context, filename string, reader io.Reader) (string, error) {
 	return o.uploadToFolder(c, "model_icon", filename, reader)
 }
+
+func (o *OssClient) UploadAgentDocument(c context.Context, filename string, reader io.Reader) (string, error) {
+	return o.uploadToFolder(c, "agent_document", filename, reader)
+}

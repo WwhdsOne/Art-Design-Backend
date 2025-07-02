@@ -21,6 +21,7 @@ type Config struct {
 	Zap          Zap               `yaml:"zap" mapstructure:"zap"`
 	OSS          OSS               `yaml:"oss" mapstructure:"oss"`
 	DigitPredict DigitPredict      `yaml:"digit_predict" mapstructure:"digit_predict"`
+	Slicer       Slicer            `yaml:"slicer" mapstructure:"slicer"`
 	DefaultUser  DefaultUserConfig `yaml:"default_user" mapstructure:"default_user"`
 	Middleware   Middleware        `yaml:"middleware" mapstructure:"middleware"`
 }
