@@ -45,7 +45,7 @@ func (f *ChunkVectorDB) SearchTopKByEmbedding(
 			SELECT chunk_id
 			FROM chunk_vectors
 			WHERE chunk_id IN (?)          -- 只在指定的 chunkIDList 范围内搜索
-			ORDER BY vector <#> ? -- 以内积（Inner Product）相似度排序，越大越相似
+			ORDER BY embedding <#> ? -- 以内积（Inner Product）相似度排序，越大越相似
 			LIMIT ?                 -- 限制返回 topK 条结果
 		`, chunkIDList, queryVec, topK).
 		Scan(&similarChunkIDs).Error // 扫描结果到 ID 列表

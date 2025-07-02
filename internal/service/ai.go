@@ -267,8 +267,8 @@ func (a *AIService) UploadAndVectorizeDocument(
 	// Step 6: 保存向量
 	for i, chunk := range chunkList {
 		chunkVector := &entity.ChunkVector{
-			ChunkID: chunk.ID,
-			Vector:  pgvector.NewVector(embeddings[i]),
+			ChunkID:   chunk.ID,
+			Embedding: pgvector.NewVector(embeddings[i]),
 		}
 		if err = a.AIAgentRepo.CreateChunkVector(c, chunkVector); err != nil {
 			zap.L().Error("保存向量失败", zap.Int64("chunkID", chunk.ID), zap.Error(err))
