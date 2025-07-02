@@ -24,3 +24,15 @@ func (a *AgentFileDB) CreateAgentFile(c context.Context, e *entity.AgentFile) (e
 	}
 	return
 }
+
+func (a *AgentFileDB) GetAgentFileIDsByAgentID(c context.Context, agentId int64) (ids []int64, err error) {
+	if err = DB(c, a.db).
+		Model(&entity.AgentFile{}).
+		Select("id").
+		Where("agent_id = ?", agentId).
+		Scan(&ids).Error; err != nil {
+		err = errors.WrapDBError(err, "获取AI知识库文件ID失败")
+		return
+	}
+	return
+}

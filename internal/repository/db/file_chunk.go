@@ -24,3 +24,28 @@ func (f *FileChunkDB) CreateFileChunk(c context.Context, e *entity.FileChunk) (e
 	}
 	return
 }
+
+func (f *FileChunkDB) GetFileChunkIDsByFileIDList(c context.Context, fileIDList []int64) (res []int64, err error) {
+	if err = DB(c, f.db).
+		Model(&entity.FileChunk{}).
+		Select("id").
+		Where("file_id IN (?)", fileIDList).
+		Scan(&res).Error; err != nil {
+		err = errors.WrapDBError(err, "获取文件块ID失败")
+		return
+	}
+	return
+}
+
+func (f *FileChunkDB) GetFileContentByIDList(c context.Context, ids []int64) (contents []string, err error) {
+	if err = DB(c, f.db).
+		Model(&entity.FileChunk{}). // 指定表
+		Select("content").          // 只查询 content 字段
+		Where("id IN (?)", ids).
+		Pluck("content", &contents). // 直接提取 content 字段到字符串切片
+		Error; err != nil {
+		err = errors.WrapDBError(err, "获取文件块内容失败")
+		return
+	}
+	return
+}

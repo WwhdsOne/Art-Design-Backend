@@ -57,3 +57,11 @@ func (a *AIAgentDB) GetSimpleAgentList(c context.Context) (agentList []*entity.A
 	}
 	return
 }
+
+func (a *AIAgentDB) GetAgentByID(c context.Context, id int64) (agent *entity.AIAgent, err error) {
+	if err = DB(c, a.db).Where("id = ?", id).First(&agent).Error; err != nil {
+		err = errors.WrapDBError(err, "获取智能体失败")
+		return
+	}
+	return
+}

@@ -42,6 +42,7 @@ func NewAIController(engine *gin.Engine, middleware *middleware.Middlewares, ser
 		agentGroup.POST("/create", aiCtrl.CreateAgent)
 		agentGroup.POST("/page", aiCtrl.GetAIAgentPage)
 		agentGroup.GET("/simpleList", aiCtrl.getSimpleAgentList)
+		agentGroup.POST("/chat-completion", aiCtrl.agentChatCompletion)
 	}
 	return aiCtrl
 }
@@ -220,4 +221,16 @@ func (a *AIController) GetAIAgentPage(c *gin.Context) {
 		return
 	}
 	result.OkWithData(res, c)
+}
+
+func (a *AIController) agentChatCompletion(c *gin.Context) {
+	var req request.ChatCompletion
+	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
+		_ = c.Error(err)
+		return
+	}
+	if err := a.aiService.AgentChatCompletion(c, &req); err != nil {
+		_ = c.Error(err)
+		return
+	}
 }

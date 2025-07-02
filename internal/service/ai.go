@@ -18,6 +18,7 @@ import (
 	"github.com/pgvector/pgvector-go"
 	"go.uber.org/zap"
 	"mime/multipart"
+	"strings"
 )
 
 type AIService struct {
@@ -185,6 +186,24 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 	return
 }
 
+func (a *AIService) getQianwenEmbeddings(c context.Context, chunks []string) ([][]float32, error) {
+	const providerID int64 = 51088793876300041
+
+	provider, err := a.AIProviderRepo.GetAIProviderByIDWithCache(c, providerID)
+	if err != nil {
+		zap.L().Error("获取嵌入模型供应商失败", zap.Error(err))
+		return nil, fmt.Errorf("获取嵌入模型供应商失败: %w", err)
+	}
+
+	embeddings, err := a.AIModelClient.Embed(c, provider.APIKey, chunks)
+	if err != nil {
+		zap.L().Error("获取嵌入向量失败", zap.Error(err))
+		return nil, fmt.Errorf("获取嵌入向量失败: %w", err)
+	}
+
+	return embeddings, nil
+}
+
 func (a *AIService) UploadAndVectorizeDocument(
 	c context.Context,
 	file multipart.File,
@@ -234,16 +253,9 @@ func (a *AIService) UploadAndVectorizeDocument(
 	}
 
 	// Step 5: 获取 Embedding（使用指定 provider,千问）
-	const providerID = int64(51088793876300041)
-	provider, err := a.AIProviderRepo.GetAIProviderByIDWithCache(c, providerID)
+	embeddings, err := a.getQianwenEmbeddings(c, chunks)
 	if err != nil {
-		zap.L().Error("获取嵌入模型供应商失败", zap.Error(err))
-		return fmt.Errorf("获取嵌入模型供应商失败: %w", err)
-	}
-	embeddings, err := a.AIModelClient.Embed(c, provider.APIKey, chunks)
-	if err != nil {
-		zap.L().Error("获取文本向量失败", zap.Error(err))
-		return fmt.Errorf("获取文本向量失败: %w", err)
+		return err
 	}
 	if len(embeddings) != len(chunkList) {
 		zap.L().Error("向量数量与分块数量不一致",
@@ -313,4 +325,63 @@ func (a *AIService) GetSimpleAgentList(c context.Context) (res []*response.Simpl
 		res = append(res, agentResp)
 	}
 	return
+}
+
+func (a *AIService) AgentChatCompletion(c *gin.Context, r *request.ChatCompletion) (err error) {
+	// Step 1: 获取 Agent 信息
+	agentInfo, err := a.AIAgentRepo.GetAgentByID(c, int64(r.ID))
+	if err != nil {
+		zap.L().Error("获取智能体失败", zap.Error(err))
+		return fmt.Errorf("获取智能体失败: %w", err)
+	}
+
+	// Step 2: 获取用户最新提问（最后一条 user 消息）
+	var latestQuestion string
+	for i := len(r.Messages) - 1; i >= 0; i-- {
+		if r.Messages[i].Role == "user" {
+			latestQuestion = r.Messages[i].Content
+			break
+		}
+	}
+	if latestQuestion == "" {
+		return fmt.Errorf("未找到用户提问")
+	}
+
+	// Step 3: 向量化提问
+	embedding, err := a.getQianwenEmbeddings(c, []string{latestQuestion})
+	if err != nil {
+		return err
+	}
+
+	// Step 4: 基于 embedding 搜索相关内容（假设你有一个向量搜索接口）
+	retrievedTexts, err := a.AIAgentRepo.SearchAgentRelatedChunks(c, agentInfo.ID, embedding[0])
+	if err != nil {
+		zap.L().Error("向量检索失败", zap.Error(err))
+		return fmt.Errorf("向量检索失败: %w", err)
+	}
+
+	// Step 5: 构造新的对话上下文（system + retrieved + user）
+	var fullMessages []ai.ChatMessage
+	if agentInfo.SystemPrompt != "" {
+		fullMessages = append(fullMessages, ai.ChatMessage{
+			Role:    "system",
+			Content: agentInfo.SystemPrompt,
+		})
+	}
+
+	// 将检索到的文本合并为一段 context
+	contextText := strings.Join(retrievedTexts, "\n\n")
+	fullMessages = append(fullMessages, ai.ChatMessage{
+		Role:    "system",
+		Content: fmt.Sprintf("以下是与问题相关的背景资料：\n\n%s", contextText),
+	})
+
+	// 拼接用户历史对话
+	fullMessages = append(fullMessages, r.Messages...)
+
+	// Step 6: 调用模型回答（根据 agentInfo.ModelID 决定使用哪个模型）
+	return a.ChatCompletion(c, &request.ChatCompletion{
+		ID:       common.LongStringID(agentInfo.ModelID),
+		Messages: fullMessages,
+	})
 }
