@@ -61,7 +61,7 @@ func (a *AIAgentRepo) SearchAgentRelatedChunks(c context.Context, agentID int64,
 		return
 	}
 	// 根据文件块ID和向量查询出对应的ID
-	similarChunkIDs, err := a.ChunkVectorDB.SearchTopKByEmbedding(c, fileChunkIDs, pgvector.NewVector(vector), 3)
+	similarChunkIDs, err := a.ChunkVectorDB.SearchTopKByEmbedding(c, fileChunkIDs, pgvector.NewVector(vector), 10)
 	if err != nil {
 		return
 	}

@@ -124,3 +124,11 @@ func (a *AIModelDB) GetSimpleChatModelList(c context.Context) (models []*entity.
 	}
 	return
 }
+
+func (a *AIModelDB) GetRerankModel(c context.Context) (model *entity.AIModel, err error) {
+	if err = DB(c, a.db).Where("enabled = ?", true).Where("model_type = ?", "rerank").First(&model).Error; err != nil {
+		err = errors.WrapDBError(err, "获取模型失败")
+		return
+	}
+	return
+}
