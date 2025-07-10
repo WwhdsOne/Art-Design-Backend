@@ -329,7 +329,7 @@ func (a *AIService) GetSimpleAgentList(c context.Context) (res []*response.Simpl
 
 func (a *AIService) AgentChatCompletion(c *gin.Context, r *request.ChatCompletion) (err error) {
 	// Step 1: 获取 Agent 信息
-	agentInfo, err := a.AIAgentRepo.GetAgentByID(c, int64(r.ID))
+	agentInfo, err := a.AIAgentRepo.GetAIAgentByIDWithCache(c, int64(r.ID))
 	if err != nil {
 		zap.L().Error("获取智能体失败", zap.Error(err))
 		return fmt.Errorf("获取智能体失败: %w", err)
@@ -362,6 +362,8 @@ func (a *AIService) AgentChatCompletion(c *gin.Context, r *request.ChatCompletio
 
 	// Step 5: 构造新的对话上下文（system + retrieved + user）
 	var fullMessages []ai.ChatMessage
+
+	// 添加 agent 的默认 system prompt（如有）
 	if agentInfo.SystemPrompt != "" {
 		fullMessages = append(fullMessages, ai.ChatMessage{
 			Role:    "system",
@@ -369,14 +371,23 @@ func (a *AIService) AgentChatCompletion(c *gin.Context, r *request.ChatCompletio
 		})
 	}
 
-	// 将检索到的文本合并为一段 context
-	contextText := strings.Join(retrievedTexts, "\n\n")
-	fullMessages = append(fullMessages, ai.ChatMessage{
-		Role:    "system",
-		Content: fmt.Sprintf("以下是与问题相关的背景资料：\n\n%s", contextText),
-	})
+	// 将检索到的文本合并为一段 context，并构造辅助 system 提示
+	if len(retrievedTexts) > 0 {
+		contextText := strings.Join(retrievedTexts, "\n\n")
+		fullMessages = append(fullMessages, ai.ChatMessage{
+			Role: "system",
+			Content: fmt.Sprintf(`以下是与用户问题相关的背景资料。请仅根据这些资料回答问题，如果资料中没有提及，请直接回复：“很抱歉，我无法在现有知识中找到相关答案。”：
 
-	// 拼接用户历史对话
+%s`, contextText),
+		})
+	} else {
+		fullMessages = append(fullMessages, ai.ChatMessage{
+			Role:    "system",
+			Content: `注意：当前没有任何与用户问题相关的背景资料。如果资料中没有提及，请直接回复：“很抱歉，我无法在现有知识中找到相关答案。”`,
+		})
+	}
+
+	// 拼接用户原始对话
 	fullMessages = append(fullMessages, r.Messages...)
 
 	// Step 6: 调用模型回答（根据 agentInfo.ModelID 决定使用哪个模型）

@@ -36,6 +36,8 @@ const (
 	AIModelInfoTTL       = 86400 * time.Second
 	AIProviderInfo       = "AIPROVIDER:INFO:"
 	AIProviderInfoTTL    = 86400 * time.Second
+	AIAgentInfo          = "AIAgent:INFO:"
+	AIAgentInfoTTL       = 86400 * time.Second
 )
 
 // RateLimiter 访问频率限制

@@ -118,11 +118,13 @@ func wireApp() *bootstrap.HttpServer {
 	agentFileDB := db.NewAgentFileDB(gormDB)
 	fileChunkDB := db.NewFileChunkDB(gormDB)
 	chunkVectorDB := db.NewChunkVectorDB(gormDB)
+	aiAgentCache := cache.NewAIAgentCache(redisWrapper)
 	aiAgentRepo := &repository.AIAgentRepo{
 		AIAgentDB:     aiAgentDB,
 		AgentFileDB:   agentFileDB,
 		FileChunkDB:   fileChunkDB,
 		ChunkVectorDB: chunkVectorDB,
+		AIAgentCache:  aiAgentCache,
 	}
 	slicer := bootstrap.InitSlicer(configConfig)
 	aiService := &service.AIService{
