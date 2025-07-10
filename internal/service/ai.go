@@ -237,51 +237,76 @@ func (a *AIService) UploadAndVectorizeDocument(
 		return fmt.Errorf("文档内容为空，无法切分")
 	}
 
-	// Step 4: 保存分块内容
-	chunkList := make([]*entity.FileChunk, 0, len(chunks))
-	for i, chunk := range chunks {
-		chunkEntity := &entity.FileChunk{
-			FileID:     agentFile.ID,
-			ChunkIndex: i,
-			Content:    chunk,
+	// 使用事务包裹整个处理流程
+	err = a.GormTX.Transaction(c, func(ctx context.Context) error {
+		// Step 4: 保存分块内容
+		chunkList := make([]*entity.FileChunk, 0, len(chunks))
+		for i, chunk := range chunks {
+			chunkEntity := &entity.FileChunk{
+				FileID:     agentFile.ID,
+				ChunkIndex: i,
+				Content:    chunk,
+			}
+			if err = a.AIAgentRepo.CreateFileChunk(ctx, chunkEntity); err != nil {
+				zap.L().Error("创建文件块失败", zap.Int("index", i), zap.Error(err))
+				return fmt.Errorf("创建文件块失败(index %d): %w", i, err)
+			}
+			chunkList = append(chunkList, chunkEntity)
 		}
-		if err = a.AIAgentRepo.CreateFileChunk(c, chunkEntity); err != nil {
-			zap.L().Error("创建文件块失败", zap.Int("index", i), zap.Error(err))
-			return fmt.Errorf("创建文件块失败(index %d): %w", i, err)
-		}
-		chunkList = append(chunkList, chunkEntity)
-	}
 
-	// Step 5: 获取 Embedding（使用指定 provider,千问）
-	embeddings, err := a.getQianwenEmbeddings(c, chunks)
+		// Step 5: 分批获取 Embedding（每次最多 10 个 chunk）
+		batchSize := 10
+		allEmbeddings := make([][]float32, 0, len(chunkList))
+		for i := 0; i < len(chunks); i += batchSize {
+			end := i + batchSize
+			if end > len(chunks) {
+				end = len(chunks)
+			}
+			batchChunks := chunks[i:end]
+
+			// 调用千问 Embedding API（每次最多 10 个）
+			batchEmbeddings, err := a.getQianwenEmbeddings(ctx, batchChunks)
+			if err != nil {
+				return fmt.Errorf("获取 Embedding 失败(batch %d-%d): %w", i, end-1, err)
+			}
+			allEmbeddings = append(allEmbeddings, batchEmbeddings...)
+		}
+
+		// Step 6: 检查向量数量是否匹配
+		if len(allEmbeddings) != len(chunkList) {
+			zap.L().Error("向量数量与分块数量不一致",
+				zap.Int("chunks", len(chunkList)),
+				zap.Int("vectors", len(allEmbeddings)))
+			return fmt.Errorf("向量数量与分块数量不一致")
+		}
+
+		// Step 7: 保存向量
+		for i, chunk := range chunkList {
+			chunkVector := &entity.ChunkVector{
+				ChunkID:   chunk.ID,
+				Embedding: pgvector.NewVector(allEmbeddings[i]),
+			}
+			if err = a.AIAgentRepo.CreateChunkVector(ctx, chunkVector); err != nil {
+				zap.L().Error("保存向量失败", zap.Int64("chunkID", chunk.ID), zap.Error(err))
+				return fmt.Errorf("保存向量失败(chunkID %d): %w", chunk.ID, err)
+			}
+		}
+
+		// ✅ 输出日志（事务内）
+		zap.L().Info("文档上传与向量化完成",
+			zap.Int64("agentID", agentID),
+			zap.Int("chunkCount", len(chunks)),
+			zap.String("file", filename),
+		)
+		return nil
+	})
+
 	if err != nil {
+		// 事务已自动回滚，此处可补充额外日志
+		zap.L().Error("文档处理事务失败", zap.Error(err))
 		return err
 	}
-	if len(embeddings) != len(chunkList) {
-		zap.L().Error("向量数量与分块数量不一致",
-			zap.Int("chunks", len(chunkList)),
-			zap.Int("vectors", len(embeddings)))
-		return fmt.Errorf("向量数量与分块数量不一致")
-	}
 
-	// Step 6: 保存向量
-	for i, chunk := range chunkList {
-		chunkVector := &entity.ChunkVector{
-			ChunkID:   chunk.ID,
-			Embedding: pgvector.NewVector(embeddings[i]),
-		}
-		if err = a.AIAgentRepo.CreateChunkVector(c, chunkVector); err != nil {
-			zap.L().Error("保存向量失败", zap.Int64("chunkID", chunk.ID), zap.Error(err))
-			return fmt.Errorf("保存向量失败(chunkID %d): %w", chunk.ID, err)
-		}
-	}
-
-	// ✅ 输出日志
-	zap.L().Info("文档上传与向量化完成",
-		zap.Int64("agentID", agentID),
-		zap.Int("chunkCount", len(chunks)),
-		zap.String("file", filename),
-	)
 	return nil
 }
 
