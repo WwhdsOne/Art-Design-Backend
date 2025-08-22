@@ -24,10 +24,10 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v4
       # 设置GO语言环境
-      - name: Set up Go 1.24
+      - name: Set up Go 1.25
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24.3'
+          go-version: '1.25.0'
           # 自建Runner需要关闭缓存，否在会报错
           # 在issue https://github.com/actions/setup-go/issues/403 提及
           cache: true
