@@ -6,8 +6,9 @@ import (
 	"Art-Design-Backend/pkg/errors"
 	"context"
 	"fmt"
-	"gorm.io/gorm"
 	"strings"
+
+	"gorm.io/gorm"
 )
 
 type UserDB struct {

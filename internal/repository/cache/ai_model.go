@@ -5,8 +5,9 @@ import (
 	"Art-Design-Backend/internal/model/response"
 	"Art-Design-Backend/pkg/constant/rediskey"
 	"Art-Design-Backend/pkg/redisx"
-	"github.com/bytedance/sonic"
 	"strconv"
+
+	"github.com/bytedance/sonic"
 )
 
 type AIModelCache struct {

@@ -5,25 +5,27 @@ import (
 	"Art-Design-Backend/internal/controller"
 	"Art-Design-Backend/pkg/utils"
 	"context"
-	"github.com/gin-gonic/gin"
-	"go.uber.org/zap"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 type HttpServer struct {
-	Engine                 *gin.Engine                        // gin引擎
-	Logger                 *zap.Logger                        // 日志
-	AuthController         *controller.AuthController         // 鉴权Ctrl
-	UserController         *controller.UserController         // 用户Ctrl
-	MenuController         *controller.MenuController         // 菜单Ctrl
-	RoleController         *controller.RoleController         // 角色Ctrl
-	DigitPredictController *controller.DigitPredictController // 数字预测Ctrl
-	AIController           *controller.AIController           // AI模型Ctrl
-	Config                 *config.Config                     // 服务器配置
+	Engine                  *gin.Engine                         // gin引擎
+	Logger                  *zap.Logger                         // 日志
+	AuthController          *controller.AuthController          // 鉴权Ctrl
+	UserController          *controller.UserController          // 用户Ctrl
+	MenuController          *controller.MenuController          // 菜单Ctrl
+	RoleController          *controller.RoleController          // 角色Ctrl
+	DigitPredictController  *controller.DigitPredictController  // 数字预测Ctrl
+	AIController            *controller.AIController            // AI模型Ctrl
+	KnowledgeBaseController *controller.KnowledgeBaseController // 知识库文件Ctrl
+	Config                  *config.Config                      // 服务器配置
 }
 
 func (h *HttpServer) InitGinServer() {

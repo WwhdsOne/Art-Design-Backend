@@ -2,17 +2,19 @@ package bootstrap
 
 import (
 	"Art-Design-Backend/config"
+	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/pkg/utils"
 	"context"
 	"fmt"
-	"go.uber.org/zap"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 	"reflect"
 	"strings"
 	"sync"
 	"time"
+
+	"go.uber.org/zap"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 // AutoMigrate 自动迁移
@@ -33,7 +35,7 @@ func AutoMigrate(db *gorm.DB) {
 	//db.AutoMigrate(&entity.AIProvider{})
 	// 8. AI智能体
 	//db.AutoMigrate(&entity.AIAgent{})
-	//db.AutoMigrate(&entity.AgentFile{})
+	db.AutoMigrate(&entity.KnowledgeBaseFile{})
 	//db.AutoMigrate(&entity.ChunkVector{})
 	//db.AutoMigrate(&entity.FileChunk{})
 }

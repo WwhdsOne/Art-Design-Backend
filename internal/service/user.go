@@ -13,11 +13,12 @@ import (
 	"Art-Design-Backend/pkg/authutils"
 	"context"
 	"fmt"
+	"mime/multipart"
+
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
-	"mime/multipart"
 )
 
 type UserService struct {

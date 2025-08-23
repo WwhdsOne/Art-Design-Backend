@@ -5,13 +5,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/bytedance/sonic"
-	"github.com/redis/go-redis/v9"
-	"go.uber.org/zap"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/bytedance/sonic"
+	"github.com/redis/go-redis/v9"
+	"go.uber.org/zap"
 )
 
 type persistData struct {

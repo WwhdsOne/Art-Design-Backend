@@ -5,10 +5,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/bytedance/sonic"
-	"go.uber.org/zap"
 	"io"
 	"net/http"
+
+	"github.com/bytedance/sonic"
+	"go.uber.org/zap"
 )
 
 // ChatRequest 普通非流式请求，返回完整响应体 []byte 或错误

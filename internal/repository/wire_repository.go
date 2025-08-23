@@ -3,6 +3,7 @@ package repository
 import (
 	"Art-Design-Backend/internal/repository/cache"
 	"Art-Design-Backend/internal/repository/db"
+
 	"github.com/google/wire"
 )
 
@@ -13,7 +14,6 @@ var RedisCacheSet = wire.NewSet(
 	cache.NewUserCache,
 	cache.NewAIModelCache,
 	cache.NewAIProviderCache,
-	cache.NewAIAgentCache,
 )
 
 var DBSet = wire.NewSet(
@@ -26,10 +26,9 @@ var DBSet = wire.NewSet(
 	db.NewDigitPredictDB,
 	db.NewAIModelDB,
 	db.NewAIProviderDB,
-	db.NewAIAgentDB,
-	db.NewAgentFileDB,
 	db.NewFileChunkDB,
 	db.NewChunkVectorDB,
+	db.NewKnowledgeBaseDB,
 )
 
 var RepositorySet = wire.NewSet(
@@ -42,5 +41,5 @@ var RepositorySet = wire.NewSet(
 	wire.Struct(new(AuthRepo), "*"),
 	wire.Struct(new(DigitPredictRepo), "*"),
 	wire.Struct(new(AIProviderRepo), "*"),
-	wire.Struct(new(AIAgentRepo), "*"),
+	wire.Struct(new(KnowledgeBaseRepo), "*"),
 )

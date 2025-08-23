@@ -12,20 +12,17 @@ import (
 	"Art-Design-Backend/pkg/aliyun"
 	"Art-Design-Backend/pkg/slicer_client"
 	"context"
-	"fmt"
+	"mime/multipart"
+
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
-	"github.com/pgvector/pgvector-go"
 	"go.uber.org/zap"
-	"mime/multipart"
-	"strings"
 )
 
 type AIService struct {
 	AIModelRepo    *repository.AIModelRepo    // 模型Repo
 	AIModelClient  *ai.AIModelClient          // 聊天
 	AIProviderRepo *repository.AIProviderRepo // 模型供应商Repo
-	AIAgentRepo    *repository.AIAgentRepo    // 智能助手Repo
 	OssClient      *aliyun.OssClient          // 阿里云OSS
 	Slicer         *slicer_client.Slicer      // 文档切片
 	GormTX         *db.GormTransactionManager // 事务
@@ -186,259 +183,241 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 	return
 }
 
-func (a *AIService) getQianwenEmbeddings(c context.Context, chunks []string) ([][]float32, error) {
-	const providerID int64 = 51088793876300041
+//func (a *AIService) UploadAndVectorizeDocument(
+//	c context.Context,
+//	file multipart.File,
+//	filename string,
+//	agentID int64,
+//) error {
+//	// Step 1: 上传文档到 OSS
+//	documentURL, err := a.OssClient.UploadAgentDocument(c, filename, file)
+//	if err != nil {
+//		zap.L().Error("上传文档失败", zap.Error(err))
+//		return fmt.Errorf("上传文档失败: %w", err)
+//	}
+//
+//	// Step 2: 创建 AgentFile 记录
+//	agentFile := &entity.AgentFile{
+//		AgentID: agentID,
+//		FileURL: documentURL,
+//	}
+//	if err = a.AIAgentRepo.CreateAgentFile(c, agentFile); err != nil {
+//		zap.L().Error("保存 AgentFile 失败", zap.Error(err))
+//		return fmt.Errorf("保存 AgentFile 失败: %w", err)
+//	}
+//
+//	// Step 3: 文档分块
+//	chunks, err := a.Slicer.GetChunksFromSlicer(documentURL)
+//	if err != nil {
+//		zap.L().Error("文档分块失败", zap.Error(err))
+//		return fmt.Errorf("文档分块失败: %w", err)
+//	}
+//	if len(chunks) == 0 {
+//		return fmt.Errorf("文档内容为空，无法切分")
+//	}
+//
+//	// 使用事务包裹整个处理流程
+//	err = a.GormTX.Transaction(c, func(ctx context.Context) error {
+//		// Step 4: 保存分块内容
+//		chunkList := make([]*entity.FileChunk, 0, len(chunks))
+//		for i, chunk := range chunks {
+//			chunkEntity := &entity.FileChunk{
+//				FileID:     agentFile.ID,
+//				ChunkIndex: i,
+//				Content:    chunk,
+//			}
+//			if err = a.AIAgentRepo.CreateFileChunk(ctx, chunkEntity); err != nil {
+//				zap.L().Error("创建文件块失败", zap.Int("index", i), zap.Error(err))
+//				return fmt.Errorf("创建文件块失败(index %d): %w", i, err)
+//			}
+//			chunkList = append(chunkList, chunkEntity)
+//		}
+//
+//		// Step 5: 分批获取 Embedding（每次最多 10 个 chunk）
+//		batchSize := 10
+//		allEmbeddings := make([][]float32, 0, len(chunkList))
+//		for i := 0; i < len(chunks); i += batchSize {
+//			end := i + batchSize
+//			if end > len(chunks) {
+//				end = len(chunks)
+//			}
+//			batchChunks := chunks[i:end]
+//
+//			// 调用千问 Embedding API（每次最多 10 个）
+//			batchEmbeddings, err := a.getQianwenEmbeddings(ctx, batchChunks)
+//			if err != nil {
+//				return fmt.Errorf("获取 Embedding 失败(batch %d-%d): %w", i, end-1, err)
+//			}
+//			allEmbeddings = append(allEmbeddings, batchEmbeddings...)
+//		}
+//
+//		// Step 6: 检查向量数量是否匹配
+//		if len(allEmbeddings) != len(chunkList) {
+//			zap.L().Error("向量数量与分块数量不一致",
+//				zap.Int("chunks", len(chunkList)),
+//				zap.Int("vectors", len(allEmbeddings)))
+//			return fmt.Errorf("向量数量与分块数量不一致")
+//		}
+//
+//		// Step 7: 保存向量
+//		for i, chunk := range chunkList {
+//			chunkVector := &entity.ChunkVector{
+//				ChunkID:   chunk.ID,
+//				Embedding: pgvector.NewVector(allEmbeddings[i]),
+//			}
+//			if err = a.AIAgentRepo.CreateChunkVector(ctx, chunkVector); err != nil {
+//				zap.L().Error("保存向量失败", zap.Int64("chunkID", chunk.ID), zap.Error(err))
+//				return fmt.Errorf("保存向量失败(chunkID %d): %w", chunk.ID, err)
+//			}
+//		}
+//
+//		// ✅ 输出日志（事务内）
+//		zap.L().Info("文档上传与向量化完成",
+//			zap.Int64("agentID", agentID),
+//			zap.Int("chunkCount", len(chunks)),
+//			zap.String("file", filename),
+//		)
+//		return nil
+//	})
+//
+//	if err != nil {
+//		// 事务已自动回滚，此处可补充额外日志
+//		zap.L().Error("文档处理事务失败", zap.Error(err))
+//		return err
+//	}
+//
+//	return nil
+//}
 
-	provider, err := a.AIProviderRepo.GetAIProviderByIDWithCache(c, providerID)
-	if err != nil {
-		zap.L().Error("获取嵌入模型供应商失败", zap.Error(err))
-		return nil, fmt.Errorf("获取嵌入模型供应商失败: %w", err)
-	}
+//func (a *AIService) CreateAgent(c *gin.Context, r *request.AIAgent) (err error) {
+//	agent := &entity.AIAgent{}
+//	_ = copier.Copy(agent, r)
+//	if err = a.AIAgentRepo.Create(c, agent); err != nil {
+//		zap.L().Error("创建AI模型失败", zap.Error(err))
+//		return
+//	}
+//	return
+//}
+//
+//func (a *AIService) GetAIAgentPage(c *gin.Context, q *query.AIAgent) (res *common.PaginationResp[*response.AIAgent], err error) {
+//	agents, total, err := a.AIAgentRepo.GetAIAgentPage(c, q)
+//	if err != nil {
+//		zap.L().Error("获取AI模型分页失败", zap.Error(err))
+//		return
+//	}
+//	agentRes := make([]*response.AIAgent, 0, len(agents))
+//	for _, agent := range agents {
+//		agentResp := &response.AIAgent{}
+//		_ = copier.Copy(agentResp, agent)
+//		agentRes = append(agentRes, agentResp)
+//	}
+//	res = common.BuildPageResp[*response.AIAgent](agentRes, total, q.PaginationReq)
+//	return
+//}
+//
+//func (a *AIService) GetSimpleAgentList(c context.Context) (res []*response.SimpleAIAgent, err error) {
+//	var agentList []*entity.AIAgent
+//	agentList, err = a.AIAgentRepo.GetSimpleAgentList(c)
+//	if err != nil {
+//		zap.L().Error("获取智能体列表失败", zap.Error(err))
+//		return
+//	}
+//	res = make([]*response.SimpleAIAgent, 0, len(agentList))
+//	for _, agent := range agentList {
+//		agentResp := &response.SimpleAIAgent{}
+//		_ = copier.Copy(agentResp, agent)
+//		res = append(res, agentResp)
+//	}
+//	return
+//}
 
-	embeddings, err := a.AIModelClient.Embed(c, provider.APIKey, chunks)
-	if err != nil {
-		zap.L().Error("获取嵌入向量失败", zap.Error(err))
-		return nil, fmt.Errorf("获取嵌入向量失败: %w", err)
-	}
-
-	return embeddings, nil
-}
-
-func (a *AIService) UploadAndVectorizeDocument(
-	c context.Context,
-	file multipart.File,
-	filename string,
-	agentID int64,
-) error {
-	// Step 1: 上传文档到 OSS
-	documentURL, err := a.OssClient.UploadAgentDocument(c, filename, file)
-	if err != nil {
-		zap.L().Error("上传文档失败", zap.Error(err))
-		return fmt.Errorf("上传文档失败: %w", err)
-	}
-
-	// Step 2: 创建 AgentFile 记录
-	agentFile := &entity.AgentFile{
-		AgentID: agentID,
-		FileURL: documentURL,
-	}
-	if err = a.AIAgentRepo.CreateAgentFile(c, agentFile); err != nil {
-		zap.L().Error("保存 AgentFile 失败", zap.Error(err))
-		return fmt.Errorf("保存 AgentFile 失败: %w", err)
-	}
-
-	// Step 3: 文档分块
-	chunks, err := a.Slicer.GetChunksFromSlicer(documentURL)
-	if err != nil {
-		zap.L().Error("文档分块失败", zap.Error(err))
-		return fmt.Errorf("文档分块失败: %w", err)
-	}
-	if len(chunks) == 0 {
-		return fmt.Errorf("文档内容为空，无法切分")
-	}
-
-	// 使用事务包裹整个处理流程
-	err = a.GormTX.Transaction(c, func(ctx context.Context) error {
-		// Step 4: 保存分块内容
-		chunkList := make([]*entity.FileChunk, 0, len(chunks))
-		for i, chunk := range chunks {
-			chunkEntity := &entity.FileChunk{
-				FileID:     agentFile.ID,
-				ChunkIndex: i,
-				Content:    chunk,
-			}
-			if err = a.AIAgentRepo.CreateFileChunk(ctx, chunkEntity); err != nil {
-				zap.L().Error("创建文件块失败", zap.Int("index", i), zap.Error(err))
-				return fmt.Errorf("创建文件块失败(index %d): %w", i, err)
-			}
-			chunkList = append(chunkList, chunkEntity)
-		}
-
-		// Step 5: 分批获取 Embedding（每次最多 10 个 chunk）
-		batchSize := 10
-		allEmbeddings := make([][]float32, 0, len(chunkList))
-		for i := 0; i < len(chunks); i += batchSize {
-			end := i + batchSize
-			if end > len(chunks) {
-				end = len(chunks)
-			}
-			batchChunks := chunks[i:end]
-
-			// 调用千问 Embedding API（每次最多 10 个）
-			batchEmbeddings, err := a.getQianwenEmbeddings(ctx, batchChunks)
-			if err != nil {
-				return fmt.Errorf("获取 Embedding 失败(batch %d-%d): %w", i, end-1, err)
-			}
-			allEmbeddings = append(allEmbeddings, batchEmbeddings...)
-		}
-
-		// Step 6: 检查向量数量是否匹配
-		if len(allEmbeddings) != len(chunkList) {
-			zap.L().Error("向量数量与分块数量不一致",
-				zap.Int("chunks", len(chunkList)),
-				zap.Int("vectors", len(allEmbeddings)))
-			return fmt.Errorf("向量数量与分块数量不一致")
-		}
-
-		// Step 7: 保存向量
-		for i, chunk := range chunkList {
-			chunkVector := &entity.ChunkVector{
-				ChunkID:   chunk.ID,
-				Embedding: pgvector.NewVector(allEmbeddings[i]),
-			}
-			if err = a.AIAgentRepo.CreateChunkVector(ctx, chunkVector); err != nil {
-				zap.L().Error("保存向量失败", zap.Int64("chunkID", chunk.ID), zap.Error(err))
-				return fmt.Errorf("保存向量失败(chunkID %d): %w", chunk.ID, err)
-			}
-		}
-
-		// ✅ 输出日志（事务内）
-		zap.L().Info("文档上传与向量化完成",
-			zap.Int64("agentID", agentID),
-			zap.Int("chunkCount", len(chunks)),
-			zap.String("file", filename),
-		)
-		return nil
-	})
-
-	if err != nil {
-		// 事务已自动回滚，此处可补充额外日志
-		zap.L().Error("文档处理事务失败", zap.Error(err))
-		return err
-	}
-
-	return nil
-}
-
-func (a *AIService) CreateAgent(c *gin.Context, r *request.AIAgent) (err error) {
-	agent := &entity.AIAgent{}
-	_ = copier.Copy(agent, r)
-	if err = a.AIAgentRepo.Create(c, agent); err != nil {
-		zap.L().Error("创建AI模型失败", zap.Error(err))
-		return
-	}
-	return
-}
-
-func (a *AIService) GetAIAgentPage(c *gin.Context, q *query.AIAgent) (res *common.PaginationResp[*response.AIAgent], err error) {
-	agents, total, err := a.AIAgentRepo.GetAIAgentPage(c, q)
-	if err != nil {
-		zap.L().Error("获取AI模型分页失败", zap.Error(err))
-		return
-	}
-	agentRes := make([]*response.AIAgent, 0, len(agents))
-	for _, agent := range agents {
-		agentResp := &response.AIAgent{}
-		_ = copier.Copy(agentResp, agent)
-		agentRes = append(agentRes, agentResp)
-	}
-	res = common.BuildPageResp[*response.AIAgent](agentRes, total, q.PaginationReq)
-	return
-}
-
-func (a *AIService) GetSimpleAgentList(c context.Context) (res []*response.SimpleAIAgent, err error) {
-	var agentList []*entity.AIAgent
-	agentList, err = a.AIAgentRepo.GetSimpleAgentList(c)
-	if err != nil {
-		zap.L().Error("获取智能体列表失败", zap.Error(err))
-		return
-	}
-	res = make([]*response.SimpleAIAgent, 0, len(agentList))
-	for _, agent := range agentList {
-		agentResp := &response.SimpleAIAgent{}
-		_ = copier.Copy(agentResp, agent)
-		res = append(res, agentResp)
-	}
-	return
-}
-
-func (a *AIService) AgentChatCompletion(c *gin.Context, r *request.ChatCompletion) (err error) {
-	// Step 1: 获取 Agent 信息
-	agentInfo, err := a.AIAgentRepo.GetAIAgentByIDWithCache(c, int64(r.ID))
-	if err != nil {
-		zap.L().Error("获取智能体失败", zap.Error(err))
-		return fmt.Errorf("获取智能体失败: %w", err)
-	}
-
-	// Step 2: 获取用户最新提问（最后一条 user 消息）
-	var latestQuestion string
-	for i := len(r.Messages) - 1; i >= 0; i-- {
-		if r.Messages[i].Role == "user" {
-			latestQuestion = r.Messages[i].Content
-			break
-		}
-	}
-	if latestQuestion == "" {
-		return fmt.Errorf("未找到用户提问")
-	}
-
-	// Step 3: 向量化提问
-	embedding, err := a.getQianwenEmbeddings(c, []string{latestQuestion})
-	if err != nil {
-		return err
-	}
-
-	// Step 4: 基于 embedding 搜索相关内容（假设你有一个向量搜索接口）
-	retrievedTexts, err := a.AIAgentRepo.SearchAgentRelatedChunks(c, agentInfo.ID, embedding[0])
-	if err != nil {
-		zap.L().Error("向量检索失败", zap.Error(err))
-		return fmt.Errorf("向量检索失败: %w", err)
-	}
-
-	//Step 5: 使用重排序模型进一步优化
-	rerankModel, err := a.AIModelRepo.GetRerankModel(c)
-	if err != nil {
-		zap.L().Error("获取重排序模型失败", zap.Error(err))
-		return
-	}
-	rerankProvider, err := a.AIProviderRepo.GetAIProviderByIDWithCache(c, rerankModel.ProviderID)
-	if err != nil {
-		zap.L().Error("获取重排序模型提供者失败", zap.Error(err))
-		return
-	}
-	rerankTexts, err := a.AIModelClient.Rerank(rerankProvider.APIKey, ai.RerankRequest{
-		Model:     rerankModel.Model,
-		Documents: retrievedTexts,
-		Query:     latestQuestion,
-	}, 3)
-	if err != nil {
-		zap.L().Error("重排序失败", zap.Error(err))
-		return
-	}
-	zap.L().Info("向量并重排搜索结果", zap.String("query", latestQuestion), zap.Any("texts", rerankTexts))
-
-	// Step 6: 构造新的对话上下文（system + retrieved + user）
-	var fullMessages []ai.ChatMessage
-
-	// 添加 agent 的默认 system prompt（如有）
-	if agentInfo.SystemPrompt != "" {
-		fullMessages = append(fullMessages, ai.ChatMessage{
-			Role:    "system",
-			Content: agentInfo.SystemPrompt,
-		})
-	}
-
-	// 将检索到的文本合并为一段 context，并构造辅助 system 提示
-	if len(retrievedTexts) > 0 {
-		contextText := strings.Join(rerankTexts, "\n\n")
-		fullMessages = append(fullMessages, ai.ChatMessage{
-			Role: "system",
-			Content: fmt.Sprintf(`以下是与用户问题相关的背景资料。请仅根据这些资料回答问题，
-				如果资料中没有提及，请直接回复：“很抱歉，我无法在现有知识中找到相关答案。”：%s`, contextText),
-		})
-	} else {
-		fullMessages = append(fullMessages, ai.ChatMessage{
-			Role:    "system",
-			Content: `注意：当前没有任何与用户问题相关的背景资料。如果资料中没有提及，请直接回复：“很抱歉，我无法在现有知识中找到相关答案。”`,
-		})
-	}
-
-	// 拼接用户原始对话
-	fullMessages = append(fullMessages, r.Messages...)
-
-	// Step 7: 调用模型回答（根据 agentInfo.ModelID 决定使用哪个模型）
-	return a.ChatCompletion(c, &request.ChatCompletion{
-		ID:       common.LongStringID(agentInfo.ModelID),
-		Messages: fullMessages,
-	})
-}
+//func (a *AIService) AgentChatCompletion(c *gin.Context, r *request.ChatCompletion) (err error) {
+//	// Step 1: 获取 Agent 信息
+//	agentInfo, err := a.AIAgentRepo.GetAIAgentByIDWithCache(c, int64(r.ID))
+//	if err != nil {
+//		zap.L().Error("获取智能体失败", zap.Error(err))
+//		return fmt.Errorf("获取智能体失败: %w", err)
+//	}
+//
+//	// Step 2: 获取用户最新提问（最后一条 user 消息）
+//	var latestQuestion string
+//	for i := len(r.Messages) - 1; i >= 0; i-- {
+//		if r.Messages[i].Role == "user" {
+//			latestQuestion = r.Messages[i].Content
+//			break
+//		}
+//	}
+//	if latestQuestion == "" {
+//		return fmt.Errorf("未找到用户提问")
+//	}
+//
+//	// Step 3: 向量化提问
+//	embedding, err := a.getQianwenEmbeddings(c, []string{latestQuestion})
+//	if err != nil {
+//		return err
+//	}
+//
+//	// Step 4: 基于 embedding 搜索相关内容（假设你有一个向量搜索接口）
+//	retrievedTexts, err := a.AIAgentRepo.SearchAgentRelatedChunks(c, agentInfo.ID, embedding[0])
+//	if err != nil {
+//		zap.L().Error("向量检索失败", zap.Error(err))
+//		return fmt.Errorf("向量检索失败: %w", err)
+//	}
+//
+//	//Step 5: 使用重排序模型进一步优化
+//	rerankModel, err := a.AIModelRepo.GetRerankModel(c)
+//	if err != nil {
+//		zap.L().Error("获取重排序模型失败", zap.Error(err))
+//		return
+//	}
+//	rerankProvider, err := a.AIProviderRepo.GetAIProviderByIDWithCache(c, rerankModel.ProviderID)
+//	if err != nil {
+//		zap.L().Error("获取重排序模型提供者失败", zap.Error(err))
+//		return
+//	}
+//	rerankTexts, err := a.AIModelClient.Rerank(rerankProvider.APIKey, ai.RerankRequest{
+//		Model:     rerankModel.Model,
+//		Documents: retrievedTexts,
+//		Query:     latestQuestion,
+//	}, 3)
+//	if err != nil {
+//		zap.L().Error("重排序失败", zap.Error(err))
+//		return
+//	}
+//	zap.L().Info("向量并重排搜索结果", zap.String("query", latestQuestion), zap.Any("texts", rerankTexts))
+//
+//	// Step 6: 构造新的对话上下文（system + retrieved + user）
+//	var fullMessages []ai.ChatMessage
+//
+//	// 添加 agent 的默认 system prompt（如有）
+//	if agentInfo.SystemPrompt != "" {
+//		fullMessages = append(fullMessages, ai.ChatMessage{
+//			Role:    "system",
+//			Content: agentInfo.SystemPrompt,
+//		})
+//	}
+//
+//	// 将检索到的文本合并为一段 context，并构造辅助 system 提示
+//	if len(retrievedTexts) > 0 {
+//		contextText := strings.Join(rerankTexts, "\n\n")
+//		fullMessages = append(fullMessages, ai.ChatMessage{
+//			Role: "system",
+//			Content: fmt.Sprintf(`以下是与用户问题相关的背景资料。请仅根据这些资料回答问题，
+//				如果资料中没有提及，请直接回复：“很抱歉，我无法在现有知识中找到相关答案。”：%s`, contextText),
+//		})
+//	} else {
+//		fullMessages = append(fullMessages, ai.ChatMessage{
+//			Role:    "system",
+//			Content: `注意：当前没有任何与用户问题相关的背景资料。如果资料中没有提及，请直接回复：“很抱歉，我无法在现有知识中找到相关答案。”`,
+//		})
+//	}
+//
+//	// 拼接用户原始对话
+//	fullMessages = append(fullMessages, r.Messages...)
+//
+//	// Step 7: 调用模型回答（根据 agentInfo.ModelID 决定使用哪个模型）
+//	return a.ChatCompletion(c, &request.ChatCompletion{
+//		ID:       common.LongStringID(agentInfo.ModelID),
+//		Messages: fullMessages,
+//	})
+//}

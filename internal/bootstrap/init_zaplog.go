@@ -2,10 +2,11 @@ package bootstrap
 
 import (
 	"Art-Design-Backend/config"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"os"
 	"time"
+
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 func encoder(z *config.Zap) zapcore.Encoder {

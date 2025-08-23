@@ -8,6 +8,7 @@ import (
 	"Art-Design-Backend/internal/bootstrap"
 	"Art-Design-Backend/internal/controller"
 	"Art-Design-Backend/internal/repository"
+
 	"github.com/google/wire"
 )
 

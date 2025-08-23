@@ -2,9 +2,10 @@ package slicer_client
 
 import (
 	"bytes"
-	"github.com/bytedance/sonic"
 	"io"
 	"net/http"
+
+	"github.com/bytedance/sonic"
 )
 
 type Slicer struct {

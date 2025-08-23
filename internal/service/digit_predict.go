@@ -9,10 +9,11 @@ import (
 	"Art-Design-Backend/pkg/digit_client"
 	"context"
 	"fmt"
+	"mime/multipart"
+
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
 	"go.uber.org/zap"
-	"mime/multipart"
 )
 
 type DigitPredictService struct {

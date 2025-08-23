@@ -2,6 +2,7 @@ package controller
 
 import (
 	"Art-Design-Backend/internal/service"
+
 	"github.com/google/wire"
 )
 
@@ -12,6 +13,7 @@ var ControllerSet = wire.NewSet(
 	RoleCtrlSet,
 	DigitPredictSet,
 	AIModelCtrlSet,
+	KnowledgeBaseCtrlSet,
 )
 
 var AuthCtrlSet = wire.NewSet(
@@ -42,4 +44,9 @@ var DigitPredictSet = wire.NewSet(
 var AIModelCtrlSet = wire.NewSet(
 	NewAIController,
 	wire.Struct(new(service.AIService), "*"),
+)
+
+var KnowledgeBaseCtrlSet = wire.NewSet(
+	NewKnowledgeBaseController,
+	wire.Struct(new(service.KnowledgeBaseService), "*"),
 )

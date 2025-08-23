@@ -6,7 +6,7 @@ import (
 	"Art-Design-Backend/internal/service"
 	"Art-Design-Backend/pkg/middleware"
 	"Art-Design-Backend/pkg/result"
-	"Art-Design-Backend/pkg/utils"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -38,11 +38,11 @@ func NewAIController(engine *gin.Engine, middleware *middleware.Middlewares, ser
 	{
 		agentGroup := r.Group("/agent")
 		agentGroup.Use(middleware.AuthMiddleware())
-		agentGroup.POST("/uploadAgentDocument/:id", aiCtrl.UploadAgentDocument)
-		agentGroup.POST("/create", aiCtrl.CreateAgent)
-		agentGroup.POST("/page", aiCtrl.GetAIAgentPage)
-		agentGroup.GET("/simpleList", aiCtrl.getSimpleAgentList)
-		agentGroup.POST("/chat-completion", aiCtrl.agentChatCompletion)
+		//agentGroup.POST("/uploadAgentDocument/:id", aiCtrl.UploadAgentDocument)
+		//agentGroup.POST("/create", aiCtrl.CreateAgent)
+		//agentGroup.POST("/page", aiCtrl.GetAIAgentPage)
+		//agentGroup.GET("/simpleList", aiCtrl.getSimpleAgentList)
+		//agentGroup.POST("/chat-completion", aiCtrl.agentChatCompletion)
 	}
 	return aiCtrl
 }
@@ -162,75 +162,75 @@ func (a *AIController) getSimpleProviderList(c *gin.Context) {
 	result.OkWithData(res, c)
 }
 
-func (a *AIController) UploadAgentDocument(c *gin.Context) {
-	file, header, err := c.Request.FormFile("file")
-	if err != nil {
-		result.FailWithMessage("请选择要上传的文件", c)
-		return
-	}
-	defer file.Close()
+//func (a *AIController) UploadAgentDocument(c *gin.Context) {
+//	file, header, err := c.Request.FormFile("file")
+//	if err != nil {
+//		result.FailWithMessage("请选择要上传的文件", c)
+//		return
+//	}
+//	defer file.Close()
+//
+//	if header.Size > 100<<20 {
+//		result.FailWithMessage("文件不能超过 100MB", c)
+//		return
+//	}
+//
+//	filename := header.Filename
+//	agentID, err := utils.ParseID(c)
+//
+//	err = a.aiService.UploadAndVectorizeDocument(c, file, filename, agentID)
+//	if err != nil {
+//		result.FailWithMessage("文件上传失败: "+err.Error(), c)
+//		return
+//	}
+//
+//	result.OkWithMessage("上传成功", c)
+//}
 
-	if header.Size > 100<<20 {
-		result.FailWithMessage("文件不能超过 100MB", c)
-		return
-	}
+//func (a *AIController) CreateAgent(c *gin.Context) {
+//	var req request.AIAgent
+//	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
+//		_ = c.Error(err)
+//		return
+//	}
+//	if err := a.aiService.CreateAgent(c, &req); err != nil {
+//		_ = c.Error(err)
+//		return
+//	}
+//	result.OkWithMessage("创建成功", c)
+//}
+//
+//func (a *AIController) getSimpleAgentList(c *gin.Context) {
+//	res, err := a.aiService.GetSimpleAgentList(c)
+//	if err != nil {
+//		_ = c.Error(err)
+//		return
+//	}
+//	result.OkWithData(res, c)
+//}
+//
+//func (a *AIController) GetAIAgentPage(c *gin.Context) {
+//	var req query.AIAgent
+//	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
+//		_ = c.Error(err)
+//		return
+//	}
+//	res, err := a.aiService.GetAIAgentPage(c, &req)
+//	if err != nil {
+//		_ = c.Error(err)
+//		return
+//	}
+//	result.OkWithData(res, c)
+//}
 
-	filename := header.Filename
-	agentID, err := utils.ParseID(c)
-
-	err = a.aiService.UploadAndVectorizeDocument(c, file, filename, agentID)
-	if err != nil {
-		result.FailWithMessage("文件上传失败: "+err.Error(), c)
-		return
-	}
-
-	result.OkWithMessage("上传成功", c)
-}
-
-func (a *AIController) CreateAgent(c *gin.Context) {
-	var req request.AIAgent
-	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
-		_ = c.Error(err)
-		return
-	}
-	if err := a.aiService.CreateAgent(c, &req); err != nil {
-		_ = c.Error(err)
-		return
-	}
-	result.OkWithMessage("创建成功", c)
-}
-
-func (a *AIController) getSimpleAgentList(c *gin.Context) {
-	res, err := a.aiService.GetSimpleAgentList(c)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-	result.OkWithData(res, c)
-}
-
-func (a *AIController) GetAIAgentPage(c *gin.Context) {
-	var req query.AIAgent
-	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
-		_ = c.Error(err)
-		return
-	}
-	res, err := a.aiService.GetAIAgentPage(c, &req)
-	if err != nil {
-		_ = c.Error(err)
-		return
-	}
-	result.OkWithData(res, c)
-}
-
-func (a *AIController) agentChatCompletion(c *gin.Context) {
-	var req request.ChatCompletion
-	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
-		_ = c.Error(err)
-		return
-	}
-	if err := a.aiService.AgentChatCompletion(c, &req); err != nil {
-		_ = c.Error(err)
-		return
-	}
-}
+//func (a *AIController) agentChatCompletion(c *gin.Context) {
+//	var req request.ChatCompletion
+//	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
+//		_ = c.Error(err)
+//		return
+//	}
+//	if err := a.aiService.AgentChatCompletion(c, &req); err != nil {
+//		_ = c.Error(err)
+//		return
+//	}
+//}

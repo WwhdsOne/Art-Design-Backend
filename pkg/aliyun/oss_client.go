@@ -3,9 +3,10 @@ package aliyun
 import (
 	"Art-Design-Backend/pkg/utils"
 	"context"
-	"github.com/aliyun/alibabacloud-oss-go-sdk-v2/oss"
 	"io"
 	"path/filepath"
+
+	"github.com/aliyun/alibabacloud-oss-go-sdk-v2/oss"
 )
 
 type OssClient struct {
@@ -43,6 +44,6 @@ func (o *OssClient) UploadModelIcon(c context.Context, filename string, reader i
 	return o.uploadToFolder(c, "model_icon", filename, reader)
 }
 
-func (o *OssClient) UploadAgentDocument(c context.Context, filename string, reader io.Reader) (string, error) {
-	return o.uploadToFolder(c, "agent_document", filename, reader)
+func (o *OssClient) UploadKnowledgeBaseFile(c context.Context, filename string, reader io.Reader) (string, error) {
+	return o.uploadToFolder(c, "knowledge_base_file", filename, reader)
 }

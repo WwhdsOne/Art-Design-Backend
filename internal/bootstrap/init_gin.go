@@ -3,14 +3,15 @@ package bootstrap
 import (
 	"Art-Design-Backend/config"
 	"Art-Design-Backend/pkg/middleware"
+	"regexp"
+	"time"
+
 	"github.com/gin-contrib/gzip"
 	ginzap "github.com/gin-contrib/zap"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
 	"go.uber.org/zap"
-	"regexp"
-	"time"
 )
 
 // RegisterValidator 注册全局请求校验器

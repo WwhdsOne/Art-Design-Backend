@@ -2,8 +2,9 @@ package common
 
 import (
 	"Art-Design-Backend/pkg/authutils"
-	"gorm.io/gorm"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 // BaseModel 是一个通用的模型，包含 ID、CreatedAt、UpdatedAt 和 DeletedAt 字段

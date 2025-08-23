@@ -2,8 +2,9 @@ package jwt
 
 import (
 	"errors"
-	"github.com/golang-jwt/jwt/v5"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 // 错误类型定义

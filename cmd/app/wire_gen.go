@@ -114,39 +114,44 @@ func wireApp() *bootstrap.HttpServer {
 		AIProviderDB:    aiProviderDB,
 		AIProviderCache: aiProviderCache,
 	}
-	aiAgentDB := db.NewAIAgentDB(gormDB)
-	agentFileDB := db.NewAgentFileDB(gormDB)
-	fileChunkDB := db.NewFileChunkDB(gormDB)
-	chunkVectorDB := db.NewChunkVectorDB(gormDB)
-	aiAgentCache := cache.NewAIAgentCache(redisWrapper)
-	aiAgentRepo := &repository.AIAgentRepo{
-		AIAgentDB:     aiAgentDB,
-		AgentFileDB:   agentFileDB,
-		FileChunkDB:   fileChunkDB,
-		ChunkVectorDB: chunkVectorDB,
-		AIAgentCache:  aiAgentCache,
-	}
 	slicer := bootstrap.InitSlicer(configConfig)
 	aiService := &service.AIService{
 		AIModelRepo:    aiModelRepo,
 		AIModelClient:  aiModelClient,
 		AIProviderRepo: aiProviderRepo,
-		AIAgentRepo:    aiAgentRepo,
 		OssClient:      ossClient,
 		Slicer:         slicer,
 		GormTX:         gormTransactionManager,
 	}
 	aiController := controller.NewAIController(engine, middlewares, aiService)
+	knowledgeBaseDB := db.NewKnowledgeBaseDB(gormDB)
+	fileChunkDB := db.NewFileChunkDB(gormDB)
+	chunkVectorDB := db.NewChunkVectorDB(gormDB)
+	knowledgeBaseRepo := &repository.KnowledgeBaseRepo{
+		KnowledgeBaseDB: knowledgeBaseDB,
+		FileChunkDB:     fileChunkDB,
+		ChunkVectorDB:   chunkVectorDB,
+	}
+	knowledgeBaseService := &service.KnowledgeBaseService{
+		OssClient:         ossClient,
+		Slicer:            slicer,
+		GormTX:            gormTransactionManager,
+		AIModelClient:     aiModelClient,
+		KnowledgeBaseRepo: knowledgeBaseRepo,
+		AIProviderRepo:    aiProviderRepo,
+	}
+	knowledgeBaseController := controller.NewKnowledgeBaseController(engine, middlewares, knowledgeBaseService)
 	httpServer := &bootstrap.HttpServer{
-		Engine:                 engine,
-		Logger:                 logger,
-		AuthController:         authController,
-		UserController:         userController,
-		MenuController:         menuController,
-		RoleController:         roleController,
-		DigitPredictController: digitPredictController,
-		AIController:           aiController,
-		Config:                 configConfig,
+		Engine:                  engine,
+		Logger:                  logger,
+		AuthController:          authController,
+		UserController:          userController,
+		MenuController:          menuController,
+		RoleController:          roleController,
+		DigitPredictController:  digitPredictController,
+		AIController:            aiController,
+		KnowledgeBaseController: knowledgeBaseController,
+		Config:                  configConfig,
 	}
 	return httpServer
 }

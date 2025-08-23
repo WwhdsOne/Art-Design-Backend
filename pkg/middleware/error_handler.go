@@ -5,12 +5,13 @@ import (
 	"Art-Design-Backend/pkg/result"
 	"errors"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/go-playground/validator/v10"
-	"go.uber.org/zap"
 	"reflect"
 	"strings"
 	"sync"
+
+	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
+	"go.uber.org/zap"
 )
 
 var (

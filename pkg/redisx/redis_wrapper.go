@@ -1,10 +1,11 @@
 package redisx
 
 import (
-	"github.com/redis/go-redis/v9"
-	"go.uber.org/zap"
 	"sync"
 	"time"
+
+	"github.com/redis/go-redis/v9"
+	"go.uber.org/zap"
 )
 
 // RedisWrapper 结构体用于封装 Redis 客户端和默认操作超时时间

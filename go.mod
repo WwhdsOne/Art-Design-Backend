@@ -14,7 +14,7 @@ require (
 	github.com/go-playground/validator/v10 v10.27.0
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/uuid v1.6.0
-	github.com/google/wire v0.6.0
+	github.com/google/wire v0.7.0
 	github.com/jinzhu/copier v0.4.0
 	github.com/mssola/useragent v1.0.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible

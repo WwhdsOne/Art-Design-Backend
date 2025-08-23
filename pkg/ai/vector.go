@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/bytedance/sonic"
 	"io"
 	"net/http"
+
+	"github.com/bytedance/sonic"
 )
 
 // EmbeddingRequest 请求体

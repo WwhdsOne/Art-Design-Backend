@@ -1,8 +1,9 @@
 package utils
 
 import (
-	"github.com/google/uuid"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 func StdUUID() string {

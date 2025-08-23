@@ -1,8 +1,9 @@
 package utils
 
 import (
-	"github.com/sony/sonyflake"
 	"time"
+
+	"github.com/sony/sonyflake"
 )
 
 var sf = sonyflake.NewSonyflake(sonyflake.Settings{

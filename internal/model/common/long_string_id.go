@@ -2,8 +2,9 @@ package common
 
 import (
 	"fmt"
-	"github.com/bytedance/sonic"
 	"strconv"
+
+	"github.com/bytedance/sonic"
 )
 
 // LongStringID 定义自定义类型，用于表示前端传递的长整形的字符串
