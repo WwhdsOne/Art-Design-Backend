@@ -1,7 +1,10 @@
 package service
 
 import (
+	"Art-Design-Backend/internal/model/common"
 	"Art-Design-Backend/internal/model/entity"
+	"Art-Design-Backend/internal/model/query"
+	"Art-Design-Backend/internal/model/response"
 	"Art-Design-Backend/internal/repository"
 	"Art-Design-Backend/internal/repository/db"
 	"Art-Design-Backend/pkg/ai"
@@ -13,6 +16,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/jinzhu/copier"
 	"github.com/pgvector/pgvector-go"
 	"go.uber.org/zap"
 )
@@ -24,6 +28,7 @@ type KnowledgeBaseService struct {
 	AIModelClient     *ai.AIModelClient             // AI 模型
 	KnowledgeBaseRepo *repository.KnowledgeBaseRepo // 知识库
 	AIProviderRepo    *repository.AIProviderRepo    // AI 供应商
+	UserRepo          *repository.UserRepo          //  用户
 }
 
 func (k *KnowledgeBaseService) UploadAndVectorizeDocument(
@@ -41,12 +46,12 @@ func (k *KnowledgeBaseService) UploadAndVectorizeDocument(
 
 	// Step 2: 创建 KnowledgeBaseFile 记录
 	knowledgeBaseFile := &entity.KnowledgeBaseFile{
-		OriginalFileName: filename,                                    // 用户上传的原始文件名
-		FileType:         strings.ToLower(filepath.Ext(filename)[1:]), // 去掉 "." => pdf/docx/txt
-		FileSize:         fileSize,                                    // 单位：字节
-		FilePath:         documentURL,                                 // OSS 返回的文件存储路径或 URL
+		OriginalFileName: strings.TrimSuffix(filename, filepath.Ext(filename)), // 去掉文件后缀（如将 "example.pdf" 变为 "example"）
+		FileType:         strings.ToLower(filepath.Ext(filename)[1:]),          // 去掉 "." => pdf/docx/txt
+		FileSize:         fileSize,                                             // 单位：字节
+		FilePath:         documentURL,                                          // OSS 返回的文件存储路径或 URL
 	}
-	if err = k.KnowledgeBaseRepo.CreateAgentFile(c, knowledgeBaseFile); err != nil {
+	if err = k.KnowledgeBaseRepo.CreateKnowledgeFile(c, knowledgeBaseFile); err != nil {
 		zap.L().Error("保存 知识库文件 失败", zap.Error(err))
 		return fmt.Errorf("保存 知识库文件 失败: %w", err)
 	}
@@ -151,4 +156,60 @@ func (k *KnowledgeBaseService) getQianwenEmbeddings(c context.Context, chunks []
 	}
 
 	return embeddings, nil
+}
+
+func (k *KnowledgeBaseService) GetKnowledgeBaseFileList(
+	ctx context.Context,
+	req *query.KnowledgeBaseFile,
+) (*common.PaginationResp[response.KnowledgeBaseFile], error) {
+
+	// 1. 查用户 ID（根据 CreateUser 模糊匹配用户名）
+	var filterUserIDs []int64
+	var err error
+	if req.CreateUser != nil {
+		filterUserIDs, err = k.UserRepo.GetUserIDsByName(ctx, *req.CreateUser)
+		if err != nil {
+			return nil, err
+		}
+		if len(filterUserIDs) == 0 {
+			// zap.L().Info("未找到用户") // 可以记录日志，但不是错误
+			return common.BuildPageResp[response.KnowledgeBaseFile]([]response.KnowledgeBaseFile{}, 0, req.PaginationReq), nil
+		}
+	}
+
+	// 2. 分页查询文件实体
+	fileEntities, total, err := k.KnowledgeBaseRepo.GetKnowledgeFilePage(ctx, req, filterUserIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	// 3. 收集所有上传者 ID
+	uploaderIDs := make([]int64, 0, len(fileEntities))
+	for _, f := range fileEntities {
+		uploaderIDs = append(uploaderIDs, f.CreateBy)
+	}
+
+	// 4. 批量查询用户信息（ID -> 用户名）
+	userMap, err := k.UserRepo.GetUserMapByIDs(ctx, uploaderIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	// 5. 转换为响应对象
+	fileResponses := make([]response.KnowledgeBaseFile, 0, len(fileEntities))
+	for _, fileEntity := range fileEntities {
+		var fileResp response.KnowledgeBaseFile
+		_ = copier.Copy(&fileResp, fileEntity)
+
+		// 替换成用户名
+		if username, ok := userMap[fileEntity.CreateBy]; ok {
+			fileResp.CreateUser = username
+		}
+
+		fileResponses = append(fileResponses, fileResp)
+	}
+
+	// 6. 构建分页响应
+	resp := common.BuildPageResp[response.KnowledgeBaseFile](fileResponses, total, req.PaginationReq)
+	return resp, nil
 }

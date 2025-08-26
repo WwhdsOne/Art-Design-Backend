@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"Art-Design-Backend/internal/model/query"
 	"Art-Design-Backend/internal/service"
 	"Art-Design-Backend/pkg/middleware"
 	"Art-Design-Backend/pkg/result"
@@ -19,6 +20,7 @@ func NewKnowledgeBaseController(engine *gin.Engine, middleware *middleware.Middl
 	r := engine.Group("/api").Group("/knowledgeBase")
 	{
 		r.Use(middleware.AuthMiddleware())
+		r.POST("/page", knowledgeBaseCtrl.GetKnowledgeBaseFileList)
 		r.POST("/uploadFile", knowledgeBaseCtrl.UploadFile)
 		//r.GET("/list", knowledgeBaseCtrl.GetKnowledgeBaseFileList)
 	}
@@ -49,4 +51,19 @@ func (k *KnowledgeBaseController) UploadFile(c *gin.Context) {
 	}
 
 	result.OkWithMessage("上传成功", c)
+}
+
+func (k *KnowledgeBaseController) GetKnowledgeBaseFileList(c *gin.Context) {
+	var search query.KnowledgeBaseFile
+	// 如果绑定过程中出现错误，返回错误响应并结束函数执行
+	if err := c.ShouldBindBodyWithJSON(&search); err != nil {
+		_ = c.Error(err)
+		return
+	}
+	res, err := k.knowledgeBaseService.GetKnowledgeBaseFileList(c, &search)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithData(res, c)
 }

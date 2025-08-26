@@ -116,6 +116,22 @@ func (u *UserDB) UpdateUser(c context.Context, user *entity.User) (err error) {
 	return err
 }
 
+func (u *UserDB) GetUserIDsByName(ctx context.Context, username string) (ids []int64, err error) {
+	nameQuery := "%" + username + "%"
+	if err = DB(ctx, u.db).
+		Model(&entity.User{}).
+		Select("id").
+		Where("username LIKE ?", nameQuery).
+		Find(&ids).Error; err != nil {
+		err = errors.WrapDBError(err, "获取用户ID失败")
+		return
+	}
+	if ids == nil {
+		ids = []int64{}
+	}
+	return
+}
+
 func (u *UserDB) GetUserPage(c context.Context, user *query.User) (userPage []*entity.User, total int64, err error) {
 	db := DB(c, u.db)
 
@@ -156,4 +172,19 @@ func (u *UserDB) GetUserPage(c context.Context, user *query.User) (userPage []*e
 	}
 
 	return
+}
+
+func (r *UserDB) GetUserMapByIDs(ctx context.Context, ids []int64) (map[int64]string, error) {
+	var users []entity.User
+	if err := DB(ctx, r.db).
+		Select("id, username").
+		Where("id IN ?", ids).
+		Find(&users).Error; err != nil {
+		return nil, err
+	}
+	userMap := make(map[int64]string, len(users))
+	for _, u := range users {
+		userMap[u.ID] = u.Username
+	}
+	return userMap, nil
 }

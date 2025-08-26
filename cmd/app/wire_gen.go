@@ -139,6 +139,7 @@ func wireApp() *bootstrap.HttpServer {
 		AIModelClient:     aiModelClient,
 		KnowledgeBaseRepo: knowledgeBaseRepo,
 		AIProviderRepo:    aiProviderRepo,
+		UserRepo:          userRepo,
 	}
 	knowledgeBaseController := controller.NewKnowledgeBaseController(engine, middlewares, knowledgeBaseService)
 	httpServer := &bootstrap.HttpServer{
