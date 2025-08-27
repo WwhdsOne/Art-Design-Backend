@@ -8,4 +8,5 @@ type KnowledgeBaseRepo struct {
 	*db.KnowledgeBaseDB
 	*db.FileChunkDB
 	*db.ChunkVectorDB
+	*db.KnowledgeBaseFileRelDB
 }

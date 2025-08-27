@@ -2,9 +2,11 @@ package controller
 
 import (
 	"Art-Design-Backend/internal/model/query"
+	"Art-Design-Backend/internal/model/request"
 	"Art-Design-Backend/internal/service"
 	"Art-Design-Backend/pkg/middleware"
 	"Art-Design-Backend/pkg/result"
+	"Art-Design-Backend/pkg/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -20,9 +22,14 @@ func NewKnowledgeBaseController(engine *gin.Engine, middleware *middleware.Middl
 	r := engine.Group("/api").Group("/knowledgeBase")
 	{
 		r.Use(middleware.AuthMiddleware())
-		r.POST("/page", knowledgeBaseCtrl.GetKnowledgeBaseFileList)
-		r.POST("/uploadFile", knowledgeBaseCtrl.UploadFile)
+		r.POST("/file/page", knowledgeBaseCtrl.GetKnowledgeBaseFileList)
+		r.POST("/file/upload", knowledgeBaseCtrl.UploadFile)
 		//r.GET("/list", knowledgeBaseCtrl.GetKnowledgeBaseFileList)
+	}
+	{
+		r.POST("/page", knowledgeBaseCtrl.GetKnowledgeBasePage)
+		r.POST("/create", knowledgeBaseCtrl.CreateKnowledgeBase)
+		r.POST("/delete/:id", knowledgeBaseCtrl.DeleteKnowledgeBase)
 	}
 	return knowledgeBaseCtrl
 }
@@ -66,4 +73,48 @@ func (k *KnowledgeBaseController) GetKnowledgeBaseFileList(c *gin.Context) {
 		return
 	}
 	result.OkWithData(res, c)
+}
+
+func (k *KnowledgeBaseController) GetKnowledgeBasePage(c *gin.Context) {
+	var search query.KnowledgeBase
+	// 如果绑定过程中出现错误，返回错误响应并结束函数执行
+	if err := c.ShouldBindBodyWithJSON(&search); err != nil {
+		_ = c.Error(err)
+		return
+	}
+	res, err := k.knowledgeBaseService.GetKnowledgeBasePage(c, &search)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithData(res, c)
+}
+
+func (k *KnowledgeBaseController) CreateKnowledgeBase(c *gin.Context) {
+	var req request.KnowledgeBase
+	// 如果绑定过程中出现错误，返回错误响应并结束函数执行
+	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
+		_ = c.Error(err)
+		return
+	}
+	err := k.knowledgeBaseService.CreateKnowledgeBase(c, &req)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithMessage("知识库创建成功", c)
+}
+
+func (k *KnowledgeBaseController) DeleteKnowledgeBase(c *gin.Context) {
+	id, err := utils.ParseID(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	err = k.knowledgeBaseService.DeleteKnowledgeBase(c, id)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithMessage("知识库删除成功", c)
 }

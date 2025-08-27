@@ -55,3 +55,25 @@ func (k *KnowledgeBaseDB) GetKnowledgeFilePage(c context.Context, req *query.Kno
 
 	return
 }
+
+func (k *KnowledgeBaseDB) GetKnowledgeBasePage(c context.Context, q *query.KnowledgeBase, createUser int64) (res []*entity.KnowledgeBase, err error) {
+	if err = DB(c, k.db).Scopes(q.Paginate()).Where("created_by = ?", createUser).Find(&res).Error; err != nil {
+		err = errors.WrapDBError(err, "获取知识库失败")
+		return
+	}
+	return
+}
+
+func (k *KnowledgeBaseDB) CreateKnowledgeBase(ctx context.Context, e *entity.KnowledgeBase) error {
+	if err := DB(ctx, k.db).Create(e).Error; err != nil {
+		return errors.WrapDBError(err, "创建知识库失败")
+	}
+	return nil
+}
+
+func (k *KnowledgeBaseDB) DeleteKnowledgeBase(ctx context.Context, id int64) error {
+	if err := DB(ctx, k.db).Where("id = ?", id).Delete(&entity.KnowledgeBase{}).Error; err != nil {
+		return errors.WrapDBError(err, "删除知识库失败")
+	}
+	return nil
+}

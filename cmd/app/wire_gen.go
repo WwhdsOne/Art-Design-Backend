@@ -127,10 +127,12 @@ func wireApp() *bootstrap.HttpServer {
 	knowledgeBaseDB := db.NewKnowledgeBaseDB(gormDB)
 	fileChunkDB := db.NewFileChunkDB(gormDB)
 	chunkVectorDB := db.NewChunkVectorDB(gormDB)
+	knowledgeBaseFileRelDB := db.NewKnowledgeBaseFileRelDB(gormDB)
 	knowledgeBaseRepo := &repository.KnowledgeBaseRepo{
-		KnowledgeBaseDB: knowledgeBaseDB,
-		FileChunkDB:     fileChunkDB,
-		ChunkVectorDB:   chunkVectorDB,
+		KnowledgeBaseDB:        knowledgeBaseDB,
+		FileChunkDB:            fileChunkDB,
+		ChunkVectorDB:          chunkVectorDB,
+		KnowledgeBaseFileRelDB: knowledgeBaseFileRelDB,
 	}
 	knowledgeBaseService := &service.KnowledgeBaseService{
 		OssClient:         ossClient,

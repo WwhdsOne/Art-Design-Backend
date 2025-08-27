@@ -4,11 +4,13 @@ import (
 	"Art-Design-Backend/internal/model/common"
 	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/internal/model/query"
+	"Art-Design-Backend/internal/model/request"
 	"Art-Design-Backend/internal/model/response"
 	"Art-Design-Backend/internal/repository"
 	"Art-Design-Backend/internal/repository/db"
 	"Art-Design-Backend/pkg/ai"
 	"Art-Design-Backend/pkg/aliyun"
+	"Art-Design-Backend/pkg/authutils"
 	"Art-Design-Backend/pkg/slicer_client"
 	"context"
 	"fmt"
@@ -16,6 +18,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
 	"github.com/pgvector/pgvector-go"
 	"go.uber.org/zap"
@@ -212,4 +215,56 @@ func (k *KnowledgeBaseService) GetKnowledgeBaseFileList(
 	// 6. 构建分页响应
 	resp := common.BuildPageResp[response.KnowledgeBaseFile](fileResponses, total, req.PaginationReq)
 	return resp, nil
+}
+
+func (k *KnowledgeBaseService) GetKnowledgeBasePage(c context.Context, q *query.KnowledgeBase) (res []*response.KnowledgeBase, err error) {
+	knowledgeBases, err := k.KnowledgeBaseRepo.GetKnowledgeBasePage(c, q, authutils.GetUserID(c))
+	res = make([]*response.KnowledgeBase, 0, len(knowledgeBases))
+	for _, knowledgeBase := range knowledgeBases {
+		var knowledgeBaseResp response.KnowledgeBase
+		_ = copier.Copy(&knowledgeBaseResp, knowledgeBase)
+		res = append(res, &knowledgeBaseResp)
+	}
+	return
+}
+
+func (k *KnowledgeBaseService) CreateKnowledgeBase(c context.Context, req *request.KnowledgeBase) (err error) {
+	var knowledgeBase entity.KnowledgeBase
+	_ = copier.Copy(&knowledgeBase, req)
+	err = k.KnowledgeBaseRepo.CreateKnowledgeBase(c, &knowledgeBase)
+	if err != nil {
+		zap.L().Error("创建知识库失败", zap.Error(err))
+		return
+	}
+	var knowledgeBaseFileRelList []*entity.KnowledgeBaseFileRel
+	for _, fileID := range req.FileIDs {
+		knowledgeBaseFileRelList = append(knowledgeBaseFileRelList, &entity.KnowledgeBaseFileRel{
+			KnowledgeBaseID:     knowledgeBase.ID,
+			KnowledgeBaseFileID: fileID,
+		})
+	}
+	if err = k.KnowledgeBaseRepo.CreateKnowledgeBaseFileRel(c, knowledgeBaseFileRelList); err != nil {
+		zap.L().Error("创建知识库文件关系失败", zap.Error(err))
+		return
+	}
+	return
+}
+
+func (k *KnowledgeBaseService) DeleteKnowledgeBase(c *gin.Context, id int64) (err error) {
+	err = k.GormTX.Transaction(c, func(ctx context.Context) (err error) {
+		if err = k.KnowledgeBaseRepo.DeleteKnowledgeBase(c, id); err != nil {
+			zap.L().Error("删除知识库失败", zap.Error(err))
+			return
+		}
+		if err = k.KnowledgeBaseRepo.DeleteKnowledgeBaseFileRel(c, id); err != nil {
+			zap.L().Error("删除知识库文件关系失败", zap.Error(err))
+			return
+		}
+		return
+	})
+	if err != nil {
+		zap.L().Error("删除知识库事务失败", zap.Error(err))
+		return
+	}
+	return
 }

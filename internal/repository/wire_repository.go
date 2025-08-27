@@ -29,6 +29,7 @@ var DBSet = wire.NewSet(
 	db.NewFileChunkDB,
 	db.NewChunkVectorDB,
 	db.NewKnowledgeBaseDB,
+	db.NewKnowledgeBaseFileRelDB,
 )
 
 var RepositorySet = wire.NewSet(
