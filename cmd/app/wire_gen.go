@@ -114,16 +114,6 @@ func wireApp() *bootstrap.HttpServer {
 		AIProviderDB:    aiProviderDB,
 		AIProviderCache: aiProviderCache,
 	}
-	slicer := bootstrap.InitSlicer(configConfig)
-	aiService := &service.AIService{
-		AIModelRepo:    aiModelRepo,
-		AIModelClient:  aiModelClient,
-		AIProviderRepo: aiProviderRepo,
-		OssClient:      ossClient,
-		Slicer:         slicer,
-		GormTX:         gormTransactionManager,
-	}
-	aiController := controller.NewAIController(engine, middlewares, aiService)
 	knowledgeBaseDB := db.NewKnowledgeBaseDB(gormDB)
 	fileChunkDB := db.NewFileChunkDB(gormDB)
 	chunkVectorDB := db.NewChunkVectorDB(gormDB)
@@ -134,6 +124,17 @@ func wireApp() *bootstrap.HttpServer {
 		ChunkVectorDB:          chunkVectorDB,
 		KnowledgeBaseFileRelDB: knowledgeBaseFileRelDB,
 	}
+	slicer := bootstrap.InitSlicer(configConfig)
+	aiService := &service.AIService{
+		AIModelRepo:       aiModelRepo,
+		AIModelClient:     aiModelClient,
+		AIProviderRepo:    aiProviderRepo,
+		KnowledgeBaseRepo: knowledgeBaseRepo,
+		OssClient:         ossClient,
+		Slicer:            slicer,
+		GormTX:            gormTransactionManager,
+	}
+	aiController := controller.NewAIController(engine, middlewares, aiService)
 	knowledgeBaseService := &service.KnowledgeBaseService{
 		OssClient:         ossClient,
 		Slicer:            slicer,

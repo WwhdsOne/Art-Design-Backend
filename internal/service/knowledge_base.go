@@ -237,10 +237,11 @@ func (k *KnowledgeBaseService) CreateKnowledgeBase(c context.Context, req *reque
 		return
 	}
 	var knowledgeBaseFileRelList []*entity.KnowledgeBaseFileRel
-	for _, fileID := range req.FileIDs {
+	knowledgeBaseFileRelList = make([]*entity.KnowledgeBaseFileRel, 0, len(req.Files))
+	for _, file := range req.Files {
 		knowledgeBaseFileRelList = append(knowledgeBaseFileRelList, &entity.KnowledgeBaseFileRel{
 			KnowledgeBaseID:     knowledgeBase.ID,
-			KnowledgeBaseFileID: fileID,
+			KnowledgeBaseFileID: int64(file.ID),
 		})
 	}
 	if err = k.KnowledgeBaseRepo.CreateKnowledgeBaseFileRel(c, knowledgeBaseFileRelList); err != nil {
@@ -265,6 +266,68 @@ func (k *KnowledgeBaseService) DeleteKnowledgeBase(c *gin.Context, id int64) (er
 	if err != nil {
 		zap.L().Error("删除知识库事务失败", zap.Error(err))
 		return
+	}
+	return
+}
+
+func (k *KnowledgeBaseService) UpdateKnowledgeBase(c context.Context, r *request.KnowledgeBase) (err error) {
+	var knowledgeBase entity.KnowledgeBase
+	_ = copier.Copy(&knowledgeBase, r)
+	err = k.GormTX.Transaction(c, func(ctx context.Context) (err error) {
+		if err = k.KnowledgeBaseRepo.DeleteKnowledgeBaseFileRel(ctx, knowledgeBase.ID); err != nil {
+			zap.L().Error("删除知识库文件关系失败", zap.Error(err))
+			return
+		}
+		// 创建知识库文件关系,只有文件不为空时才创建
+		if len(r.Files) != 0 {
+			// 预分配足够容量的切片，避免多次扩容
+			knowledgeBaseFileRelList := make([]*entity.KnowledgeBaseFileRel, 0, len(r.Files))
+
+			for _, file := range r.Files {
+				knowledgeBaseFileRelList = append(knowledgeBaseFileRelList, &entity.KnowledgeBaseFileRel{
+					KnowledgeBaseID:     knowledgeBase.ID,
+					KnowledgeBaseFileID: int64(file.ID),
+				})
+			}
+			if err = k.KnowledgeBaseRepo.CreateKnowledgeBaseFileRel(ctx, knowledgeBaseFileRelList); err != nil {
+				zap.L().Error("创建知识库文件关系失败", zap.Error(err))
+				return
+			}
+		}
+		if err = k.KnowledgeBaseRepo.UpdateKnowledgeBase(ctx, &knowledgeBase); err != nil {
+			zap.L().Error("更新知识库失败", zap.Error(err))
+			return
+		}
+		return
+	})
+	if err != nil {
+		zap.L().Error("更新知识库事务失败", zap.Error(err))
+		return
+	}
+	return
+}
+
+func (k *KnowledgeBaseService) GetKnowledgeBaseFilesByID(
+	c context.Context, id int64) (res []*response.KnowledgeBaseFile, err error) {
+	knowledgeBaseFiles, err := k.KnowledgeBaseRepo.GetKnowledgeBaseFilesByID(c, id)
+	res = make([]*response.KnowledgeBaseFile, 0, len(knowledgeBaseFiles))
+	for _, knowledgeBaseFile := range knowledgeBaseFiles {
+		var knowledgeBaseFileResp response.KnowledgeBaseFile
+		_ = copier.Copy(&knowledgeBaseFileResp, knowledgeBaseFile)
+		res = append(res, &knowledgeBaseFileResp)
+	}
+	return
+}
+
+func (k *KnowledgeBaseService) GetSimpleKnowledgeBaseList(c context.Context) (res []*response.SimpleKnowledgeBase, err error) {
+	var userID int64
+	userID = authutils.GetUserID(c)
+	knowledgeBases, err := k.KnowledgeBaseRepo.GetSimpleKnowledgeBaseList(c, userID)
+	res = make([]*response.SimpleKnowledgeBase, 0, len(knowledgeBases))
+	for _, knowledgeBase := range knowledgeBases {
+		var knowledgeBaseResp response.SimpleKnowledgeBase
+		_ = copier.Copy(&knowledgeBaseResp, knowledgeBase)
+		res = append(res, &knowledgeBaseResp)
 	}
 	return
 }

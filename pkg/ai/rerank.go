@@ -76,12 +76,18 @@ func (c *AIModelClient) Rerank(token string, req RerankRequest, topK int) ([]str
 
 	resp, err := c.client.Do(httpReq)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to send rerank request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("bad response status: %d", resp.StatusCode)
+		// 读取响应体以获取更多错误详情
+		respBody, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return nil, fmt.Errorf("bad response status: %d, failed to read response body: %w", resp.StatusCode, readErr)
+		}
+
+		return nil, fmt.Errorf("bad response status: %d, response body: %s", resp.StatusCode, string(respBody))
 	}
 
 	// 读取响应体

@@ -6,6 +6,7 @@ import (
 )
 
 type ChatCompletion struct {
-	ID       common.LongStringID `json:"id" binding:"required" label:"模型ID"`
-	Messages []ai.ChatMessage    `json:"messages" binding:"required" label:"消息列表"`
+	ID              common.LongStringID `json:"id" binding:"required" label:"模型ID"`
+	Messages        []ai.ChatMessage    `json:"messages" binding:"required" label:"消息列表"`
+	KnowledgeBaseID common.LongStringID `json:"knowledge_base_id" binding:"omitempty" label:"关联知识库ID"`
 }

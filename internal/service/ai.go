@@ -12,7 +12,9 @@ import (
 	"Art-Design-Backend/pkg/aliyun"
 	"Art-Design-Backend/pkg/slicer_client"
 	"context"
+	"fmt"
 	"mime/multipart"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
@@ -20,12 +22,32 @@ import (
 )
 
 type AIService struct {
-	AIModelRepo    *repository.AIModelRepo    // 模型Repo
-	AIModelClient  *ai.AIModelClient          // 聊天
-	AIProviderRepo *repository.AIProviderRepo // 模型供应商Repo
-	OssClient      *aliyun.OssClient          // 阿里云OSS
-	Slicer         *slicer_client.Slicer      // 文档切片
-	GormTX         *db.GormTransactionManager // 事务
+	AIModelRepo       *repository.AIModelRepo       // 模型Repo
+	AIModelClient     *ai.AIModelClient             // 聊天
+	AIProviderRepo    *repository.AIProviderRepo    // 模型供应商Repo
+	KnowledgeBaseRepo *repository.KnowledgeBaseRepo // 知识库Repo
+	OssClient         *aliyun.OssClient             // 阿里云OSS
+	Slicer            *slicer_client.Slicer         // 文档切片
+	GormTX            *db.GormTransactionManager    // 事务
+}
+
+// 获取嵌入向量
+func (a *AIService) getQianwenEmbeddings(c context.Context, chunks []string) ([][]float32, error) {
+	const providerID int64 = 51088793876300041
+
+	provider, err := a.AIProviderRepo.GetAIProviderByIDWithCache(c, providerID)
+	if err != nil {
+		zap.L().Error("获取嵌入模型供应商失败", zap.Error(err))
+		return nil, fmt.Errorf("获取嵌入模型供应商失败: %w", err)
+	}
+
+	embeddings, err := a.AIModelClient.Embed(c, provider.APIKey, chunks)
+	if err != nil {
+		zap.L().Error("获取嵌入向量失败", zap.Error(err))
+		return nil, fmt.Errorf("获取嵌入向量失败: %w", err)
+	}
+
+	return embeddings, nil
 }
 
 func (a *AIService) CreateAIProvider(c context.Context, r *request.AIProvider) (err error) {
@@ -169,12 +191,80 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 		zap.L().Error("获取AI模型供应商失败", zap.Int64("provider_id", modelInfo.ProviderID), zap.Error(err))
 		return
 	}
+	// Step 1: 获取用户最新提问（最后一条 user 消息）
+	var latestQuestion string
+	for i := len(r.Messages) - 1; i >= 0; i-- {
+		if r.Messages[i].Role == "user" {
+			latestQuestion = r.Messages[i].Content
+			break
+		}
+	}
+	if latestQuestion == "" {
+		return fmt.Errorf("未找到用户提问")
+	}
+
+	// Step 3: 向量化提问
+	embedding, err := a.getQianwenEmbeddings(c, []string{latestQuestion})
+	if err != nil {
+		return err
+	}
+
+	// Step 4: 基于 embedding 搜索相关内容（假设你有一个向量搜索接口）
+	retrievedTexts, err :=
+		a.KnowledgeBaseRepo.SearchAgentRelatedChunks(c, int64(r.KnowledgeBaseID), embedding[0])
+	if err != nil {
+		zap.L().Error("向量检索失败", zap.Error(err))
+		return fmt.Errorf("向量检索失败: %w", err)
+	}
+
+	//Step 5: 使用重排序模型进一步优化
+	rerankModel, err := a.AIModelRepo.GetRerankModel(c)
+	if err != nil {
+		zap.L().Error("获取重排序模型失败", zap.Error(err))
+		return
+	}
+	rerankProvider, err := a.AIProviderRepo.GetAIProviderByIDWithCache(c, rerankModel.ProviderID)
+	if err != nil {
+		zap.L().Error("获取重排序模型提供者失败", zap.Error(err))
+		return
+	}
+	rerankTexts, err := a.AIModelClient.Rerank(rerankProvider.APIKey, ai.RerankRequest{
+		Model:     rerankModel.Model,
+		Documents: retrievedTexts,
+		Query:     latestQuestion,
+	}, 3)
+	if err != nil {
+		zap.L().Error("重排序失败", zap.Error(err))
+		return
+	}
+	zap.L().Info("向量并重排搜索结果", zap.String("query", latestQuestion), zap.Any("texts", rerankTexts))
+
+	// Step 6: 构造新的对话上下文（system + retrieved + user）
+	var fullMessages []ai.ChatMessage
+
+	// 将检索到的文本合并为一段 context，并构造辅助 system 提示
+	if len(retrievedTexts) > 0 {
+		contextText := strings.Join(rerankTexts, "\n\n")
+		fullMessages = append(fullMessages, ai.ChatMessage{
+			Role: "system",
+			Content: fmt.Sprintf(`以下是与用户问题相关的背景资料。请仅根据这些资料回答问题，
+				如果资料中没有提及，请直接回复：“很抱歉，我无法在现有知识中找到相关答案。”：%s`, contextText),
+		})
+	} else {
+		fullMessages = append(fullMessages, ai.ChatMessage{
+			Role:    "system",
+			Content: `注意：当前没有任何与用户问题相关的背景资料。如果资料中没有提及，请直接回复：“很抱歉，我无法在现有知识中找到相关答案。”`,
+		})
+	}
+
+	// 拼接用户原始对话
+	fullMessages = append(fullMessages, r.Messages...)
 	// 直接调用新版 ChatStreamWithWriter
 	err = a.AIModelClient.ChatStreamWithWriter(
 		c.Request.Context(), c.Writer,
 		provider.BaseURL+modelInfo.ApiPath,
 		provider.APIKey,
-		ai.DefaultStreamChatRequest(modelInfo.Model, r.Messages),
+		ai.DefaultStreamChatRequest(modelInfo.Model, fullMessages),
 	)
 	if err != nil {
 		zap.L().Error("AI模型聊天失败", zap.Error(err))
@@ -358,7 +448,8 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 //	}
 //
 //	// Step 4: 基于 embedding 搜索相关内容（假设你有一个向量搜索接口）
-//	retrievedTexts, err := a.AIAgentRepo.SearchAgentRelatedChunks(c, agentInfo.ID, embedding[0])
+//	retrievedTexts, err :=
+//		a.KnowledgeBaseRepo.SearchAgentRelatedChunks(c, r.KnowledgeBaseID, embedding[0])
 //	if err != nil {
 //		zap.L().Error("向量检索失败", zap.Error(err))
 //		return fmt.Errorf("向量检索失败: %w", err)

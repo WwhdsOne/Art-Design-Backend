@@ -57,7 +57,9 @@ func (k *KnowledgeBaseDB) GetKnowledgeFilePage(c context.Context, req *query.Kno
 }
 
 func (k *KnowledgeBaseDB) GetKnowledgeBasePage(c context.Context, q *query.KnowledgeBase, createUser int64) (res []*entity.KnowledgeBase, err error) {
-	if err = DB(c, k.db).Scopes(q.Paginate()).Where("created_by = ?", createUser).Find(&res).Error; err != nil {
+	if err = DB(c, k.db).Scopes(q.Paginate()).
+		Where("created_by = ?", createUser).
+		Find(&res).Error; err != nil {
 		err = errors.WrapDBError(err, "获取知识库失败")
 		return
 	}
@@ -76,4 +78,28 @@ func (k *KnowledgeBaseDB) DeleteKnowledgeBase(ctx context.Context, id int64) err
 		return errors.WrapDBError(err, "删除知识库失败")
 	}
 	return nil
+}
+
+func (k *KnowledgeBaseDB) UpdateKnowledgeBase(c context.Context, e *entity.KnowledgeBase) error {
+	if err := DB(c, k.db).Where("id = ?", e.ID).Updates(e).Error; err != nil {
+		return errors.WrapDBError(err, "更新知识库失败")
+	}
+	return nil
+}
+
+func (k *KnowledgeBaseDB) GetKnowledgeBaseFileByIDs(c context.Context, ids []int64) (res []*entity.KnowledgeBaseFile, err error) {
+	if err = DB(c, k.db).Where("id in ?", ids).Find(&res).Error; err != nil {
+		err = errors.WrapDBError(err, "获取知识库文件失败")
+		return
+	}
+	return
+}
+
+func (k *KnowledgeBaseDB) GetSimpleKnowledgeBaseList(c context.Context, userID int64) (res []*entity.KnowledgeBase, err error) {
+	if err = DB(c, k.db).Select("id", "name").
+		Where("created_by = ?", userID).Find(&res).Error; err != nil {
+		err = errors.WrapDBError(err, "获取知识库列表失败")
+		return
+	}
+	return
 }

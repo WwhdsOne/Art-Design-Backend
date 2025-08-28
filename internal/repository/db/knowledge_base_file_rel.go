@@ -30,3 +30,10 @@ func (k *KnowledgeBaseFileRelDB) DeleteKnowledgeBaseFileRel(c context.Context, i
 	}
 	return
 }
+
+func (k *KnowledgeBaseFileRelDB) GetKnowledgeBaseFileRel(c context.Context, knowledgeBaseID int64) (res []*entity.KnowledgeBaseFileRel, err error) {
+	if err = DB(c, k.db).Where("knowledge_base_id = ?", knowledgeBaseID).Find(&res).Error; err != nil {
+		return nil, errors.NewDBError("获取知识库文件关系失败")
+	}
+	return
+}
