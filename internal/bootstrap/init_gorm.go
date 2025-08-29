@@ -37,6 +37,8 @@ func AutoMigrate(db *gorm.DB) {
 	//db.AutoMigrate(&entity.ChunkVector{})
 	//db.AutoMigrate(&entity.FileChunk{})
 	//db.AutoMigrate(&entity.KnowledgeBase{})
+	//db.AutoMigrate(&entity.Conversation{})
+	//db.AutoMigrate(&entity.Message{})
 }
 
 // snowflakeIdFieldsMap 存储类型和对应的ID字段名（缓存，提高效率）

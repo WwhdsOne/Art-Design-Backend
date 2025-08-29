@@ -10,12 +10,16 @@ import (
 	"Art-Design-Backend/internal/repository/db"
 	"Art-Design-Backend/pkg/ai"
 	"Art-Design-Backend/pkg/aliyun"
+	"Art-Design-Backend/pkg/authutils"
 	"Art-Design-Backend/pkg/slicer_client"
 	"context"
 	"fmt"
 	"mime/multipart"
+	"net/http"
 	"strings"
+	"unicode/utf8"
 
+	"github.com/bytedance/sonic"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
 	"go.uber.org/zap"
@@ -26,6 +30,7 @@ type AIService struct {
 	AIModelClient     *ai.AIModelClient             // 聊天
 	AIProviderRepo    *repository.AIProviderRepo    // 模型供应商Repo
 	KnowledgeBaseRepo *repository.KnowledgeBaseRepo // 知识库Repo
+	ConversationRepo  *repository.ConversationRepo  // 会话Repo
 	OssClient         *aliyun.OssClient             // 阿里云OSS
 	Slicer            *slicer_client.Slicer         // 文档切片
 	GormTX            *db.GormTransactionManager    // 事务
@@ -175,12 +180,16 @@ func (a *AIService) UploadModelIcon(c *gin.Context, filename string, src multipa
 
 // ChatCompletion
 // todo
-// 1. 对话管理
+// 1. 对话管理 ✅
 // 2. 模型信息缓存 ✅
 // 3. 标签抽取
 // 4. 价格计算
 func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (err error) {
 	modelID := int64(r.ID)
+
+	var conversation entity.Conversation
+
+	// Step 1: 获取模型信息
 	modelInfo, err := a.AIModelRepo.GetAIModelByID(c, modelID)
 	if err != nil {
 		zap.L().Error("获取AI模型失败", zap.Int64("model_id", modelID), zap.Error(err))
@@ -191,7 +200,8 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 		zap.L().Error("获取AI模型供应商失败", zap.Int64("provider_id", modelInfo.ProviderID), zap.Error(err))
 		return
 	}
-	// Step 1: 获取用户最新提问（最后一条 user 消息）
+
+	// Step 2: 提取用户最新问题
 	var latestQuestion string
 	for i := len(r.Messages) - 1; i >= 0; i-- {
 		if r.Messages[i].Role == "user" {
@@ -203,64 +213,122 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 		return fmt.Errorf("未找到用户提问")
 	}
 
-	// Step 3: 向量化提问
-	embedding, err := a.getQianwenEmbeddings(c, []string{latestQuestion})
-	if err != nil {
-		return err
+	// Step 3: 会话初始化
+	if r.ConversationID == 0 {
+		// Step 3.1: 创建会话
+		conversation = entity.Conversation{}
+		// 确保字符少于等于10时才进行截取，否则由大模型总结为十个字
+		if utf8.RuneCountInString(latestQuestion) <= 10 {
+			conversation.Title = latestQuestion
+		} else {
+			// Step 3.2: 如果新对话提问信息过长，使用当前选择的对话大模型总结十个字作为会话标题
+			titleSummaryJson, err := a.AIModelClient.ChatRequest(
+				c.Request.Context(),
+				provider.BaseURL+modelInfo.ApiPath,
+				provider.APIKey,
+				ai.DefaultChatRequest(modelInfo.Model,
+					[]ai.ChatMessage{
+						{
+							Role:    "system",
+							Content: ai.TitleSummaryPrompt,
+						},
+						{
+							Role:    "user",
+							Content: latestQuestion,
+						},
+					},
+				),
+			)
+			if err != nil {
+				zap.L().Error("总结标题失败", zap.Error(err))
+				conversation.Title = latestQuestion[:10]
+			} else {
+				var titleSummary ai.ChatCompletionResponse
+				_ = sonic.Unmarshal(titleSummaryJson, &titleSummary)
+				conversation.Title = titleSummary.FirstText()
+				zap.L().Info("总结标题成功", zap.Int64("conversation_id", conversation.ID), zap.String("title", conversation.Title))
+			}
+		}
+
+		if err = a.ConversationRepo.CreateConversation(c, &conversation); err != nil {
+			zap.L().Error("创建会话失败", zap.Error(err))
+			return
+		}
 	}
 
-	// Step 4: 基于 embedding 搜索相关内容（假设你有一个向量搜索接口）
-	retrievedTexts, err :=
-		a.KnowledgeBaseRepo.SearchAgentRelatedChunks(c, int64(r.KnowledgeBaseID), embedding[0])
-	if err != nil {
-		zap.L().Error("向量检索失败", zap.Error(err))
-		return fmt.Errorf("向量检索失败: %w", err)
-	}
-
-	//Step 5: 使用重排序模型进一步优化
-	rerankModel, err := a.AIModelRepo.GetRerankModel(c)
-	if err != nil {
-		zap.L().Error("获取重排序模型失败", zap.Error(err))
-		return
-	}
-	rerankProvider, err := a.AIProviderRepo.GetAIProviderByIDWithCache(c, rerankModel.ProviderID)
-	if err != nil {
-		zap.L().Error("获取重排序模型提供者失败", zap.Error(err))
-		return
-	}
-	rerankTexts, err := a.AIModelClient.Rerank(rerankProvider.APIKey, ai.RerankRequest{
-		Model:     rerankModel.Model,
-		Documents: retrievedTexts,
-		Query:     latestQuestion,
-	}, 3)
-	if err != nil {
-		zap.L().Error("重排序失败", zap.Error(err))
-		return
-	}
-	zap.L().Info("向量并重排搜索结果", zap.String("query", latestQuestion), zap.Any("texts", rerankTexts))
-
-	// Step 6: 构造新的对话上下文（system + retrieved + user）
+	// Step 4: 构建知识库回答
 	var fullMessages []ai.ChatMessage
+	var documents []string
+	var retrievedTextChunks []*entity.FileChunk
+	if r.KnowledgeBaseID != 0 {
+		// Step 3: 计算 embedding
+		embedding, err := a.getQianwenEmbeddings(c, []string{latestQuestion})
+		if err != nil {
+			return err
+		}
 
-	// 将检索到的文本合并为一段 context，并构造辅助 system 提示
-	if len(retrievedTexts) > 0 {
-		contextText := strings.Join(rerankTexts, "\n\n")
-		fullMessages = append(fullMessages, ai.ChatMessage{
-			Role: "system",
-			Content: fmt.Sprintf(`以下是与用户问题相关的背景资料。请仅根据这些资料回答问题，
-				如果资料中没有提及，请直接回复：“很抱歉，我无法在现有知识中找到相关答案。”：%s`, contextText),
-		})
-	} else {
-		fullMessages = append(fullMessages, ai.ChatMessage{
-			Role:    "system",
-			Content: `注意：当前没有任何与用户问题相关的背景资料。如果资料中没有提及，请直接回复：“很抱歉，我无法在现有知识中找到相关答案。”`,
-		})
+		// Step 4.1: 向量检索
+		retrievedTextChunks, err = a.KnowledgeBaseRepo.SearchAgentRelatedChunks(
+			c, int64(r.KnowledgeBaseID), embedding[0])
+		if err != nil {
+			zap.L().Error("向量检索失败", zap.Error(err))
+			return fmt.Errorf("向量检索失败: %w", err)
+		}
+
+		// Step 4.2: 重排序
+		rerankModel, err := a.AIModelRepo.GetRerankModel(c)
+		if err != nil {
+			zap.L().Error("获取重排序模型失败", zap.Error(err))
+			return fmt.Errorf("获取重排序模型失败: %w", err)
+		}
+		rerankProvider, err := a.AIProviderRepo.GetAIProviderByIDWithCache(c, rerankModel.ProviderID)
+		if err != nil {
+			zap.L().Error("获取重排序模型提供者失败", zap.Error(err))
+			return fmt.Errorf("获取重排序模型提供者失败: %w", err)
+		}
+		documents := make([]string, 0, len(retrievedTextChunks))
+		for _, chunk := range retrievedTextChunks {
+			documents = append(documents, chunk.Content)
+		}
+		rerankTexts, err := a.AIModelClient.Rerank(rerankProvider.APIKey, ai.RerankRequest{
+			Model:     rerankModel.Model,
+			Documents: documents,
+			Query:     latestQuestion,
+		}, 3)
+		if err != nil {
+			zap.L().Error("重排序失败", zap.Error(err))
+			return fmt.Errorf("重排序失败: %w", err)
+		}
+
+		// Step 4.3 : 构造 prompt
+		if len(documents) > 0 {
+			contextText := strings.Join(rerankTexts, "\n\n")
+			fullMessages = append(fullMessages, ai.ChatMessage{
+				Role: "system",
+				Content: fmt.Sprintf(`以下是与用户问题相关的背景资料。
+						请仅根据这些资料回答问题，如果资料中没有提及，请直接回复：
+						“很抱歉，我无法在现有知识中找到相关答案。”：%s`, contextText),
+			})
+		} else {
+			fullMessages = append(fullMessages, ai.ChatMessage{
+				Role:    "system",
+				Content: `注意：当前没有任何与用户问题相关的背景资料。`,
+			})
+		}
 	}
 
-	// 拼接用户原始对话
 	fullMessages = append(fullMessages, r.Messages...)
-	// 直接调用新版 ChatStreamWithWriter
-	err = a.AIModelClient.ChatStreamWithWriter(
+
+	// Step 5: 在新对话中返回对话ID
+	if r.ConversationID == 0 {
+		var newConversationResp response.Conversation
+		_ = copier.Copy(&newConversationResp, conversation)
+		marshalString, _ := sonic.MarshalString(&newConversationResp)
+		_, _ = fmt.Fprintf(c.Writer, "data: "+marshalString+"\n\n")
+		c.Writer.(http.Flusher).Flush()
+	}
+	// Step 6: 调用大模型 (流式)
+	AIResponse, err := a.AIModelClient.ChatStreamWithWriter(
 		c.Request.Context(), c.Writer,
 		provider.BaseURL+modelInfo.ApiPath,
 		provider.APIKey,
@@ -269,6 +337,65 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 	if err != nil {
 		zap.L().Error("AI模型聊天失败", zap.Error(err))
 		return
+	}
+
+	// Step 7: 异步保存会话
+	// todo待测试
+	go func(ctx context.Context, convID int64, question, answer string) {
+		// 不要直接传 gin.Context
+		prompt := &entity.Message{
+			Role:           "user",
+			Content:        question,
+			ConversationID: convID,
+		}
+		assistantMessage := &entity.Message{
+			Role:           "assistant",
+			Content:        answer,
+			ConversationID: convID,
+		}
+
+		if len(documents) > 0 {
+			assistantMessage.KnowledgeBaseID = (*int64)(&r.KnowledgeBaseID)
+			var fileChunkIDs []int64
+			for _, chunk := range retrievedTextChunks {
+				fileChunkIDs = append(fileChunkIDs, chunk.ID)
+			}
+			// 注意：FileChunkIDs 可能需要单独存表
+			assistantMessage.FileChunkIDs = fileChunkIDs
+		}
+
+		if err := a.ConversationRepo.CreateMessage(ctx, prompt); err != nil {
+			zap.L().Error("保存用户提问消息失败", zap.Error(err))
+			return
+		}
+		if err := a.ConversationRepo.CreateMessage(ctx, assistantMessage); err != nil {
+			zap.L().Error("保存AI回答消息失败", zap.Error(err))
+			return
+		}
+	}(c.Copy(), conversation.ID, latestQuestion, AIResponse)
+
+	return
+}
+
+func (a *AIService) GetHistoryConversation(c context.Context) (res []*response.Conversation, err error) {
+	userID := authutils.GetUserID(c)
+	historyConversations, err := a.ConversationRepo.GetHistoryConversation(c, userID)
+	res = make([]*response.Conversation, 0, len(historyConversations))
+	for _, conversation := range historyConversations {
+		var conversationRes response.Conversation
+		_ = copier.Copy(&conversationRes, conversation)
+		res = append(res, &conversationRes)
+	}
+	return
+}
+
+func (a *AIService) GetMessageByConversationID(c context.Context, id int64) (res []*response.Message, err error) {
+	messages, err := a.ConversationRepo.GetMessageByConversationID(c, id)
+	res = make([]*response.Message, 0, len(messages))
+	for _, message := range messages {
+		var messageRes response.Message
+		_ = copier.Copy(&messageRes, message)
+		res = append(res, &messageRes)
 	}
 	return
 }

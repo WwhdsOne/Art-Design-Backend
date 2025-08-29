@@ -6,6 +6,7 @@ import (
 	"Art-Design-Backend/internal/service"
 	"Art-Design-Backend/pkg/middleware"
 	"Art-Design-Backend/pkg/result"
+	"Art-Design-Backend/pkg/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -43,6 +44,13 @@ func NewAIController(engine *gin.Engine, middleware *middleware.Middlewares, ser
 		//agentGroup.POST("/page", aiCtrl.GetAIAgentPage)
 		//agentGroup.GET("/simpleList", aiCtrl.getSimpleAgentList)
 		//agentGroup.POST("/chat-completion", aiCtrl.agentChatCompletion)
+	}
+	{
+		conversationGroup := r.Group("/conversation")
+		conversationGroup.Use(middleware.AuthMiddleware())
+		conversationGroup.GET("/history", aiCtrl.GetHistoryConversation)
+		conversationGroup.GET("/:id/messages", aiCtrl.GetMessageByConversationID)
+
 	}
 	return aiCtrl
 }
@@ -155,6 +163,29 @@ func (a *AIController) getSimpleModelList(c *gin.Context) {
 
 func (a *AIController) getSimpleProviderList(c *gin.Context) {
 	res, err := a.aiService.GetSimpleProviderList(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithData(res, c)
+}
+
+func (a *AIController) GetHistoryConversation(c *gin.Context) {
+	res, err := a.aiService.GetHistoryConversation(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithData(res, c)
+}
+
+func (a *AIController) GetMessageByConversationID(c *gin.Context) {
+	id, err := utils.ParseID(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	res, err := a.aiService.GetMessageByConversationID(c, id)
 	if err != nil {
 		_ = c.Error(err)
 		return

@@ -10,8 +10,9 @@ var (
 	DigitPredictTableName         = "digit_predict"
 	AIModelTableName              = "ai_model"
 	AIProviderTableName           = "ai_provider"
-	AIAgentTableName              = "ai_agent"
 	KnowledgeBaseTableName        = "knowledge_base"
 	KnowledgeBaseFileTableName    = "knowledge_base_file"
 	KnowledgeBaseFileRelTableName = "knowledge_base_file_rel"
+	ConversationTableName         = "conversation"
+	MessageTableName              = "message"
 )

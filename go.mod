@@ -16,6 +16,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/google/wire v0.7.0
 	github.com/jinzhu/copier v0.4.0
+	github.com/lib/pq v1.10.9
 	github.com/mssola/useragent v1.0.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pgvector/pgvector-go v0.3.0

@@ -124,12 +124,19 @@ func wireApp() *bootstrap.HttpServer {
 		ChunkVectorDB:          chunkVectorDB,
 		KnowledgeBaseFileRelDB: knowledgeBaseFileRelDB,
 	}
+	conversationDB := db.NewConversationDB(gormDB)
+	messageDB := db.NewMessageDB(gormDB)
+	conversationRepo := &repository.ConversationRepo{
+		ConversationDB: conversationDB,
+		MessageDB:      messageDB,
+	}
 	slicer := bootstrap.InitSlicer(configConfig)
 	aiService := &service.AIService{
 		AIModelRepo:       aiModelRepo,
 		AIModelClient:     aiModelClient,
 		AIProviderRepo:    aiProviderRepo,
 		KnowledgeBaseRepo: knowledgeBaseRepo,
+		ConversationRepo:  conversationRepo,
 		OssClient:         ossClient,
 		Slicer:            slicer,
 		GormTX:            gormTransactionManager,

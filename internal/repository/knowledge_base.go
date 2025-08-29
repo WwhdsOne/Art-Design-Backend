@@ -31,7 +31,7 @@ func (k *KnowledgeBaseRepo) GetKnowledgeBaseFilesByID(ctx context.Context, id in
 	return
 }
 
-func (k *KnowledgeBaseRepo) SearchAgentRelatedChunks(c context.Context, knowledgeBaseID int64, vector []float32) (chunks []string, err error) {
+func (k *KnowledgeBaseRepo) SearchAgentRelatedChunks(c context.Context, knowledgeBaseID int64, vector []float32) (chunks []*entity.FileChunk, err error) {
 	// 获取智能体的文件ID列表
 	knowledgeBaseFileIDList, err := k.GetKnowledgeBaseFilesByID(c, knowledgeBaseID)
 	if err != nil {

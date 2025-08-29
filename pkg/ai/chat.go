@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/bytedance/sonic"
 	"go.uber.org/zap"
@@ -14,7 +15,6 @@ import (
 
 // ChatRequest 普通非流式请求，返回完整响应体 []byte 或错误
 func (c *AIModelClient) ChatRequest(ctx context.Context, url, token string, reqData ChatRequest) ([]byte, error) {
-	reqData.Stream = true
 	body, err := sonic.Marshal(reqData)
 	if err != nil {
 		return nil, err
@@ -41,30 +41,36 @@ func (c *AIModelClient) ChatRequest(ctx context.Context, url, token string, reqD
 	return io.ReadAll(resp.Body)
 }
 
-// ChatStreamWithWriter 流式请求，将远程 SSE 响应数据实时推送给 ginCtx，供前端实时消费
-func (c *AIModelClient) ChatStreamWithWriter(ctx context.Context, w http.ResponseWriter, url, token string, reqData ChatRequest) (err error) {
+// ChatStreamWithWriter 流式请求，将远程 SSE 响应数据实时推送给 ginCtx，
+// 同时在函数返回时拼接完整的 AI 响应
+func (c *AIModelClient) ChatStreamWithWriter(
+	ctx context.Context,
+	w http.ResponseWriter,
+	url, token string,
+	reqData ChatRequest,
+) (fullResp string, err error) {
 	reqData.Stream = true
 
 	body, err := sonic.Marshal(reqData)
 	if err != nil {
-		return fmt.Errorf("marshal request: %w", err)
+		return "", fmt.Errorf("marshal request: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
 	if err != nil {
-		return fmt.Errorf("create request: %w", err)
+		return "", fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("do request: %w", err)
+		return "", fmt.Errorf("do request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("bad response status: %d", resp.StatusCode)
+		return "", fmt.Errorf("bad response status: %d", resp.StatusCode)
 	}
 
 	// 设置 SSE 响应头
@@ -74,23 +80,23 @@ func (c *AIModelClient) ChatStreamWithWriter(ctx context.Context, w http.Respons
 	header.Set("Connection", "keep-alive")
 	header.Set("Access-Control-Allow-Origin", "*")
 
-	// http.Flusher 必须支持刷新
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		return fmt.Errorf("response does not support flushing")
+		return "", fmt.Errorf("response does not support flushing")
 	}
 
 	reader := bufio.NewReader(resp.Body)
 
+	var sb strings.Builder // 用于拼接完整响应
+
 	for {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return sb.String(), ctx.Err()
 		default:
-			var line []byte
-			line, err = reader.ReadBytes('\n')
+			line, err := reader.ReadBytes('\n')
 			if err != nil {
-				return err
+				return sb.String(), err
 			}
 			line = bytes.TrimSpace(line)
 			if len(line) == 0 {
@@ -98,30 +104,27 @@ func (c *AIModelClient) ChatStreamWithWriter(ctx context.Context, w http.Respons
 			}
 			line = bytes.TrimPrefix(line, []byte("data: "))
 			if string(line) == "[DONE]" {
-				return nil
+				return sb.String(), nil
 			}
 
 			var streamResponse ChatCompletionStreamResponse
 			if err = sonic.Unmarshal(line, &streamResponse); err != nil {
 				zap.L().Error("Failed to parse response", zap.Error(err), zap.String("raw", string(line)))
-				return err
+				return sb.String(), err
 			}
 
 			if streamResponse.Choices[0].isEnd() {
-				return
+				return sb.String(), nil
 			}
 
 			if content := streamResponse.Choices[0].Delta.Content; content != "" {
+				sb.WriteString(content) // 拼接到完整响应
+
+				// 实时推送到前端
 				jsonData := map[string]string{"v": content}
-				var jsonBytes []byte
-				jsonBytes, err = sonic.Marshal(jsonData)
-				if err != nil {
-					zap.L().Error("JSON marshal error", zap.Error(err))
-					return err
-				}
+				jsonBytes, _ := sonic.Marshal(jsonData)
 				if _, err = fmt.Fprintf(w, "data: %s\n\n", jsonBytes); err != nil {
-					zap.L().Error("Write error", zap.Error(err))
-					return err
+					return sb.String(), err
 				}
 				flusher.Flush()
 			}

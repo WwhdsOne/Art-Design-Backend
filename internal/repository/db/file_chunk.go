@@ -38,13 +38,12 @@ func (f *FileChunkDB) GetFileChunkIDsByFileIDList(c context.Context, fileIDList 
 	return
 }
 
-func (f *FileChunkDB) GetFileContentByIDList(c context.Context, ids []int64) (contents []string, err error) {
+func (f *FileChunkDB) GetFileContentByIDList(c context.Context, ids []int64) (chunks []*entity.FileChunk, err error) {
 	if err = DB(c, f.db).
-		Model(&entity.FileChunk{}). // 指定表
-		Select("content").          // 只查询 content 字段
+		Model(&entity.FileChunk{}).
+		Select("id, content").
 		Where("id IN (?)", ids).
-		Pluck("content", &contents). // 直接提取 content 字段到字符串切片
-		Error; err != nil {
+		Find(&chunks).Error; err != nil {
 		err = errors.WrapDBError(err, "获取文件块内容失败")
 		return
 	}

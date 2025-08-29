@@ -34,3 +34,41 @@ func (c *StreamChoice) isEnd() bool {
 	// 检查内容是否为[DONE]
 	return c.Delta.Content == "[DONE]"
 }
+
+// ChatCompletionResponse 非流式返回的标准结构体
+type ChatCompletionResponse struct {
+	ID      string                 `json:"id"`
+	Object  string                 `json:"object"`
+	Created int64                  `json:"created"` // 时间戳
+	Model   string                 `json:"model"`
+	Choices []ChatCompletionChoice `json:"choices"`
+	Usage   *ChatCompletionUsage   `json:"usage,omitempty"`
+}
+
+// ChatCompletionChoice 每条生成结果
+type ChatCompletionChoice struct {
+	Index        int                   `json:"index"`
+	Message      ChatCompletionMessage `json:"message"`
+	FinishReason string                `json:"finish_reason"`
+}
+
+// ChatCompletionMessage 消息结构体
+type ChatCompletionMessage struct {
+	Role    string `json:"role"`    // "user" / "assistant" / "system"
+	Content string `json:"content"` // 生成的文本
+}
+
+// ChatCompletionUsage token 使用情况
+type ChatCompletionUsage struct {
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
+	TotalTokens      int `json:"total_tokens"`
+}
+
+// FirstText 可选：辅助方法，快速获取第一条生成文本
+func (r *ChatCompletionResponse) FirstText() string {
+	if len(r.Choices) > 0 {
+		return r.Choices[0].Message.Content
+	}
+	return ""
+}

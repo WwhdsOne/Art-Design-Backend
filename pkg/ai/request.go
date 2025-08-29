@@ -38,3 +38,11 @@ func DefaultStreamChatRequest(model string, messages []ChatMessage) ChatRequest 
 		Stream:   true,
 	}
 }
+
+func DefaultChatRequest(model string, messages []ChatMessage) ChatRequest {
+	return ChatRequest{
+		Model:    model,
+		Messages: messages,
+		Stream:   false,
+	}
+}
