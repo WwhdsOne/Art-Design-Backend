@@ -101,13 +101,13 @@ func wireApp() *bootstrap.HttpServer {
 		OssClient:          ossClient,
 	}
 	digitPredictController := controller.NewDigitPredictController(engine, middlewares, digitPredictService)
+	aiModelClient := bootstrap.InitAIModelClient()
 	aiModelDB := db.NewAIModelDB(gormDB)
 	aiModelCache := cache.NewAIModelCache(redisWrapper)
 	aiModelRepo := &repository.AIModelRepo{
 		AIModelDB:    aiModelDB,
 		AIModelCache: aiModelCache,
 	}
-	aiModelClient := bootstrap.InitAIModelClient()
 	aiProviderDB := db.NewAIProviderDB(gormDB)
 	aiProviderCache := cache.NewAIProviderCache(redisWrapper)
 	aiProviderRepo := &repository.AIProviderRepo{
@@ -130,18 +130,17 @@ func wireApp() *bootstrap.HttpServer {
 		ConversationDB: conversationDB,
 		MessageDB:      messageDB,
 	}
-	slicer := bootstrap.InitSlicer(configConfig)
 	aiService := &service.AIService{
-		AIModelRepo:       aiModelRepo,
 		AIModelClient:     aiModelClient,
+		AIModelRepo:       aiModelRepo,
 		AIProviderRepo:    aiProviderRepo,
 		KnowledgeBaseRepo: knowledgeBaseRepo,
 		ConversationRepo:  conversationRepo,
 		OssClient:         ossClient,
-		Slicer:            slicer,
 		GormTX:            gormTransactionManager,
 	}
 	aiController := controller.NewAIController(engine, middlewares, aiService)
+	slicer := bootstrap.InitSlicer(configConfig)
 	knowledgeBaseService := &service.KnowledgeBaseService{
 		OssClient:         ossClient,
 		Slicer:            slicer,

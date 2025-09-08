@@ -8,7 +8,7 @@ import (
 )
 
 type Message struct {
-	ID              int64         `gorm:"primaryKey;autoIncrement;comment:主键"`
+	ID              int64         `gorm:"type:bigint;column:id;primaryKey;autoIncrement:false"`
 	ConversationID  int64         `gorm:"not null;index;comment:会话ID"`
 	Role            string        `gorm:"type:varchar(20);not null;check:role IN ('user','assistant');comment:消息角色"`
 	Content         string        `gorm:"type:text;not null;comment:消息内容"`
