@@ -261,16 +261,17 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 		conversation.ID = int64(r.ConversationID)
 	}
 
+	var textContext string
+	var imageContext string
 	// Step 4: 构建知识库回答
 	var fullMessages []ai.ChatMessage
 	documents := make([]string, 0)
 	var retrievedTextChunks []*entity.FileChunk
-	// Step 4: 构建系统上下文
-	var contextTexts []string
+	var embedding [][]float32
 
 	// 4.1 向量检索
 	if r.KnowledgeBaseID != 0 {
-		embedding, err := a.getQianwenEmbeddings(c, []string{latestQuestion})
+		embedding, err = a.getQianwenEmbeddings(c, []string{latestQuestion})
 		if err != nil {
 			return err
 		}
@@ -281,12 +282,14 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 		}
 
 		// 重排序
-		rerankModel, err := a.AIModelRepo.GetRerankModel(c)
+		var rerankModel *entity.AIModel
+		rerankModel, err = a.AIModelRepo.GetRerankModel(c)
 		if err != nil {
 			zap.L().Error("获取重排序模型失败", zap.Error(err))
 			return fmt.Errorf("获取重排序模型失败: %w", err)
 		}
-		rerankProvider, err := a.AIProviderRepo.GetAIProviderByIDWithCache(c, rerankModel.ProviderID)
+		var rerankProvider *entity.AIProvider
+		rerankProvider, err = a.AIProviderRepo.GetAIProviderByIDWithCache(c, rerankModel.ProviderID)
 		if err != nil {
 			zap.L().Error("获取重排序模型提供者失败", zap.Error(err))
 			return fmt.Errorf("获取重排序模型提供者失败: %w", err)
@@ -295,7 +298,8 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 		for _, chunk := range retrievedTextChunks {
 			documents = append(documents, chunk.Content)
 		}
-		rerankTexts, err := a.AIModelClient.Rerank(rerankProvider.APIKey, ai.RerankRequest{
+		rerankTexts := make([]string, 0)
+		rerankTexts, err = a.AIModelClient.Rerank(rerankProvider.APIKey, ai.RerankRequest{
 			Model:     rerankModel.Model,
 			Documents: documents,
 			Query:     latestQuestion,
@@ -306,18 +310,20 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 		}
 
 		if len(rerankTexts) > 0 {
-			contextTexts = append(contextTexts, strings.Join(rerankTexts, "\n\n"))
+			textContext = strings.Join(rerankTexts, "\n\n")
 		}
 	}
 
 	// 4.2 图片理解
 	if len(r.Files) > 0 {
-		multiModel, err := a.AIModelRepo.GetAIModelByID(c, multiModelID)
+		var multiModel *entity.AIModel
+		multiModel, err = a.AIModelRepo.GetAIModelByID(c, multiModelID)
 		if err != nil {
 			zap.L().Error("获取多模态模型失败", zap.Error(err))
 			return
 		}
-		multiModelProvider, err := a.AIProviderRepo.GetAIProviderByIDWithCache(c, multiModel.ProviderID)
+		var multiModelProvider *entity.AIProvider
+		multiModelProvider, err = a.AIProviderRepo.GetAIProviderByIDWithCache(c, multiModel.ProviderID)
 		if err != nil {
 			zap.L().Error("获取多模态模型供应商失败", zap.Error(err))
 			return
@@ -338,8 +344,8 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 				},
 			})
 		}
-
-		imageSummaryResponse, err := a.AIModelClient.MultiModeChatRequest(
+		var imageSummaryResponse []byte
+		imageSummaryResponse, err = a.AIModelClient.MultiModeChatRequest(
 			c.Request.Context(),
 			multiModelProvider.BaseURL+multiModel.ApiPath,
 			multiModelProvider.APIKey,
@@ -350,20 +356,44 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 		} else {
 			var imageSummary ai.ChatCompletionResponse
 			_ = sonic.Unmarshal(imageSummaryResponse, &imageSummary)
-			contextTexts = append(contextTexts, imageSummary.FirstText())
+			imageContext = imageSummary.FirstText()
 			zap.L().Info("图片理解成功", zap.Int64("conversation_id", conversation.ID))
 		}
 	}
 
 	// 4.3 构造 system 消息
-	if len(contextTexts) > 0 {
+	if textContext != "" || imageContext != "" {
 		fullMessages = append(fullMessages, ai.ChatMessage{
 			Role: "system",
-			Content: fmt.Sprintf(`以下是与用户问题相关的背景资料。
-				请仅根据这些资料回答问题，如果资料中没有提及，请直接回复：
-				“很抱歉，我无法在现有知识中找到相关答案。”：
-				%s`, strings.Join(contextTexts, "\n\n")),
+			Content: fmt.Sprintf(`以下是与用户问题相关的背景资料，请严格按照规则回答：
+				1. 文本知识（来自知识库和向量检索）：
+				%s
+				
+				2. 图片理解知识（来自用户上传的图片，多模态分析结果）：
+				%s
+				
+				规则：
+				- 请仅根据上述资料回答问题。
+				- 如果用户提问的内容在以上资料中都没有提及，请直接回答：
+				  “很抱歉，我无法在现有知识中找到相关答案。”
+				- 不要自己推测或者添加额外信息。
+				- 尽量用中文简洁自然地回答。
+				`, textContext, imageContext),
 		})
+		fmt.Printf(`以下是与用户问题相关的背景资料，请严格按照规则回答：
+				1. 文本知识（来自知识库和向量检索）：
+				%s
+				
+				2. 图片理解知识（来自用户上传的图片，多模态分析结果）：
+				%s
+				
+				规则：
+				- 请仅根据上述资料回答问题。
+				- 如果用户提问的内容在以上资料中都没有提及，请直接回答：
+				  “很抱歉，我无法在现有知识中找到相关答案。”
+				- 不要自己推测或者添加额外信息。
+				- 尽量用中文简洁自然地回答。
+				`, textContext, imageContext)
 	} else {
 		fullMessages = append(fullMessages, ai.ChatMessage{
 			Role:    "system",
