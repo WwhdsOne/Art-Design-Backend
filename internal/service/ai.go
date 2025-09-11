@@ -265,22 +265,22 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 	var fullMessages []ai.ChatMessage
 	documents := make([]string, 0)
 	var retrievedTextChunks []*entity.FileChunk
+	// Step 4: 构建系统上下文
+	var contextTexts []string
+
+	// 4.1 向量检索
 	if r.KnowledgeBaseID != 0 {
-		// Step 3: 计算 embedding
 		embedding, err := a.getQianwenEmbeddings(c, []string{latestQuestion})
 		if err != nil {
 			return err
 		}
-
-		// Step 4.1: 向量检索
-		retrievedTextChunks, err = a.KnowledgeBaseRepo.SearchAgentRelatedChunks(
-			c, int64(r.KnowledgeBaseID), embedding[0])
+		retrievedTextChunks, err = a.KnowledgeBaseRepo.SearchAgentRelatedChunks(c, int64(r.KnowledgeBaseID), embedding[0])
 		if err != nil {
 			zap.L().Error("向量检索失败", zap.Error(err))
 			return fmt.Errorf("向量检索失败: %w", err)
 		}
 
-		// Step 4.2: 重排序
+		// 重排序
 		rerankModel, err := a.AIModelRepo.GetRerankModel(c)
 		if err != nil {
 			zap.L().Error("获取重排序模型失败", zap.Error(err))
@@ -291,6 +291,7 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 			zap.L().Error("获取重排序模型提供者失败", zap.Error(err))
 			return fmt.Errorf("获取重排序模型提供者失败: %w", err)
 		}
+
 		for _, chunk := range retrievedTextChunks {
 			documents = append(documents, chunk.Content)
 		}
@@ -304,61 +305,41 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 			return fmt.Errorf("重排序失败: %w", err)
 		}
 
-		// Step 4.3 : 构造 prompt
-		if len(documents) > 0 {
-			contextText := strings.Join(rerankTexts, "\n\n")
-			fullMessages = append(fullMessages, ai.ChatMessage{
-				Role: "system",
-				Content: fmt.Sprintf(`以下是与用户问题相关的背景资料。
-						请仅根据这些资料回答问题，如果资料中没有提及，请直接回复：
-						“很抱歉，我无法在现有知识中找到相关答案。”：%s`, contextText),
-			})
-		} else {
-			fullMessages = append(fullMessages, ai.ChatMessage{
-				Role:    "system",
-				Content: `注意：当前没有任何与用户问题相关的背景资料。`,
-			})
+		if len(rerankTexts) > 0 {
+			contextTexts = append(contextTexts, strings.Join(rerankTexts, "\n\n"))
 		}
 	}
 
-	// Step 5: 通过多模态模型解读图片拼接回答
+	// 4.2 图片理解
 	if len(r.Files) > 0 {
-		var multiModel *entity.AIModel
-		var multiModelProvider *entity.AIProvider
-		multiModel, err = a.AIModelRepo.GetAIModelByID(c, multiModelID)
+		multiModel, err := a.AIModelRepo.GetAIModelByID(c, multiModelID)
 		if err != nil {
 			zap.L().Error("获取多模态模型失败", zap.Error(err))
 			return
 		}
-		multiModelProvider, err = a.AIProviderRepo.GetAIProviderByIDWithCache(c, multiModel.ProviderID)
+		multiModelProvider, err := a.AIProviderRepo.GetAIProviderByIDWithCache(c, multiModel.ProviderID)
 		if err != nil {
 			zap.L().Error("获取多模态模型供应商失败", zap.Error(err))
 			return
 		}
+
 		var multiModeMessages []ai.MultiModeChatMessage
 		multiModeMessages = append(multiModeMessages, ai.MultiModeChatMessage{
 			Role: "system",
 			Content: []ai.MultiModeChatContent{
-				{
-					Type: "text",
-					Text: prompt.ImageSummaryPrompt,
-				},
+				{Type: "text", Text: prompt.ImageSummaryPrompt},
 			},
 		})
-		// 添加图片
 		for _, file := range r.Files {
 			multiModeMessages = append(multiModeMessages, ai.MultiModeChatMessage{
 				Role: "user",
 				Content: []ai.MultiModeChatContent{
-					{
-						Type:     "image_url",
-						ImageUrl: file,
-					},
+					{Type: "image_url", ImageUrl: file},
 				},
 			})
 		}
-		var imageSummaryResponse []byte
-		imageSummaryResponse, err = a.AIModelClient.MultiModeChatRequest(
+
+		imageSummaryResponse, err := a.AIModelClient.MultiModeChatRequest(
 			c.Request.Context(),
 			multiModelProvider.BaseURL+multiModel.ApiPath,
 			multiModelProvider.APIKey,
@@ -369,17 +350,28 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 		} else {
 			var imageSummary ai.ChatCompletionResponse
 			_ = sonic.Unmarshal(imageSummaryResponse, &imageSummary)
-			fullMessages = append(fullMessages, ai.ChatMessage{
-				Role:    "system",
-				Content: imageSummary.FirstText(),
-			})
+			contextTexts = append(contextTexts, imageSummary.FirstText())
 			zap.L().Info("图片理解成功", zap.Int64("conversation_id", conversation.ID))
-		}
-		if err != nil {
-			return
 		}
 	}
 
+	// 4.3 构造 system 消息
+	if len(contextTexts) > 0 {
+		fullMessages = append(fullMessages, ai.ChatMessage{
+			Role: "system",
+			Content: fmt.Sprintf(`以下是与用户问题相关的背景资料。
+				请仅根据这些资料回答问题，如果资料中没有提及，请直接回复：
+				“很抱歉，我无法在现有知识中找到相关答案。”：
+				%s`, strings.Join(contextTexts, "\n\n")),
+		})
+	} else {
+		fullMessages = append(fullMessages, ai.ChatMessage{
+			Role:    "system",
+			Content: `注意：当前没有任何与用户问题相关的背景资料。`,
+		})
+	}
+
+	// Step 5: 追加用户原始消息
 	fullMessages = append(fullMessages, r.Messages...)
 
 	// Step 6: 在新对话中返回对话ID
