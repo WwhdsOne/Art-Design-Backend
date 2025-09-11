@@ -117,9 +117,13 @@ func (a *AIModelDB) GetAIModelPage(c context.Context, q *query.AIModel) (pageRes
 }
 
 func (a *AIModelDB) GetSimpleChatModelList(c context.Context) (models []*entity.AIModel, err error) {
-	if err = DB(c, a.db).Select("id", "icon", "model").
+	var modelTypes = []string{
+		"chat",
+		//"multimode",
+	}
+	if err = DB(c, a.db).Select("id", "icon", "model", "model_type").
 		Where("enabled = ?", true).
-		Where("model_type = ?", "chat").Find(&models).Error; err != nil {
+		Where("model_type IN (?)", modelTypes).Find(&models).Error; err != nil {
 		err = errors.WrapDBError(err, "获取模型简洁列表失败")
 		return
 	}

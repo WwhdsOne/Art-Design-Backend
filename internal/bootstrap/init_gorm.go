@@ -2,7 +2,6 @@ package bootstrap
 
 import (
 	"Art-Design-Backend/config"
-	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/pkg/utils"
 	"context"
 	"fmt"
@@ -41,7 +40,7 @@ func AutoMigrate(db *gorm.DB) {
 	//db.AutoMigrate(&entity.KnowledgeBaseFileRel{})
 	//// 9. 会话
 	//db.AutoMigrate(&entity.Conversation{})
-	db.AutoMigrate(&entity.Message{})
+	//db.AutoMigrate(&entity.Message{})
 }
 
 // snowflakeIdFieldsMap 存储类型和对应的ID字段名（缓存，提高效率）

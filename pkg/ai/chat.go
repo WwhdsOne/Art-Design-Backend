@@ -41,6 +41,34 @@ func (c *AIModelClient) ChatRequest(ctx context.Context, url, token string, reqD
 	return io.ReadAll(resp.Body)
 }
 
+// MultiModeChatRequest 多模态流式请求，返回完整响应体 []byte 或错误
+func (c *AIModelClient) MultiModeChatRequest(ctx context.Context, url, token string, reqData MultiModeChatRequest) ([]byte, error) {
+	body, err := sonic.Marshal(reqData)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("bad response status: %d", resp.StatusCode)
+	}
+
+	return io.ReadAll(resp.Body)
+}
+
 // ChatStreamWithWriter 流式请求，将远程 SSE 响应数据实时推送给 ginCtx，
 // 同时在函数返回时拼接完整的 AI 响应
 func (c *AIModelClient) ChatStreamWithWriter(

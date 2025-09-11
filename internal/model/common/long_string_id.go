@@ -12,16 +12,28 @@ type LongStringID int64
 
 // UnmarshalJSON 实现 UnmarshalJSON 方法，用于将字符串反序列化为 int64
 func (id *LongStringID) UnmarshalJSON(data []byte) error {
+	// 如果是 null，直接返回，不赋值
+	if string(data) == "null" {
+		*id = 0
+		return nil
+	}
+
 	// 尝试将 JSON 数据解析为字符串
 	var strValue string
 	if err := sonic.Unmarshal(data, &strValue); err != nil {
 		return err
 	}
 
+	// 空字符串处理，直接赋 0
+	if strValue == "" {
+		*id = 0
+		return nil
+	}
+
 	// 将字符串转换为 int64
 	intValue, err := strconv.ParseInt(strValue, 10, 64)
 	if err != nil {
-		return err
+		return fmt.Errorf("LongStringID 解析失败: %w", err)
 	}
 
 	// 赋值给 LongStringID

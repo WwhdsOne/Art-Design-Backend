@@ -47,3 +47,7 @@ func (o *OssClient) UploadModelIcon(c context.Context, filename string, reader i
 func (o *OssClient) UploadKnowledgeBaseFile(c context.Context, filename string, reader io.Reader) (string, error) {
 	return o.uploadToFolder(c, "knowledge_base_file", filename, reader)
 }
+
+func (o *OssClient) UploadChatMessageImage(c context.Context, filename string, reader io.Reader) (string, error) {
+	return o.uploadToFolder(c, "chat_message_image", filename, reader)
+}

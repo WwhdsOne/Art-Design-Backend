@@ -28,6 +28,7 @@ func NewAIController(engine *gin.Engine, middleware *middleware.Middlewares, ser
 		aiModelGroup.POST("/chat-completion", aiCtrl.chatCompletion)
 		aiModelGroup.GET("/simpleList", aiCtrl.getSimpleModelList)
 		aiModelGroup.POST("/uploadIcon", aiCtrl.uploadAIModelIcon)
+		aiModelGroup.POST("/uploadChatFile", aiCtrl.uploadChatImage)
 	}
 	{
 		aiProviderGroup := r.Group("/provider")
@@ -37,8 +38,8 @@ func NewAIController(engine *gin.Engine, middleware *middleware.Middlewares, ser
 		aiProviderGroup.GET("/simpleList", aiCtrl.getSimpleProviderList)
 	}
 	{
-		agentGroup := r.Group("/agent")
-		agentGroup.Use(middleware.AuthMiddleware())
+		//agentGroup := r.Group("/agent")
+		//agentGroup.Use(middleware.AuthMiddleware())
 		//agentGroup.POST("/uploadAgentDocument/:id", aiCtrl.UploadAgentDocument)
 		//agentGroup.POST("/create", aiCtrl.CreateAgent)
 		//agentGroup.POST("/page", aiCtrl.GetAIAgentPage)
@@ -50,7 +51,6 @@ func NewAIController(engine *gin.Engine, middleware *middleware.Middlewares, ser
 		conversationGroup.Use(middleware.AuthMiddleware())
 		conversationGroup.GET("/history", aiCtrl.GetHistoryConversation)
 		conversationGroup.GET("/:id/messages", aiCtrl.GetMessageByConversationID)
-
 	}
 	return aiCtrl
 }
@@ -191,6 +191,37 @@ func (a *AIController) GetMessageByConversationID(c *gin.Context) {
 		return
 	}
 	result.OkWithData(res, c)
+}
+
+func (a *AIController) uploadChatImage(c *gin.Context) {
+	// 获取上传的文件
+	file, err := c.FormFile("file")
+	if err != nil {
+		result.FailWithMessage("请选择要上传的文件", c)
+		return
+	}
+
+	// 打开上传的文件流
+	src, err := file.Open()
+	if err != nil {
+		result.FailWithMessage("无法打开上传的文件", c)
+		return
+	}
+	defer src.Close()
+
+	// 检查文件大小是否超过 10MB
+	if file.Size > 10<<20 { // 10 MB
+		result.FailWithMessage("文件大小不能超过 10MB", c)
+		return
+	}
+
+	chatMessageURL, err := a.aiService.UploadChatMessageImage(c, file.Filename, src)
+	if err != nil {
+		result.FailWithMessage("模型图标上传失败: "+err.Error(), c)
+		return
+	}
+
+	result.OkWithData(chatMessageURL, c)
 }
 
 //func (a *AIController) UploadAgentDocument(c *gin.Context) {

@@ -25,6 +25,8 @@ import (
 	"go.uber.org/zap"
 )
 
+const multiModelID = 61331207874412809
+
 type AIService struct {
 	AIModelClient     *ai.AIModelClient             // AI客户端
 	AIModelRepo       *repository.AIModelRepo       // 模型Repo
@@ -186,6 +188,8 @@ func (a *AIService) UploadModelIcon(c *gin.Context, filename string, src multipa
 func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (err error) {
 	modelID := int64(r.ID)
 
+	zap.L().Info("对话请求信息:", zap.Int64("conversation_id", int64(r.ConversationID)))
+
 	var conversation entity.Conversation
 
 	// Step 1: 获取模型信息
@@ -253,11 +257,13 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 			zap.L().Error("创建会话失败", zap.Error(err))
 			return
 		}
+	} else {
+		conversation.ID = int64(r.ConversationID)
 	}
 
 	// Step 4: 构建知识库回答
 	var fullMessages []ai.ChatMessage
-	var documents []string
+	documents := make([]string, 0)
 	var retrievedTextChunks []*entity.FileChunk
 	if r.KnowledgeBaseID != 0 {
 		// Step 3: 计算 embedding
@@ -285,7 +291,6 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 			zap.L().Error("获取重排序模型提供者失败", zap.Error(err))
 			return fmt.Errorf("获取重排序模型提供者失败: %w", err)
 		}
-		documents := make([]string, 0, len(retrievedTextChunks))
 		for _, chunk := range retrievedTextChunks {
 			documents = append(documents, chunk.Content)
 		}
@@ -316,9 +321,68 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 		}
 	}
 
+	// Step 5: 通过多模态模型解读图片拼接回答
+	if len(r.Files) > 0 {
+		var multiModel *entity.AIModel
+		var multiModelProvider *entity.AIProvider
+		multiModel, err = a.AIModelRepo.GetAIModelByID(c, multiModelID)
+		if err != nil {
+			zap.L().Error("获取多模态模型失败", zap.Error(err))
+			return
+		}
+		multiModelProvider, err = a.AIProviderRepo.GetAIProviderByIDWithCache(c, multiModel.ProviderID)
+		if err != nil {
+			zap.L().Error("获取多模态模型供应商失败", zap.Error(err))
+			return
+		}
+		var multiModeMessages []ai.MultiModeChatMessage
+		multiModeMessages = append(multiModeMessages, ai.MultiModeChatMessage{
+			Role: "system",
+			Content: []ai.MultiModeChatContent{
+				{
+					Type: "text",
+					Text: prompt.ImageSummaryPrompt,
+				},
+			},
+		})
+		// 添加图片
+		for _, file := range r.Files {
+			multiModeMessages = append(multiModeMessages, ai.MultiModeChatMessage{
+				Role: "user",
+				Content: []ai.MultiModeChatContent{
+					{
+						Type:     "image_url",
+						ImageUrl: file,
+					},
+				},
+			})
+		}
+		var imageSummaryResponse []byte
+		imageSummaryResponse, err = a.AIModelClient.MultiModeChatRequest(
+			c.Request.Context(),
+			multiModelProvider.BaseURL+multiModel.ApiPath,
+			multiModelProvider.APIKey,
+			ai.DefaultMultiModeChatRequest(multiModel.Model, multiModeMessages),
+		)
+		if err != nil {
+			zap.L().Error("图片理解失败", zap.Error(err))
+		} else {
+			var imageSummary ai.ChatCompletionResponse
+			_ = sonic.Unmarshal(imageSummaryResponse, &imageSummary)
+			fullMessages = append(fullMessages, ai.ChatMessage{
+				Role:    "system",
+				Content: imageSummary.FirstText(),
+			})
+			zap.L().Info("图片理解成功", zap.Int64("conversation_id", conversation.ID))
+		}
+		if err != nil {
+			return
+		}
+	}
+
 	fullMessages = append(fullMessages, r.Messages...)
 
-	// Step 5: 在新对话中返回对话ID
+	// Step 6: 在新对话中返回对话ID
 	if r.ConversationID == 0 {
 		var newConversationResp response.Conversation
 		_ = copier.Copy(&newConversationResp, conversation)
@@ -326,7 +390,7 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 		_, _ = fmt.Fprintf(c.Writer, "data: "+marshalString+"\n\n")
 		c.Writer.(http.Flusher).Flush()
 	}
-	// Step 6: 调用大模型 (流式)
+	// Step 7: 调用大模型 (流式)
 	AIResponse, err := a.AIModelClient.ChatStreamWithWriter(
 		c.Request.Context(), c.Writer,
 		provider.BaseURL+modelInfo.ApiPath,
@@ -338,7 +402,7 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 		return
 	}
 
-	// Step 7: 异步保存会话
+	// Step 8: 异步保存会话
 	// todo待测试
 	go func(ctx context.Context, convID int64, question, answer string) {
 		// 不要直接传 gin.Context
@@ -370,6 +434,12 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 			zap.L().Error("保存AI回答消息失败", zap.Error(err))
 			return
 		}
+		zap.L().Info("保存会话成功",
+			zap.Int64("conversation_id", conversation.ID),
+			zap.Int64("user_id", authutils.GetUserID(c)),
+			zap.String("question", latestQuestion),
+			zap.String("answer", AIResponse),
+		)
 	}(c.Copy(), conversation.ID, latestQuestion, AIResponse)
 
 	return
@@ -394,6 +464,15 @@ func (a *AIService) GetMessageByConversationID(c context.Context, id int64) (res
 		var messageRes response.Message
 		_ = copier.Copy(&messageRes, message)
 		res = append(res, &messageRes)
+	}
+	return
+}
+
+func (a *AIService) UploadChatMessageImage(c *gin.Context, filename string, src multipart.File) (url string, err error) {
+	url, err = a.OssClient.UploadChatMessageImage(c, filename, src)
+	if err != nil {
+		zap.L().Error("上传对话图片失败", zap.Error(err))
+		return
 	}
 	return
 }

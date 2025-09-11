@@ -10,4 +10,5 @@ type ChatCompletion struct {
 	Messages        []ai.ChatMessage    `json:"messages" binding:"required" label:"消息列表"`
 	ConversationID  common.LongStringID `json:"conversation_id" binding:"omitempty" label:"会话ID"`
 	KnowledgeBaseID common.LongStringID `json:"knowledge_base_id" binding:"omitempty" label:"关联知识库ID"`
+	Files           []string            `json:"files" binding:"omitempty" label:"上传文件"`
 }
