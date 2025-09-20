@@ -14,7 +14,7 @@ GOEXPERIMENT=greenteagc GOAMD64=v4 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go buil
   -trimpath \
   -buildvcs=false \
   -ldflags "-w -s -X main.version=${VERSION} -X main.buildTime=${BUILD_TIME}" \
-  -tags "sonic,avx,netgo,osusergo" \
+  -tags "sonic" \
   -o "${APP_NAME}" \
   ./cmd/app
 
