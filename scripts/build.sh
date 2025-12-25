@@ -10,13 +10,18 @@ VERSION=$(git describe --tags --always --dirty)
 BUILD_TIME=$(date '+%Y-%m-%d_%H:%M:%S')
 
 # 构建参数，启用 greenteagc
-GOEXPERIMENT=greenteagc GOAMD64=v4 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v \
+GOOS=linux \
+GOARCH=amd64 \
+CGO_ENABLED=0 \
+GOAMD64=v4 \
+go build -v \
   -trimpath \
   -buildvcs=false \
   -ldflags "-w -s -X main.version=${VERSION} -X main.buildTime=${BUILD_TIME}" \
   -tags "sonic" \
   -o "${APP_NAME}" \
   ./cmd/app
+
 
 if command -v upx >/dev/null 2>&1; then
     echo "🔧 使用 UPX 压缩可执行文件..."
