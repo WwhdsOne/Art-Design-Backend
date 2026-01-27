@@ -24,7 +24,8 @@ func NewRoleCache(redis *redisx.RedisWrapper) *RoleCache {
 // 同时也删除映射表缓存
 func (r *RoleCache) InvalidRoleInfoCache(roleID int64) (err error) {
 	// 删除角色信息缓存
-	key := fmt.Sprintf("%s%d", rediskey.RoleInfo, roleID)
+	key := fmt.Sprintf("%s%d", rediskey.RoleUserDependencies, roleID)
+	// 这里删除了	RoleUserDependencies
 	err = r.redis.DelBySetMembers(key)
 	if err != nil {
 		return errors.WrapCacheError(err, "删除角色信息缓存失败")
