@@ -12,7 +12,6 @@ myapp
 # Go 依赖缓存
 vendor/
 *.mod.*
-*.sum
 
 # 可选：如果你使用 IDE（比如 Goland）
 .idea/
