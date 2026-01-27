@@ -121,11 +121,25 @@ func (r *RedisWrapper) statsProcessor() {
 	}
 }
 
+// getKeyCategory 根据 Redis 风格的 key 返回其“类别前缀”
+// 例如，Redis key 常用格式为 "category:subkey:field"
+// 该函数返回最后一个冒号之前的部分（包含冒号），用于统计或归类
+//
+// 参数:
+//
+//	key - Redis 风格的字符串键
+//
+// 返回值:
+//
+//	返回 key 的类别前缀，如果没有冒号则返回原 key
 func getKeyCategory(key string) string {
+	// 查找最后一个冒号的位置
 	idx := strings.LastIndex(key, ":")
 	if idx == -1 {
+		// 如果没有冒号，直接返回原 key
 		return key
 	}
+	// 返回从开头到最后一个冒号（包含冒号）
 	return key[:idx+1]
 }
 

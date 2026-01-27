@@ -39,9 +39,9 @@ func (r *RoleRepo) GetRoleListByUserID(c context.Context, userID int64) (roleLis
 	roleList, err = r.UserCache.GetUserRoleList(userID)
 	if err == nil {
 		return
-	} else {
-		zap.L().Warn("获取用户角色列表缓存失败", zap.Error(err))
 	}
+
+	zap.L().Warn("获取用户角色列表缓存失败", zap.Error(err))
 
 	// 2. 查询角色ID列表
 	roleIDList, err := r.GetRoleIDListByUserID(c, userID)
@@ -78,7 +78,7 @@ func (r *RoleRepo) GetRoleListByUserID(c context.Context, userID int64) (roleLis
 		}
 		// 5. 写入 Redis 映射表（每个角色映射该用户缓存key）
 		for _, roleID := range roleIDList {
-			if err := r.RoleCache.SetRoleUserDep(userID, roleID); err != nil {
+			if err := r.RoleCache.SetRoleUserDep(roleID, userID); err != nil {
 				zap.L().Warn("用户角色对应关系写入映射表失败", zap.Error(err))
 			}
 		}
