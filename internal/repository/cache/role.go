@@ -65,7 +65,7 @@ func (r *RoleCache) SetRoleInfo(role *entity.Role) (err error) {
 	return
 }
 
-func (r *RoleCache) SetRoleUserDep(roleID int64, userID int64) (err error) {
+func (r *RoleCache) SetRoleUserDep(userID int64, roleID int64) (err error) {
 	roleUserDepKey := fmt.Sprintf(rediskey.RoleUserDependencies+"%d", roleID)
 	userRoleInfoKey := fmt.Sprintf(rediskey.UserRoleList+"%d", userID)
 	err = r.redis.SAdd(roleUserDepKey, userRoleInfoKey)

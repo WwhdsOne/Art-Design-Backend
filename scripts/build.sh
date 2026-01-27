@@ -13,8 +13,7 @@ BUILD_TIME=$(date '+%Y-%m-%d_%H:%M:%S')
 GOOS=linux \
 GOARCH=amd64 \
 CGO_ENABLED=0 \
-GOAMD64=v4 \
-go build -v \
+go build \
   -trimpath \
   -buildvcs=false \
   -ldflags "-w -s -X main.version=${VERSION} -X main.buildTime=${BUILD_TIME}" \
