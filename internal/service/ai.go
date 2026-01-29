@@ -39,6 +39,8 @@ type AIService struct {
 
 // 获取嵌入向量
 func (a *AIService) getQianwenEmbeddings(c context.Context, chunks []string) ([][]float32, error) {
+	// qwen模型供应商ID
+	// todo后续写到配置文件
 	const providerID int64 = 51088793876300041
 
 	provider, err := a.AIProviderRepo.GetAIProviderByIDWithCache(c, providerID)
@@ -90,13 +92,18 @@ func (a *AIService) CreateAIModel(c context.Context, r *request.AIModel) (err er
 	var aiModel entity.AIModel
 	_ = copier.Copy(&aiModel, &r)
 	if err = a.AIModelRepo.CheckAIDuplicate(c, &aiModel); err != nil {
-		zap.L().Error("AI模型已存在", zap.Error(err))
+		zap.L().Error("AI 模型已存在", zap.Error(err))
 		return
 	}
 	if err = a.AIModelRepo.Create(c, &aiModel); err != nil {
-		zap.L().Error("aiModelCreate失败", zap.Error(err))
+		zap.L().Error("AI 模型创建失败", zap.Error(err))
 		return
 	}
+	go func() {
+		if redisErr := a.AIModelRepo.InvalidSimpleModelList(); redisErr != nil {
+			zap.L().Error("模型信息简易列表失效失败", zap.Error(redisErr))
+		}
+	}()
 	return
 }
 func (a *AIService) GetSimpleChatModelList(c context.Context) (res []*response.SimpleAIModel, err error) {
