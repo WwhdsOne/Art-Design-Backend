@@ -1,4 +1,3 @@
-configs
 myapp
 
 # Go 编译生成文件
@@ -28,4 +27,8 @@ Thumbs.db
 
 # Git hooks（自动生成，不纳入版本控制）
 .git/hooks/
+
+# 配置文件（包含敏感信息，请勿提交）
+configs/dev.yaml
+configs/*.env
 

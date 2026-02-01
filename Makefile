@@ -23,6 +23,7 @@ install-tools:
 	go get -tool github.com/mgechev/revive
 	go get -tool github.com/google/wire/cmd/wire
 	go get -tool github.com/golangci/golangci-lint/cmd/golangci-lint
+	go get -tool github.com/evilmartians/lefthook
 	@echo "工具安装完成！"
 
 # 快速 lint（revive）

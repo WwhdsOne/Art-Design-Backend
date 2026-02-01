@@ -1,0 +1,72 @@
+# 配置文件示例
+# 请根据实际环境修改配置，注意：不要将包含真实密钥的配置文件提交到版本控制
+
+server:
+  port: ":8888"                           # 服务端口
+  read-timeout: "300s"                      # 读取超时
+  write-timeout: "300s"                      # 写入超时
+  idle-timeout: "60s"                        # 空闲超时
+
+postgre_sql:
+  host: "localhost"                          # PostgreSQL 主机地址（开发环境可用 localhost）
+  port: 5432                                # PostgreSQL 端口
+  user: "postgres"                           # 数据库用户名
+  password: "your-postgres-password"           # 数据库密码（敏感信息，请勿泄露）
+  database: "Art-Design-Backend"              # 数据库名称
+
+redis:
+  host: "localhost"                          # Redis 主机地址
+  port: 6379                                # Redis 端口
+  password: "your-redis-password"              # Redis 密码（敏感信息，请勿泄露）
+  db: 0                                    # Redis 数据库编号
+  operation-timeout: "10s"                   # 操作超时
+  hit-rate-log-interval: "5m"                # 命中率日志间隔
+  save-stats-interval: "30s"                 # 统计信息保存间隔
+
+jwt:
+  signing-key: "your-jwt-signing-key-here"    # JWT 签名密钥（敏感信息，请使用强随机字符串）
+  expires-time: "1d"                         # Token 过期时间
+  issuer: "Wwhds"                           # 签发人
+  audience: "Art-Design-User"                 # 接收者
+
+zap:
+  level: debug                                # 日志级别（debug/info/warn/error/fatal）
+  format: console                             # 日志格式（console/json）
+  prefix: "[Art-Design-Backend]"              # 日志前缀
+  director: log                              # 日志输出目录
+  show-line: true                             # 显示行号
+  encode-level: CapitalColorLevelEncoder         # 日志级别编码
+  stacktrace-key: stacktrace                   # 堆栈跟踪键名
+  log-in-console: true                         # 是否输出到控制台
+
+oss:
+  region: "cn-beijing"                        # OSS 区域（敏感信息）
+  bucket-name: "your-bucket-name"             # OSS 存储桶名称（敏感信息）
+  endpoint: "oss-cn-beijing.aliyuncs.com"      # OSS 端点（敏感信息）
+  folders:
+    avatar: "avatar"                         # 头像文件夹
+    mnist: "mnist"                           # MNIST 图片文件夹
+    model_icon: "model_icon"                   # 模型图标文件夹
+    knowledge_base_file: "knowledge_base_file"  # 知识库文件文件夹
+
+digit_predict:
+  predict_url: "http://your-mnist-service:8000/predict"  # 数字预测服务地址
+
+slicer:
+  slicer_url: "http://your-slicer-service:8000/upload"     # 文档切片服务地址
+
+default_user:
+  avatars:                                                       # 默认头像列表
+    - "https://your-oss-bucket.oss-cn-beijing.aliyuncs.com/avatar/anon.avif"
+    - "https://your-oss-bucket.oss-cn-beijing.aliyuncs.com/avatar/soyo.avif"
+    - "https://your-oss-bucket.oss-cn-beijing.aliyuncs.com/avatar/cat.avif"
+    - "https://your-oss-bucket.oss-cn-beijing.aliyuncs.com/avatar/tomorin.avif"
+    - "https://your-oss-bucket.oss-cn-beijing.aliyuncs.com/avatar/taki.avif"
+  reset_password: "123456"                         # 重置密码的默认值
+
+middleware:
+  rate-limit:
+    window: 60                                    # 时间窗口（秒）
+    max-req: 100                                  # 最大请求数
+  operation-log:
+    operation-log-chan-size: 100                     # 操作日志通道大小

@@ -90,7 +90,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           password: ${{ secrets.SSH_PASSWORD }}
           port: ${{ secrets.SERVER_PORT }}
-          source: "myapp,Dockerfile"
+          source: "bin/myapp,Dockerfile"
           target: "/home/docker-images/${{ env.IMAGE_NAME }}"
 
       - name: Build Docker image
