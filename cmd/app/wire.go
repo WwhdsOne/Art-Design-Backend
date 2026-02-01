@@ -14,9 +14,9 @@ import (
 
 // 构造函数是因为初始化时有其他操作
 // wire.Struct则只需要构造一个结构体
-func wireApp() *bootstrap.HttpServer {
+func wireApp() *bootstrap.HTTPServer {
 	wire.Build(
-		wire.Struct(new(bootstrap.HttpServer), "*"),
+		wire.Struct(new(bootstrap.HTTPServer), "*"),
 		config.LoadConfig,
 		config.ProvideDefaultUserConfig,
 		config.ProviderMiddlewareConfig,

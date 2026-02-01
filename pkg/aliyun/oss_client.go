@@ -17,7 +17,7 @@ type OssClient struct {
 	Folders    map[string]string // 文件夹
 }
 
-func (o *OssClient) uploadToFolder(c context.Context, folderKey, filename string, reader io.Reader) (fileUrl string, err error) {
+func (o *OssClient) uploadToFolder(c context.Context, folderKey, filename string, reader io.Reader) (fileURL string, err error) {
 	folder := o.Folders[folderKey]
 	uploadFileName := utils.StdUUID() + filepath.Ext(filename)
 	request := oss.PutObjectRequest{
@@ -28,7 +28,7 @@ func (o *OssClient) uploadToFolder(c context.Context, folderKey, filename string
 	if _, err = o.Client.PutObject(c, &request); err != nil {
 		return
 	}
-	fileUrl = "https://" + o.BucketName + "." + o.Endpoint + "/" + folder + "/" + uploadFileName
+	fileURL = "https://" + o.BucketName + "." + o.Endpoint + "/" + folder + "/" + uploadFileName
 	return
 }
 

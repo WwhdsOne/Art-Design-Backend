@@ -55,7 +55,7 @@ func (r *DigitPredictDB) IsLabeled(c context.Context, id int64) (bool, error) {
 	return count > 0, nil
 }
 
-func (r *DigitPredictDB) GetDigitById(c context.Context, id int64) (res *entity.DigitPredict, err error) {
+func (r *DigitPredictDB) GetDigitByID(c context.Context, id int64) (res *entity.DigitPredict, err error) {
 	if err = DB(c, r.db).Where("id = ?", id).First(&res).Error; err != nil {
 		err = errors.WrapDBError(err, "查询数字识别结果失败")
 		return

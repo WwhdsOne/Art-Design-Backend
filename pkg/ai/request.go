@@ -26,7 +26,7 @@ type MultiModeChatMessage struct {
 type MultiModeChatContent struct {
 	Type     string `json:"type"`                // "text" or "image_url"
 	Text     string `json:"text,omitempty"`      // 文本内容
-	ImageUrl string `json:"image_url,omitempty"` // 图片 URL
+	ImageURL string `json:"image_url,omitempty"` // 图片 URL
 }
 
 type ChatMessage struct {

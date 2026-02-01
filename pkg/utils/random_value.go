@@ -7,6 +7,6 @@ import (
 
 var randomNumber = rand.New(rand.NewSource(time.Now().UnixNano()))
 
-func GenerateRandomNumber(min, max int) int {
-	return randomNumber.Intn(max-min) + min
+func GenerateRandomNumber(minVal, maxVal int) int {
+	return randomNumber.Intn(maxVal-minVal) + minVal
 }

@@ -15,7 +15,7 @@ import (
 	"go.uber.org/zap"
 )
 
-type HttpServer struct {
+type HTTPServer struct {
 	Engine                  *gin.Engine                         // gin引擎
 	Logger                  *zap.Logger                         // 日志
 	AuthController          *controller.AuthController          // 鉴权Ctrl
@@ -28,7 +28,7 @@ type HttpServer struct {
 	Config                  *config.Config                      // 服务器配置
 }
 
-func (h *HttpServer) InitGinServer() {
+func (h *HTTPServer) InitGinServer() {
 	cfg := h.Config
 	httpServer := http.Server{
 		Addr:         cfg.Server.Port,

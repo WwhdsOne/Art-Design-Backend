@@ -20,7 +20,7 @@ import (
 
 // 构造函数是因为初始化时有其他操作
 // wire.Struct则只需要构造一个结构体
-func wireApp() *bootstrap.HttpServer {
+func wireApp() *bootstrap.HTTPServer {
 	configConfig := config.LoadConfig()
 	logger := bootstrap.InitLogger(configConfig)
 	gormDB := bootstrap.InitGorm(configConfig, logger)
@@ -151,7 +151,7 @@ func wireApp() *bootstrap.HttpServer {
 		UserRepo:          userRepo,
 	}
 	knowledgeBaseController := controller.NewKnowledgeBaseController(engine, middlewares, knowledgeBaseService)
-	httpServer := &bootstrap.HttpServer{
+	httpServer := &bootstrap.HTTPServer{
 		Engine:                  engine,
 		Logger:                  logger,
 		AuthController:          authController,

@@ -3,7 +3,7 @@ package cache
 import (
 	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/pkg/constant/rediskey"
-	"Art-Design-Backend/pkg/errors"
+	myerrors "Art-Design-Backend/pkg/errors"
 	"Art-Design-Backend/pkg/redisx"
 	"fmt"
 
@@ -28,17 +28,17 @@ func (r *RoleCache) InvalidRoleInfoCache(roleID int64) (err error) {
 	// 这里删除了	RoleUserDependencies
 	err = r.redis.DelBySetMembers(key)
 	if err != nil {
-		return errors.WrapCacheError(err, "删除角色信息缓存失败")
+		return myerrors.WrapCacheError(err, "删除角色信息缓存失败")
 	}
 	return
 }
 
-func (r *RoleCache) InvalidRoleUserDepCache(userID int64, originalRoleIds []int64) (err error) {
+func (r *RoleCache) InvalidRoleUserDepCache(userID int64, originalRoleIDs []int64) (err error) {
 	userRoleInfoKey := fmt.Sprintf(rediskey.UserRoleList+"%d", userID)
-	for _, roleID := range originalRoleIds {
+	for _, roleID := range originalRoleIDs {
 		roleUserDepKey := fmt.Sprintf(rediskey.RoleUserDependencies+"%d", roleID)
 		if err = r.redis.SRem(roleUserDepKey, userRoleInfoKey); err != nil {
-			return errors.WrapCacheError(err, "删除用户角色对应关系失败")
+			return myerrors.WrapCacheError(err, "删除用户角色对应关系失败")
 		}
 	}
 	return
@@ -46,22 +46,22 @@ func (r *RoleCache) InvalidRoleUserDepCache(userID int64, originalRoleIds []int6
 
 func (r *RoleCache) GetRoleInfo(roleID int64) (role *entity.Role, err error) {
 	key := fmt.Sprintf(rediskey.RoleInfo+"%d", roleID)
-	var roleJson string
-	roleJson, err = r.redis.Get(key)
+	var roleJSON string
+	roleJSON, err = r.redis.Get(key)
 	if err != nil {
-		err = errors.WrapCacheError(err, "获取角色信息失败")
+		err = myerrors.WrapCacheError(err, "获取角色信息失败")
 		return
 	}
-	_ = sonic.UnmarshalString(roleJson, &role)
+	_ = sonic.UnmarshalString(roleJSON, &role)
 	return
 }
 
 func (r *RoleCache) SetRoleInfo(role *entity.Role) (err error) {
 	key := fmt.Sprintf(rediskey.RoleInfo+"%d", role.ID)
-	roleJson, _ := sonic.MarshalString(role)
-	err = r.redis.Set(key, roleJson, rediskey.RoleInfoTTL)
+	roleJSON, _ := sonic.MarshalString(role)
+	err = r.redis.Set(key, roleJSON, rediskey.RoleInfoTTL)
 	if err != nil {
-		return errors.WrapCacheError(err, "设置角色信息缓存失败")
+		return myerrors.WrapCacheError(err, "设置角色信息缓存失败")
 	}
 	return
 }
@@ -71,7 +71,7 @@ func (r *RoleCache) SetRoleUserDep(userID int64, roleID int64) (err error) {
 	userRoleInfoKey := fmt.Sprintf(rediskey.UserRoleList+"%d", userID)
 	err = r.redis.SAdd(roleUserDepKey, userRoleInfoKey)
 	if err != nil {
-		return errors.WrapCacheError(err, "设置角色用户对应关系失败")
+		return myerrors.WrapCacheError(err, "设置角色用户对应关系失败")
 	}
 	return
 }

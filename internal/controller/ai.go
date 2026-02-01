@@ -11,18 +11,22 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// AIController AI相关的控制器
+// AIController 处理AI模型和聊天相关的HTTP请求
 type AIController struct {
 	aiService *service.AIService // 创建一个AIService实例
 }
 
-func NewAIController(engine *gin.Engine, middleware *middleware.Middlewares, service *service.AIService) *AIController {
+// NewAIController 创建AI控制器
+// NewAIController 初始化AI控制器并注册路由
+func NewAIController(engine *gin.Engine, mws *middleware.Middlewares, svc *service.AIService) *AIController {
 	aiCtrl := &AIController{
-		aiService: service,
+		aiService: svc,
 	}
 	r := engine.Group("/api").Group("/ai")
 	{
 		aiModelGroup := r.Group("/model")
-		aiModelGroup.Use(middleware.AuthMiddleware())
+		aiModelGroup.Use(mws.AuthMiddleware())
 		aiModelGroup.POST("/create", aiCtrl.createAIModel)
 		aiModelGroup.POST("/page", aiCtrl.getAIModelPage)
 		aiModelGroup.POST("/chat-completion", aiCtrl.chatCompletion)
@@ -32,23 +36,14 @@ func NewAIController(engine *gin.Engine, middleware *middleware.Middlewares, ser
 	}
 	{
 		aiProviderGroup := r.Group("/provider")
-		aiProviderGroup.Use(middleware.AuthMiddleware())
+		aiProviderGroup.Use(mws.AuthMiddleware())
 		aiProviderGroup.POST("/create", aiCtrl.createAIProvider)
 		aiProviderGroup.POST("/page", aiCtrl.getAIProviderPage)
 		aiProviderGroup.GET("/simpleList", aiCtrl.getSimpleProviderList)
 	}
 	{
-		//agentGroup := r.Group("/agent")
-		//agentGroup.Use(middleware.AuthMiddleware())
-		//agentGroup.POST("/uploadAgentDocument/:id", aiCtrl.UploadAgentDocument)
-		//agentGroup.POST("/create", aiCtrl.CreateAgent)
-		//agentGroup.POST("/page", aiCtrl.GetAIAgentPage)
-		//agentGroup.GET("/simpleList", aiCtrl.getSimpleAgentList)
-		//agentGroup.POST("/chat-completion", aiCtrl.agentChatCompletion)
-	}
-	{
 		conversationGroup := r.Group("/conversation")
-		conversationGroup.Use(middleware.AuthMiddleware())
+		conversationGroup.Use(mws.AuthMiddleware())
 		conversationGroup.GET("/history", aiCtrl.GetHistoryConversation)
 		conversationGroup.GET("/:id/messages", aiCtrl.GetMessageByConversationID)
 	}

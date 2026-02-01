@@ -29,7 +29,7 @@ func ParseIDs(c *gin.Context) (ids []int64, err error) {
 
 func ParseID(c *gin.Context) (id int64, err error) {
 	idParam, exist := c.Params.Get("id")
-	if exist != true {
+	if !exist {
 		err = errors.New("ID 不存在")
 		return
 	}

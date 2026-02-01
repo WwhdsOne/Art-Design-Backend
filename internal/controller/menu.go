@@ -14,12 +14,12 @@ type MenuController struct {
 	menuService *service.MenuService // 创建一个MenuService实例
 }
 
-func NewMenuController(engine *gin.Engine, middleware *middleware.Middlewares, service *service.MenuService) *MenuController {
+func NewMenuController(engine *gin.Engine, mws *middleware.Middlewares, svc *service.MenuService) *MenuController {
 	menuCtrl := &MenuController{
-		menuService: service,
+		menuService: svc,
 	}
 	r := engine.Group("/api").Group("/menu")
-	r.Use(middleware.AuthMiddleware())
+	r.Use(mws.AuthMiddleware())
 	{
 		// 私有路由组（需要 JWT 认证）
 		r.GET("/list", menuCtrl.getMenuList)

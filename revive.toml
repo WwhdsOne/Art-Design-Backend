@@ -1,0 +1,150 @@
+# revive.toml - 高标准Go代码检查配置
+# 为Art-Design-Backend项目设计，确保代码高质量、高可读性、高整洁度
+
+# 全局配置
+ignoreGeneratedHeader = false  # 不忽略生成的文件头
+severity = "warning"           # 初始设为警告级别，便于团队适应
+confidence = 0.8               # 置信度阈值
+errorCode = 1                  # 错误代码
+warningCode = 1                # 警告代码
+
+# 排除模式
+exclude = [
+  "vendor/...",                # 排除vendor目录
+  "third_party/...",           # 排除第三方代码
+  "*_test.go",                 # 排除测试文件（可单独配置测试规则）
+  "cmd/app/wire_gen.go",       # 排除wire生成的文件
+]
+
+# ==================== 代码质量规则 ====================
+
+# 1. 命名规范
+# [rule.var-naming]                       # 变量命名规范（禁用：包名冲突等）
+
+[rule.receiver-naming]                    # 接收器命名规范
+
+[rule.error-naming]                       # 错误变量命名规范
+
+[rule.time-naming]                        # 时间变量命名规范
+
+[rule.redefines-builtin-id]               # 禁止重定义内置标识符
+
+# 2. 代码结构
+[rule.blank-imports]                      # 禁止空白导入
+
+[rule.dot-imports]                        # 禁止点导入
+
+[rule.superfluous-else]                   # 禁止多余的else
+
+[rule.unreachable-code]                   # 禁止不可达代码
+
+[rule.indent-error-flow]                  # 错误处理缩进规范
+
+[rule.increment-decrement]                # 自增自减规范
+
+[rule.range]                              # range循环规范
+
+# 3. 错误处理
+[rule.error-return]                       # 错误返回检查
+
+[rule.error-strings]                      # 错误字符串格式
+
+[rule.errorf]                             # 使用Errorf格式化错误
+
+# 4. 导出规范
+# [rule.exported]                           # 导出函数/类型注释要求
+
+[rule.unexported-return]                  # 未导出返回值检查
+
+# [rule.package-comments]                   # 包注释要求
+
+# 5. 函数参数
+[rule.context-as-argument]                # context作为参数规范
+
+[rule.context-keys-type]                  # context键类型规范
+
+[rule.unused-parameter]                   # 未使用参数检查
+
+# 6. 变量声明
+[rule.var-declaration]                    # 变量声明规范
+
+# ==================== 代码可读性规则 ====================
+
+# [rule.cyclomatic]
+#   arguments = [10]                        # 圈复杂度限制为10
+
+# [rule.function-length]
+#   arguments = [50]                        # 函数长度限制为50行
+
+# [rule.max-public-structs]
+#   arguments = [15]                        # 单个文件最大公开结构体数
+
+# [rule.line-length-limit]
+#   arguments = [120]                       # 行长度限制为120字符
+
+# ==================== 代码整洁度规则 ====================
+
+# [rule.add-constant]
+#   arguments = [{"maxLitCount": 3, "allowStrs": "", "allowInts": "", "allowFloats": ""}]  # 魔法数字检查
+
+[rule.flag-parameter]                     # 禁止布尔标志参数
+
+# [rule.nested-structs]                  # 嵌套结构体检查（禁用：AI响应结构体）
+
+[rule.early-return]                       # 鼓励提前返回
+
+[rule.empty-block]                        # 禁止空代码块
+
+[rule.identical-branches]                 # 禁止相同分支
+
+[rule.unnecessary-stmt]                   # 禁止不必要的语句
+
+# ==================== 性能相关规则 ====================
+
+# [rule.get-return]                        # Get函数返回值检查
+
+[rule.modifies-parameter]                 # 参数修改检查
+
+[rule.modifies-value-receiver]            # 值接收器修改检查
+
+# ==================== 安全相关规则 ====================
+
+[rule.defer]                              # defer使用规范
+
+[rule.waitgroup-by-value]                 # WaitGroup值传递检查
+
+[rule.atomic]                             # 原子操作检查
+
+# ==================== 团队协作规则 ====================
+
+[rule.confusing-naming]                   # 混淆命名检查
+
+[rule.confusing-results]                  # 混淆结果检查
+
+[rule.import-shadowing]                   # 导入阴影检查
+
+# [rule.imports-blacklist]
+#   arguments = ["crypto/md5", "crypto/sha1"]  # 禁止使用不安全的哈希算法
+
+# ==================== 文档规范 ====================
+
+# [rule.comment-spacings]                   # 注释空格规范
+
+# [rule.comment-format]                     # 注释格式规范
+
+# [rule.comment-length]                     # 注释长度规范
+
+# ==================== 测试文件专用规则 ====================
+
+# [rule.if-return]                        # if-return模式检查（禁用）
+
+[rule.string-format]                      # 字符串格式化检查
+
+[rule.struct-tag]                         # 结构体标签检查
+
+# ==================== 自定义规则 ====================
+
+# 自定义规则示例：禁止panic在非main包中使用
+# [rule.custom-no-panic]
+#   arguments = ["^panic\\("]
+#   severity = "error"

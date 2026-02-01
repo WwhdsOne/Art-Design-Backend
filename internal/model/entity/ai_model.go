@@ -13,7 +13,7 @@ type AIModel struct {
 	Model      string `gorm:"type:varchar(100);not null;comment:模型名称，例如 gpt-4"`
 	ProviderID int64  `gorm:"not null;comment:关联的供应商ID"`
 	ModelID    string `gorm:"type:varchar(100);comment:模型接口标识，例如 gpt-4-1106-preview"`
-	ApiPath    string `gorm:"type:varchar(200);comment:API 路径 base_url后续的部分"`
+	APIPath    string `gorm:"type:varchar(200);comment:API 路径 base_url后续的部分"`
 	Icon       string `gorm:"type:varchar(200);comment:模型图标Url"`
 
 	PricePromptPer1M       decimal.Decimal `gorm:"type:numeric(15,8);comment:正常输入 token 单价（每百万 token）"`

@@ -12,9 +12,9 @@ type DigitPredict struct {
 	PredictURL string
 }
 
-func (c *DigitPredict) Predict(imageUrl string) (result int, err error) {
+func (c *DigitPredict) Predict(imageURL string) (result int, err error) {
 	request := map[string]string{
-		"image_url": imageUrl,
+		"image_url": imageURL,
 	}
 	requestData, err := sonic.Marshal(request)
 	if err != nil {

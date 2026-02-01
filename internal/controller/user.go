@@ -15,12 +15,12 @@ type UserController struct {
 	userService *service.UserService // 创建一个AuthService实例
 }
 
-func NewUserController(engine *gin.Engine, middleware *middleware.Middlewares, service *service.UserService) *UserController {
+func NewUserController(engine *gin.Engine, mws *middleware.Middlewares, svc *service.UserService) *UserController {
 	userCtrl := &UserController{
-		userService: service,
+		userService: svc,
 	}
 	r := engine.Group("/api").Group("/user")
-	r.Use(middleware.AuthMiddleware())
+	r.Use(mws.AuthMiddleware())
 	{
 		// 私有路由组（需要 JWT 认证）
 		r.GET("/info", userCtrl.getUserInfo)
@@ -37,7 +37,7 @@ func NewUserController(engine *gin.Engine, middleware *middleware.Middlewares, s
 }
 
 func (u *UserController) getUserInfo(c *gin.Context) {
-	user, err := u.userService.GetUserById(c)
+	user, err := u.userService.GetUserByID(c)
 	if err != nil {
 		_ = c.Error(err)
 		return

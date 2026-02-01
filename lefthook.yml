@@ -1,0 +1,20 @@
+# Lefthook 配置文件
+# Git hooks 管理工具
+
+pre-commit:
+  parallel: true
+  commands:
+    wire:
+      run: make wire
+      glob: "**/*.go"
+    lint:
+      run: make lint
+      glob: "**/*.go"
+    test:
+      run: make test
+      glob: "**/*.go"
+
+commit-msg:
+  commands:
+    conventional-commits:
+      run: ./scripts/lint-commit-msg.sh '{1}'

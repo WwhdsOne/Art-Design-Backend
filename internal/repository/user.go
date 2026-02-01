@@ -15,9 +15,9 @@ type UserRepo struct {
 	*cache.RoleCache
 }
 
-func (u *UserRepo) InvalidUserRoleCache(c context.Context, userID int64, originalRoleIds []int64) (err error) {
+func (u *UserRepo) InvalidUserRoleCache(_ context.Context, userID int64, originalRoleIDs []int64) (err error) {
 	var errs []error
-	if e := u.RoleCache.InvalidRoleUserDepCache(userID, originalRoleIds); e != nil {
+	if e := u.RoleCache.InvalidRoleUserDepCache(userID, originalRoleIDs); e != nil {
 		errs = append(errs, e)
 	}
 	if e := u.UserCache.InvalidUserRoleCache(userID); e != nil {

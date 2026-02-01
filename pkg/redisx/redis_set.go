@@ -13,9 +13,7 @@ func (r *RedisWrapper) SMembers(key string) (val []string) {
 	// 映射表默认永久存在
 	val, err := r.client.SMembers(timeout, key).Result()
 	if err != nil {
-		if err.Error() == "redis: nil" {
-			// 这里省略 return，默认返回 val 的零值 ""
-		} else {
+		if err.Error() != "redis: nil" {
 			zap.L().Error(err.Error())
 		}
 	}

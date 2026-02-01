@@ -92,7 +92,7 @@ func (u *UserDB) GetLoginUserByUsername(c context.Context, username string) (use
 	return
 }
 
-func (u *UserDB) GetUserById(c context.Context, id int64) (user *entity.User, err error) {
+func (u *UserDB) GetUserByID(c context.Context, id int64) (user *entity.User, err error) {
 	if err = DB(c, u.db).
 		Where("id = ?", id).
 		First(&user).Error; err != nil {
@@ -174,9 +174,9 @@ func (u *UserDB) GetUserPage(c context.Context, user *query.User) (userPage []*e
 	return
 }
 
-func (r *UserDB) GetUserMapByIDs(ctx context.Context, ids []int64) (map[int64]string, error) {
+func (u *UserDB) GetUserMapByIDs(ctx context.Context, ids []int64) (map[int64]string, error) {
 	var users []entity.User
-	if err := DB(ctx, r.db).
+	if err := DB(ctx, u.db).
 		Select("id, username").
 		Where("id IN ?", ids).
 		Find(&users).Error; err != nil {

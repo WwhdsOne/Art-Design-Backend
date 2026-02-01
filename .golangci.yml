@@ -1,0 +1,56 @@
+run:
+  timeout: 10m
+  issues-exit-code: 1  # 有错误时退出码为1
+  tests: true          # 检查测试文件
+  build-tags: []       # 不限制构建标签
+
+output:
+  format: colored-line-number  # 详细输出格式
+  print-issued-lines: true     # 打印问题行
+  print-linter-name: true      # 打印检查器名称
+  uniq-by-line: false          # 不按行去重
+
+issues:
+  max-issues-per-linter: 0     # 不限制每个检查器的问题数
+  max-same-issues: 0           # 不限制相同问题数
+  exclude-use-default: false   # 不使用默认排除规则
+  exclude: []                  # 不排除任何问题
+
+severity:
+  default-severity: error      # 默认严重级别为错误
+
+linters:
+  enable:
+    - revive
+    - govet
+    - errcheck
+    - staticcheck
+    - gosimple
+    - ineffassign
+    - unused
+    - typecheck
+    - bodyclose
+    - goconst
+    - gocyclo
+    - dupl
+    - gocritic
+    - gofmt
+    - goimports
+
+linters-settings:
+  revive:
+    config: revive.toml
+    severity: warning
+  
+  govet:
+    check-shadowing: true
+  
+  gocyclo:
+    min-complexity: 15
+  
+  dupl:
+    threshold: 100
+  
+  goconst:
+    min-len: 3
+    min-occurrences: 3

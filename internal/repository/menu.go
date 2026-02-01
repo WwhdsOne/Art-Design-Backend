@@ -39,6 +39,6 @@ func (m *MenuRepo) GetMenuListByRoleIDList(c context.Context, roleIDList []int64
 	return m.MenuDB.GetMenuListByIDList(c, menuIDList)
 }
 
-func (m *MenuRepo) SetMenuListCache(c context.Context, roleIDList []int64, menuList []*entity.Menu) (err error) {
+func (m *MenuRepo) SetMenuListCache(_ context.Context, roleIDList []int64, menuList []*entity.Menu) (err error) {
 	return m.MenuCache.SetMenuListCache(roleIDList, menuList)
 }

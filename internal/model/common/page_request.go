@@ -15,8 +15,7 @@ func (r *PaginationReq) Paginate() func(db *gorm.DB) *gorm.DB {
 			r.Page = 1
 		}
 		// 默认每页10条
-		switch {
-		case r.Size <= 0:
+		if r.Size <= 0 {
 			r.Size = 10
 		}
 		offset := (r.Page - 1) * r.Size

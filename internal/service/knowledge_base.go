@@ -252,7 +252,7 @@ func (k *KnowledgeBaseService) CreateKnowledgeBase(c context.Context, req *reque
 }
 
 func (k *KnowledgeBaseService) DeleteKnowledgeBase(c *gin.Context, id int64) (err error) {
-	err = k.GormTX.Transaction(c, func(ctx context.Context) (err error) {
+	err = k.GormTX.Transaction(c, func(_ context.Context) (err error) {
 		if err = k.KnowledgeBaseRepo.DeleteKnowledgeBase(c, id); err != nil {
 			zap.L().Error("删除知识库失败", zap.Error(err))
 			return
@@ -320,8 +320,7 @@ func (k *KnowledgeBaseService) GetKnowledgeBaseFilesByID(
 }
 
 func (k *KnowledgeBaseService) GetSimpleKnowledgeBaseList(c context.Context) (res []*response.SimpleKnowledgeBase, err error) {
-	var userID int64
-	userID = authutils.GetUserID(c)
+	userID := authutils.GetUserID(c)
 	knowledgeBases, err := k.KnowledgeBaseRepo.GetSimpleKnowledgeBaseList(c, userID)
 	res = make([]*response.SimpleKnowledgeBase, 0, len(knowledgeBases))
 	for _, knowledgeBase := range knowledgeBases {

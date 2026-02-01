@@ -30,15 +30,16 @@ type UserService struct {
 	DefaultUserConfig *config.DefaultUserConfig  // 默认用户配置
 }
 
-func (u *UserService) GetUserById(c context.Context) (res response.User, err error) {
+func (u *UserService) GetUserByID(c context.Context) (res response.User, err error) {
 	var user *entity.User
 	id := authutils.GetUserID(c)
 	// 获取用户信息
-	if user, err = u.UserRepo.GetUserById(c, id); err != nil {
+	if user, err = u.UserRepo.GetUserByID(c, id); err != nil {
 		return
 	}
 	// 获取用户角色列表
-	roleList, err := u.RoleRepo.GetRoleListByUserID(c, user.ID)
+	var roleList []*entity.Role
+	roleList, err = u.RoleRepo.GetRoleListByUserID(c, user.ID)
 	if len(roleList) == 0 {
 		err = fmt.Errorf("当前用户未分配角色")
 		return
@@ -56,8 +57,8 @@ func (u *UserService) GetUserById(c context.Context) (res response.User, err err
 	return
 }
 
-func (u *UserService) GetUserPage(c context.Context, query *query.User) (resp *common.PaginationResp[response.User], err error) {
-	users, total, err := u.UserRepo.GetUserPage(c, query)
+func (u *UserService) GetUserPage(c context.Context, userQuery *query.User) (resp *common.PaginationResp[response.User], err error) {
+	users, total, err := u.UserRepo.GetUserPage(c, userQuery)
 	if err != nil {
 		return
 	}
@@ -77,7 +78,7 @@ func (u *UserService) GetUserPage(c context.Context, query *query.User) (resp *c
 		userResponses = append(userResponses, userResp)
 	}
 
-	resp = common.BuildPageResp[response.User](userResponses, total, query.PaginationReq)
+	resp = common.BuildPageResp[response.User](userResponses, total, userQuery.PaginationReq)
 	return
 }
 
@@ -108,7 +109,7 @@ func (u *UserService) ChangeUserPassword(c context.Context, userReq *request.Cha
 		zap.L().Error("复制属性失败")
 		return
 	}
-	user, err := u.UserRepo.GetUserById(c, userDo.ID)
+	user, err := u.UserRepo.GetUserByID(c, userDo.ID)
 	if err != nil {
 		return
 	}
@@ -129,7 +130,7 @@ func (u *UserService) ChangeUserPassword(c context.Context, userReq *request.Cha
 	return
 }
 
-func (u *UserService) UploadAvatar(c *gin.Context, filename string, src multipart.File) (fileUrl string, err error) {
+func (u *UserService) UploadAvatar(c *gin.Context, filename string, src multipart.File) (fileURL string, err error) {
 	url, err := u.OssClient.UploadAvatar(c, filename, src)
 	if err != nil {
 		zap.L().Error("上传头像失败", zap.Error(err))
@@ -141,7 +142,7 @@ func (u *UserService) UploadAvatar(c *gin.Context, filename string, src multipar
 	if err = u.UserRepo.UpdateUser(c, &userDo); err != nil {
 		return
 	}
-	fileUrl = url
+	fileURL = url
 	return
 }
 
@@ -203,10 +204,10 @@ func (u *UserService) GetUserRoleBinding(c context.Context, id int64) (res *resp
 
 func (u *UserService) UpdateUserRoleBinding(c *gin.Context, req *request.UserRoleBinding) (err error) {
 	err = u.GormTX.Transaction(c, func(ctx context.Context) (err error) {
-		if err = u.RoleRepo.DeleteUserRoleRelationsByUserID(ctx, int64(req.UserId)); err != nil {
+		if err = u.RoleRepo.DeleteUserRoleRelationsByUserID(ctx, int64(req.UserID)); err != nil {
 			return
 		}
-		if err = u.RoleRepo.AddRolesToUser(ctx, int64(req.UserId), req.RoleIds); err != nil {
+		if err = u.RoleRepo.AddRolesToUser(ctx, int64(req.UserID), req.RoleIDs); err != nil {
 			return
 		}
 		return
@@ -220,6 +221,6 @@ func (u *UserService) UpdateUserRoleBinding(c *gin.Context, req *request.UserRol
 		if err := u.UserRepo.InvalidUserRoleCache(c, userID, originalRoleIDList); err != nil {
 			zap.L().Error("用户变更角色信息删除缓存失败", zap.Int64("userID", userID), zap.Error(err))
 		}
-	}(int64(req.UserId), req.OriginalRoleIds)
+	}(int64(req.UserID), req.OriginalRoleIDs)
 	return
 }

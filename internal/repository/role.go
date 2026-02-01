@@ -19,14 +19,13 @@ type RoleRepo struct {
 
 func (r *RoleRepo) GetRoleIDListByUserID(c context.Context, userID int64) (roleIDs []int64, err error) {
 	list, err := r.UserCache.GetUserRoleList(userID)
-	if err != nil {
-		zap.L().Warn("获取用户角色列表缓存错误", zap.Error(err))
-	} else {
+	if err == nil {
 		for _, role := range list {
 			roleIDs = append(roleIDs, role.ID)
 		}
 		return
 	}
+	zap.L().Warn("获取用户角色列表缓存错误", zap.Error(err))
 	roleIDs, err = r.UserRolesDB.GetRoleIDListByUserID(c, userID)
 	if err != nil {
 		return

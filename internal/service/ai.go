@@ -232,9 +232,9 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 			conversation.Title = latestQuestion
 		} else {
 			// Step 3.2: 如果新对话提问信息过长，使用当前选择的对话大模型总结十个字作为会话标题
-			titleSummaryJson, err := a.AIModelClient.ChatRequest(
+			titleSummaryJSON, err := a.AIModelClient.ChatRequest(
 				c.Request.Context(),
-				provider.BaseURL+modelInfo.ApiPath,
+				provider.BaseURL+modelInfo.APIPath,
 				provider.APIKey,
 				ai.DefaultChatRequest(modelInfo.Model,
 					[]ai.ChatMessage{
@@ -254,7 +254,7 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 				conversation.Title = latestQuestion[:10]
 			} else {
 				var titleSummary ai.ChatCompletionResponse
-				_ = sonic.Unmarshal(titleSummaryJson, &titleSummary)
+				_ = sonic.Unmarshal(titleSummaryJSON, &titleSummary)
 				conversation.Title = titleSummary.FirstText()
 				zap.L().Info("总结标题成功", zap.Int64("conversation_id", conversation.ID), zap.String("title", conversation.Title))
 			}
@@ -347,14 +347,14 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 			multiModeMessages = append(multiModeMessages, ai.MultiModeChatMessage{
 				Role: "user",
 				Content: []ai.MultiModeChatContent{
-					{Type: "image_url", ImageUrl: file},
+					{Type: "image_url", ImageURL: file},
 				},
 			})
 		}
 		var imageSummaryResponse []byte
 		imageSummaryResponse, err = a.AIModelClient.MultiModeChatRequest(
 			c.Request.Context(),
-			multiModelProvider.BaseURL+multiModel.ApiPath,
+			multiModelProvider.BaseURL+multiModel.APIPath,
 			multiModelProvider.APIKey,
 			ai.DefaultMultiModeChatRequest(multiModel.Model, multiModeMessages),
 		)
@@ -416,13 +416,13 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 		var newConversationResp response.Conversation
 		_ = copier.Copy(&newConversationResp, conversation)
 		marshalString, _ := sonic.MarshalString(&newConversationResp)
-		_, _ = fmt.Fprintf(c.Writer, "data: "+marshalString+"\n\n")
+		_, _ = fmt.Fprintf(c.Writer, "%s", "data: "+marshalString+"\n\n")
 		c.Writer.(http.Flusher).Flush()
 	}
 	// Step 7: 调用大模型 (流式)
 	AIResponse, err := a.AIModelClient.ChatStreamWithWriter(
 		c.Request.Context(), c.Writer,
-		provider.BaseURL+modelInfo.ApiPath,
+		provider.BaseURL+modelInfo.APIPath,
 		provider.APIKey,
 		ai.DefaultStreamChatRequest(modelInfo.Model, fullMessages),
 	)

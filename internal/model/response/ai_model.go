@@ -10,7 +10,7 @@ type AIModel struct {
 	Model    string `json:"model"`    // 模型名称
 	Provider string `json:"provider"` // 供应商名称（如果是 ID 则改为 provider_id）
 
-	ApiPath string `json:"api_path"` // API 路径（BaseURL 后的部分）
+	APIPath string `json:"api_path"` // API 路径（BaseURL 后的部分）
 	ModelID string `json:"model_id"` // 模型接口标识（如 gpt-4-1106-preview）
 	Icon    string `json:"icon"`     // 模型图标 URL
 

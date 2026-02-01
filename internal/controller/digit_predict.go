@@ -16,16 +16,16 @@ type DigitPredictController struct {
 	DigitPredictService *service.DigitPredictService
 }
 
-func NewDigitPredictController(engine *gin.Engine, middleware *middleware.Middlewares, service *service.DigitPredictService) *DigitPredictController {
+func NewDigitPredictController(engine *gin.Engine, mws *middleware.Middlewares, svc *service.DigitPredictService) *DigitPredictController {
 	digitCtrl := &DigitPredictController{
-		DigitPredictService: service,
+		DigitPredictService: svc,
 	}
 	r := engine.Group("/api").Group("/digitPredict")
-	r.Use(middleware.AuthMiddleware())
+	r.Use(mws.AuthMiddleware())
 	{
 		// 私有路由组（需要 JWT 认证）
 		r.GET("/list", digitCtrl.getDigitPredictList)
-		r.GET("/get/:id", digitCtrl.getDigitById)
+		r.GET("/get/:id", digitCtrl.getDigitByID)
 		r.POST("/predict", digitCtrl.predict)
 		r.POST("/upload", digitCtrl.uploadDigitImage)
 	}
@@ -79,22 +79,22 @@ func (d *DigitPredictController) uploadDigitImage(c *gin.Context) {
 	}
 
 	// 调用 service 层处理上传逻辑
-	digitImageUrl, err := d.DigitPredictService.UploadDigitImage(c, file.Filename, src)
+	digitImageURL, err := d.DigitPredictService.UploadDigitImage(c, file.Filename, src)
 	if err != nil {
 		result.FailWithMessage("数字上传失败: "+err.Error(), c)
 		return
 	}
 
-	result.OkWithData(digitImageUrl, c)
+	result.OkWithData(digitImageURL, c)
 }
 
-func (d *DigitPredictController) getDigitById(c *gin.Context) {
+func (d *DigitPredictController) getDigitByID(c *gin.Context) {
 	id, err := utils.ParseID(c)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
-	digit, err := d.DigitPredictService.GetDigitById(c, id)
+	digit, err := d.DigitPredictService.GetDigitByID(c, id)
 	if err != nil {
 		_ = c.Error(err)
 		return

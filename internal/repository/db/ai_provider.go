@@ -52,8 +52,7 @@ func (a *AIProviderDB) CheckAIDuplicate(c context.Context, provider *entity.AIPr
 		return
 	}
 
-	switch {
-	case result.NameExists:
+	if result.NameExists {
 		err = errors.NewDBError("模型名称重复")
 	}
 	return

@@ -53,11 +53,11 @@ func (m *Middlewares) AuthMiddleware() gin.HandlerFunc {
 // 辅助函数：处理 Token 错误
 func handleTokenError(err error, token string, c *gin.Context) {
 	switch {
-	case errors.Is(err, jwt.TokenExpired):
+	case errors.Is(err, jwt.ErrTokenExpired):
 		result.NoAuth("授权已过期", c)
-	case errors.Is(err, jwt.TokenNotValidYet),
-		errors.Is(err, jwt.TokenMalformed),
-		errors.Is(err, jwt.TokenInvalid):
+	case errors.Is(err, jwt.ErrTokenNotValidYet),
+		errors.Is(err, jwt.ErrTokenMalformed),
+		errors.Is(err, jwt.ErrTokenInvalid):
 		result.NoAuth("Token 无效", c)
 	default:
 		zap.L().Error("Token 解析失败", zap.String("token", token), zap.Error(err))

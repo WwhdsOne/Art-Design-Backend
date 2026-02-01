@@ -10,7 +10,7 @@ type AIModel struct {
 	ID         common.LongStringID `json:"id" label:"模型ID"`
 	Model      string              `json:"model" binding:"required" label:"模型名称"`
 	ProviderID common.LongStringID `json:"provider" binding:"required" label:"模型提供商"`
-	ApiPath    string              `json:"api_path" binding:"required" label:"API 路径"`
+	APIPath    string              `json:"api_path" binding:"required" label:"API 路径"`
 	ModelID    string              `json:"model_id" label:"模型官方ID"`
 	Icon       string              `json:"icon" label:"模型图标 URL"`
 

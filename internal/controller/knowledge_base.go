@@ -15,13 +15,13 @@ type KnowledgeBaseController struct {
 	knowledgeBaseService *service.KnowledgeBaseService
 }
 
-func NewKnowledgeBaseController(engine *gin.Engine, middleware *middleware.Middlewares, service *service.KnowledgeBaseService) *KnowledgeBaseController {
+func NewKnowledgeBaseController(engine *gin.Engine, mws *middleware.Middlewares, svc *service.KnowledgeBaseService) *KnowledgeBaseController {
 	knowledgeBaseCtrl := &KnowledgeBaseController{
-		knowledgeBaseService: service,
+		knowledgeBaseService: svc,
 	}
 	r := engine.Group("/api").Group("/knowledgeBase")
 	{
-		r.Use(middleware.AuthMiddleware())
+		r.Use(mws.AuthMiddleware())
 		r.POST("/file/page", knowledgeBaseCtrl.GetKnowledgeBaseFileList)
 		r.POST("/file/upload", knowledgeBaseCtrl.UploadFile)
 		//r.GET("/list", knowledgeBaseCtrl.GetKnowledgeBaseFileList)

@@ -46,11 +46,11 @@ jobs:
       - name: Update Go dependencies
         run: |
           # 更新依赖
-          go get -u ./... && go mod tidy
+          make upgrade
 
       - name: Build Application
         run: |
-          sh scripts/build.sh
+          make build
       - name: Cleanup existing Docker container and image
         uses: appleboy/ssh-action@master
         with:

@@ -15,12 +15,12 @@ type RoleController struct {
 	roleService *service.RoleService // 创建一个MenuService实例
 }
 
-func NewRoleController(engine *gin.Engine, middleware *middleware.Middlewares, service *service.RoleService) *RoleController {
+func NewRoleController(engine *gin.Engine, mws *middleware.Middlewares, svc *service.RoleService) *RoleController {
 	menuCtrl := &RoleController{
-		roleService: service,
+		roleService: svc,
 	}
 	r := engine.Group("/api").Group("/role")
-	r.Use(middleware.AuthMiddleware())
+	r.Use(mws.AuthMiddleware())
 	{
 		r.POST("/create", menuCtrl.createRole)
 		r.POST("/update", menuCtrl.updateRole)

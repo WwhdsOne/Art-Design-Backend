@@ -13,14 +13,14 @@ type AuthController struct {
 	authService *service.AuthService // 创建一个AuthService实例
 }
 
-func NewAuthController(engine *gin.Engine, middleware *middleware.Middlewares, service *service.AuthService) *AuthController {
+func NewAuthController(engine *gin.Engine, mws *middleware.Middlewares, svc *service.AuthService) *AuthController {
 	authCtrl := &AuthController{
-		authService: service,
+		authService: svc,
 	}
 	r := engine.Group("/api").Group("/auth")
 	{
 		// 私有路由组（需要 JWT 认证）
-		r.POST("/logout", middleware.AuthMiddleware(), authCtrl.logout)
+		r.POST("/logout", mws.AuthMiddleware(), authCtrl.logout)
 	}
 	{
 		// 公共路由组（无需认证）

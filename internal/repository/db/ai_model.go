@@ -1,3 +1,4 @@
+// 包 db 提供了数据库操作的相关接口和实现
 package db
 
 import (

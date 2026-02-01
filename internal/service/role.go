@@ -141,24 +141,21 @@ func (r *RoleService) GetRoleMenuBinding(c *gin.Context, roleID int64) (res *res
 
 func (r *RoleService) UpdateRoleMenuBinding(c *gin.Context, req *request.RoleMenuBinding) (err error) {
 	err = r.GormTX.Transaction(c, func(ctx context.Context) error {
-		if err = r.RoleRepo.DeleteMenuRelationsByRoleID(ctx, int64(req.RoleId)); err != nil {
-			return err
+		if e := r.RoleRepo.DeleteMenuRelationsByRoleID(ctx, int64(req.RoleID)); e != nil {
+			return e
 		}
-		if err = r.RoleRepo.CreateRoleMenus(ctx, int64(req.RoleId), req.MenuIds); err != nil {
-			return err
+		if e := r.RoleRepo.CreateRoleMenus(ctx, int64(req.RoleID), req.MenuIDs); e != nil {
+			return e
 		}
 		return nil
 	})
-	if err != nil {
-		return
-	}
 
 	// 缓存清理移出事务
 	go func(roleID int64) {
-		if err := r.MenuRepo.InvalidateMenuCacheByRoleID(roleID); err != nil {
-			zap.L().Error("缓存删除失败（需补偿）", zap.Int64("roleID", roleID), zap.Error(err))
+		if e := r.MenuRepo.InvalidateMenuCacheByRoleID(roleID); e != nil {
+			zap.L().Error("缓存删除失败（需补偿）", zap.Int64("roleID", roleID), zap.Error(e))
 		}
-	}(int64(req.RoleId))
+	}(int64(req.RoleID))
 
 	return
 }

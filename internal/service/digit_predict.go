@@ -46,9 +46,9 @@ func (d *DigitPredictService) SubmitMission(c context.Context, req *request.Digi
 		zap.L().Error("该图片已经识别，请勿重复提交", zap.Int64("id", id))
 		return fmt.Errorf("该图片已经识别，请勿重复提交")
 	}
-	go func(imageUrl string, id int64) {
+	go func(imageURL string, id int64) {
 		var result int
-		if result, err = d.DigitPredictClient.Predict(imageUrl); err != nil {
+		if result, err = d.DigitPredictClient.Predict(imageURL); err != nil {
 			zap.L().Error("预测任务失败", zap.Error(err))
 			return
 		}
@@ -61,7 +61,7 @@ func (d *DigitPredictService) SubmitMission(c context.Context, req *request.Digi
 	return
 }
 
-func (d *DigitPredictService) UploadDigitImage(c *gin.Context, filename string, src multipart.File) (fileUrl string, err error) {
+func (d *DigitPredictService) UploadDigitImage(c *gin.Context, filename string, src multipart.File) (fileURL string, err error) {
 	url, err := d.OssClient.UploadDigitImage(c, filename, src)
 	if err != nil {
 		zap.L().Error("上传数字图片失败", zap.Error(err))
@@ -77,9 +77,9 @@ func (d *DigitPredictService) UploadDigitImage(c *gin.Context, filename string, 
 	return
 }
 
-func (d *DigitPredictService) GetDigitById(c *gin.Context, id int64) (res *response.DigitPredict, err error) {
+func (d *DigitPredictService) GetDigitByID(c *gin.Context, id int64) (res *response.DigitPredict, err error) {
 	res = &response.DigitPredict{}
-	digitDo, err := d.DigitPredictRepo.GetDigitById(c, id)
+	digitDo, err := d.DigitPredictRepo.GetDigitByID(c, id)
 	if err != nil {
 		zap.L().Error("查询数字识别失败", zap.Error(err))
 		return

@@ -26,10 +26,6 @@ Thumbs.db
 *.tmp
 *.swp
 
-# node 相关
-node_modules/
-package-lock.json
-npm-debug.log*
+# Git hooks（自动生成，不纳入版本控制）
+.git/hooks/
 
-# Husky 自动生成的 hook 安装内容（可选）
-.husky/_/

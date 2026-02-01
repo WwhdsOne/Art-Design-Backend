@@ -9,13 +9,18 @@ import (
 
 // 错误类型定义
 var (
-	TokenExpired     = errors.New("令牌已过期")
-	TokenMalformed   = errors.New("令牌格式错误")
-	TokenNotValidYet = errors.New("令牌尚未生效")
-	TokenInvalid     = errors.New("令牌无效")
+	// ErrTokenExpired 令牌已过期
+	ErrTokenExpired = errors.New("令牌已过期")
+	// ErrTokenMalformed 令牌格式错误
+	ErrTokenMalformed = errors.New("令牌格式错误")
+	// ErrTokenNotValidYet 令牌尚未生效
+	ErrTokenNotValidYet = errors.New("令牌尚未生效")
+	// ErrTokenInvalid 令牌无效
+	ErrTokenInvalid = errors.New("令牌无效")
 )
 
 // JWT 结构体定义
+// JWT 提供了JWT令牌的生成和验证功能
 type JWT struct {
 	SigningKey  []byte        // 密钥
 	Issuer      string        // 签发人
@@ -24,17 +29,21 @@ type JWT struct {
 }
 
 // BaseClaims 基础声明结构体
+// BaseClaims 定义了JWT令牌的基础声明
 type BaseClaims struct {
-	UserID int64 // 主键 id
+	UserID int64 // 用户主键ID
 }
 
-func NewBaseClaims(userId int64) BaseClaims {
+// NewBaseClaims 创建基础声明
+// NewBaseClaims 根据用户ID创建BaseClaims实例
+func NewBaseClaims(userID int64) BaseClaims {
 	return BaseClaims{
-		UserID: userId,
+		UserID: userID,
 	}
 }
 
 // CustomClaims 自定义声明结构体
+// CustomClaims 定义了JWT令牌的自定义声明
 type CustomClaims struct {
 	BaseClaims           // 基础 claims
 	jwt.RegisteredClaims // 注册 claims
@@ -65,24 +74,24 @@ func (j *JWT) CreateToken(baseClaims BaseClaims) (tokenStr string, err error) {
 // ParseToken 解析 token
 func (j *JWT) ParseToken(tokenString string) (*CustomClaims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &CustomClaims{},
-		func(token *jwt.Token) (interface{}, error) {
+		func(_ *jwt.Token) (interface{}, error) {
 			return j.SigningKey, nil
 		},
 	)
 	if err != nil {
 		switch {
 		case errors.Is(err, jwt.ErrTokenExpired):
-			return nil, TokenExpired
+			return nil, ErrTokenExpired
 		case errors.Is(err, jwt.ErrTokenMalformed):
-			return nil, TokenMalformed
+			return nil, ErrTokenMalformed
 		case errors.Is(err, jwt.ErrTokenNotValidYet):
-			return nil, TokenNotValidYet
+			return nil, ErrTokenNotValidYet
 		default:
-			return nil, TokenInvalid
+			return nil, ErrTokenInvalid
 		}
 	}
 	if claims, ok := token.Claims.(*CustomClaims); ok && token.Valid {
 		return claims, nil
 	}
-	return nil, TokenInvalid
+	return nil, ErrTokenInvalid
 }

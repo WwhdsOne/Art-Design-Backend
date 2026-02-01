@@ -17,7 +17,7 @@ import (
 )
 
 // AutoMigrate 自动迁移
-func AutoMigrate(db *gorm.DB) {
+func AutoMigrate(_ *gorm.DB) {
 	//// 1. 操作日志
 	//db.AutoMigrate(&entity.OperationLog{})
 	//// 2. 用户
@@ -43,8 +43,8 @@ func AutoMigrate(db *gorm.DB) {
 	//db.AutoMigrate(&entity.Message{})
 }
 
-// snowflakeIdFieldsMap 存储类型和对应的ID字段名（缓存，提高效率）
-var snowflakeIdFieldsMap sync.Map // key: reflect.Type, value: string
+// snowflakeIDFieldsMap 存储类型和对应的ID字段名（缓存，提高效率）
+var snowflakeIDFieldsMap sync.Map // key: reflect.Type, value: string
 
 // snowflakeIDPlugin GORM插件实现，用于自动填充雪花ID
 type snowflakeIDPlugin struct{}
@@ -121,7 +121,7 @@ func (p *snowflakeIDPlugin) setID(db *gorm.DB, fieldName string) {
 		return
 	}
 	if field.Int() == 0 {
-		field.SetInt(utils.GenerateSnowflakeId()) // 设置生成的雪花ID
+		field.SetInt(utils.GenerateSnowflakeID()) // 设置生成的雪花ID
 	}
 }
 
@@ -146,12 +146,12 @@ func (p *snowflakeIDPlugin) generateID(db *gorm.DB) {
 	var fieldName string
 
 	// 从缓存中查找是否已记录字段名
-	if fieldNameRaw, ok := snowflakeIdFieldsMap.Load(modelType); ok {
+	if fieldNameRaw, ok := snowflakeIDFieldsMap.Load(modelType); ok {
 		fieldName = fieldNameRaw.(string)
 	} else {
 		// 首次分析结构体字段，找出主键字段名
 		fieldName = detectSnowflakeIDField(modelType)
-		snowflakeIdFieldsMap.Store(modelType, fieldName)
+		snowflakeIDFieldsMap.Store(modelType, fieldName)
 	}
 
 	// 找不到主键ID字段，跳过处理（比如联表结构体）
@@ -175,25 +175,25 @@ func (z *zapGormLogger) LogMode(level logger.LogLevel) logger.Interface {
 	return &newLogger
 }
 
-func (z *zapGormLogger) Info(c context.Context, msg string, data ...interface{}) {
+func (z *zapGormLogger) Info(_ context.Context, msg string, data ...interface{}) {
 	if z.logLevel >= logger.Info {
 		z.zapLogger.Sugar().Infof(msg, data...)
 	}
 }
 
-func (z *zapGormLogger) Warn(c context.Context, msg string, data ...interface{}) {
+func (z *zapGormLogger) Warn(_ context.Context, msg string, data ...interface{}) {
 	if z.logLevel >= logger.Warn {
 		z.zapLogger.Sugar().Warnf(msg, data...)
 	}
 }
 
-func (z *zapGormLogger) Error(c context.Context, msg string, data ...interface{}) {
+func (z *zapGormLogger) Error(_ context.Context, msg string, data ...interface{}) {
 	if z.logLevel >= logger.Error {
 		z.zapLogger.Sugar().Errorf(msg, data...)
 	}
 }
 
-func (z *zapGormLogger) Trace(c context.Context, begin time.Time, fc func() (string, int64), err error) {
+func (z *zapGormLogger) Trace(_ context.Context, begin time.Time, fc func() (string, int64), err error) {
 	if z.logLevel <= logger.Silent {
 		return
 	}
@@ -216,7 +216,7 @@ func (z *zapGormLogger) Trace(c context.Context, begin time.Time, fc func() (str
 }
 
 func InitGorm(cfg *config.Config, log *zap.Logger) (DB *gorm.DB) {
-	m := cfg.PostgreSql
+	m := cfg.PostgreSQL
 	// 构建PostgreSQL连接字符串
 	dsn := fmt.Sprintf(
 		"host=%s port=%d user=%s password=%s dbname=%s sslmode=disable TimeZone=Asia/Shanghai",

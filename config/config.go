@@ -15,7 +15,7 @@ import (
 
 type Config struct {
 	Server       Server            `yaml:"server" mapstructure:"server"`
-	PostgreSql   PostgreSQLConfig  `yaml:"postgre_sql" mapstructure:"postgre_sql"`
+	PostgreSQL   PostgreSQLConfig  `yaml:"postgre_sql" mapstructure:"postgre_sql"`
 	Redis        Redis             `yaml:"redis" mapstructure:"redis"`
 	JWT          JWT               `yaml:"jwt" mapstructure:"jwt"`
 	Zap          Zap               `yaml:"zap" mapstructure:"zap"`
