@@ -48,7 +48,7 @@ test:
 
 build:
 	@echo "构建项目..."
-	sh ./scripts/build.sh
+	bash ./scripts/build.sh
 
 # 整理依赖（安全）
 tidy:
