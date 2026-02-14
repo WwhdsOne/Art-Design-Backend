@@ -7,6 +7,7 @@ import (
 	"Art-Design-Backend/internal/model/request"
 	"Art-Design-Backend/internal/model/response"
 	"Art-Design-Backend/internal/repository"
+	"Art-Design-Backend/internal/repository/db"
 	"Art-Design-Backend/pkg/ai"
 	"Art-Design-Backend/pkg/constant/llmid"
 	"Art-Design-Backend/pkg/constant/prompt"
@@ -27,6 +28,7 @@ type BrowserAgentService struct {
 	AIModelRepo      *repository.AIModelRepo
 	AIProviderRepo   *repository.AIProviderRepo
 	AIModelClient    *ai.AIModelClient
+	GormTX           *db.GormTransactionManager // 事务
 }
 
 // =========================
@@ -85,8 +87,24 @@ func (s *BrowserAgentService) RenameConversation(c *gin.Context, req *request.Re
 	return s.BrowserAgentRepo.UpdateConversation(c, conv)
 }
 
-func (s *BrowserAgentService) DeleteConversation(c *gin.Context, id int64) error {
-	return s.BrowserAgentRepo.DeleteConversation(c, id)
+func (s *BrowserAgentService) DeleteConversation(c *gin.Context, conversationID int64) error {
+	err := s.GormTX.Transaction(c, func(ctx context.Context) (err error) {
+		messageIDList, err := s.BrowserAgentRepo.ListMessagesIDListByConversationID(ctx, conversationID)
+		if err != nil {
+			return
+		}
+		if err = s.BrowserAgentRepo.DeleteActionsByMessageIDList(ctx, messageIDList); err != nil {
+			return
+		}
+		if err = s.BrowserAgentRepo.DeleteMessagesByConversationID(ctx, conversationID); err != nil {
+			return
+		}
+		if err = s.BrowserAgentRepo.DeleteConversation(ctx, conversationID); err != nil {
+			return
+		}
+		return
+	})
+	return err
 }
 
 // =========================
@@ -94,10 +112,8 @@ func (s *BrowserAgentService) DeleteConversation(c *gin.Context, id int64) error
 // =========================
 
 func (s *BrowserAgentService) CreateMessage(c *gin.Context, req *request.CreateMessageRequest) (*response.MessageResponse, error) {
-
 	msg := &entity.BrowserAgentMessage{
 		ConversationID: req.ConversationID,
-		Role:           req.Role,
 		Content:        req.Content,
 	}
 	if err := s.BrowserAgentRepo.CreateMessage(c, msg); err != nil {
@@ -108,65 +124,45 @@ func (s *BrowserAgentService) CreateMessage(c *gin.Context, req *request.CreateM
 	return &msgResp, nil
 }
 
-func (s *BrowserAgentService) ListMessages(c *gin.Context, req *request.GetMessagesRequest) ([]*response.MessageResponse, error) {
-
+func (s *BrowserAgentService) ListMessages(c *gin.Context, req *request.GetMessagesRequest) ([]response.MessageResponse, error) {
 	messages, err := s.BrowserAgentRepo.ListMessagesByConversationID(c, req.ConversationID)
 	if err != nil {
 		return nil, err
 	}
 
-	responses := make([]*response.MessageResponse, 0, len(messages))
+	responses := make([]response.MessageResponse, 0, len(messages))
 	for _, msg := range messages {
-		var msgResp response.MessageResponse
-		_ = copier.Copy(&msgResp, msg)
-		responses = append(responses, &msgResp)
+		responses = append(responses, *s.messageToResponse(msg))
 	}
 
 	return responses, nil
+}
+
+func (s *BrowserAgentService) messageToResponse(msg *entity.BrowserAgentMessage) *response.MessageResponse {
+	return &response.MessageResponse{
+		ID:             msg.ID,
+		ConversationID: msg.ConversationID,
+		Content:        msg.Content,
+		CreatedAt:      msg.CreatedAt,
+	}
 }
 
 // =========================
 // 3. Action CRUD
 // =========================
 
-func (s *BrowserAgentService) CreateAction(c *gin.Context, req *request.CreateActionRequest) (*response.ActionResponse, error) {
-	_, err := s.BrowserAgentRepo.GetMessageByID(c, req.MessageID)
-	if err != nil {
-		return nil, err
-	}
-
-	action := &entity.BrowserAgentAction{
-		MessageID:  req.MessageID,
-		ActionType: req.ActionType,
-		Sequence:   req.Sequence,
-		Status:     entity.ActionStatusPending,
-		URL:        req.URL,
-		Selector:   req.Selector,
-		Value:      req.Value,
-		Distance:   req.Distance,
-		Timeout:    req.Timeout,
-	}
-	if err := s.BrowserAgentRepo.CreateAction(c, action); err != nil {
-		return nil, err
-	}
-	var actionResp response.ActionResponse
-	_ = copier.Copy(&actionResp, action)
-	return &actionResp, nil
-}
-
-func (s *BrowserAgentService) ListActions(c *gin.Context, req *request.GetActionsRequest) ([]*response.ActionResponse, error) {
+func (s *BrowserAgentService) ListActions(c *gin.Context, req *request.GetActionsRequest) ([]response.ActionResponse, error) {
 	actions, err := s.BrowserAgentRepo.ListActionsByMessageID(c, req.MessageID)
 	if err != nil {
 		return nil, err
 	}
 
-	responses := make([]*response.ActionResponse, 0, len(actions))
+	responses := make([]response.ActionResponse, 0, len(actions))
 	for _, action := range actions {
 		var actionResp response.ActionResponse
 		_ = copier.Copy(&actionResp, action)
-		responses = append(responses, &actionResp)
+		responses = append(responses, actionResp)
 	}
-
 	return responses, nil
 }
 
@@ -174,49 +170,52 @@ func (s *BrowserAgentService) ListActions(c *gin.Context, req *request.GetAction
 // 4. 任务处理
 // =========================
 
-func (s *BrowserAgentService) HandleTask(c context.Context, conversationID int64, task string, pageState *ws.PageState) (*ws.Action, error) {
-	userMsg := &entity.BrowserAgentMessage{
-		ConversationID: conversationID,
-		Role:           entity.MessageRoleUser,
-		Content:        task,
-	}
-	if err := s.BrowserAgentRepo.CreateMessage(c, userMsg); err != nil {
-		return nil, err
-	}
-
-	history, _ := s.BrowserAgentRepo.GetRecentMessages(c, conversationID, 10)
-
-	action, err := s.decideAction(c, task, pageState, history)
+func (s *BrowserAgentService) HandleTask(c context.Context, messageID int64, pageState *ws.PageState) (*ws.Action, error) {
+	msg, err := s.BrowserAgentRepo.GetMessageByID(c, messageID)
 	if err != nil {
 		return nil, err
 	}
 
-	assistantMsg := &entity.BrowserAgentMessage{
-		ConversationID: conversationID,
-		Role:           entity.MessageRoleAssistant,
-		Content:        action.Action,
-	}
-	if err = s.BrowserAgentRepo.CreateMessage(c, assistantMsg); err != nil {
+	history, _ := s.BrowserAgentRepo.GetRecentMessages(c, msg.ConversationID, 10)
+
+	action, err := s.decideAction(c, msg.Content, pageState, history)
+	if err != nil {
 		return nil, err
 	}
 
-	dbAction := s.wsActionToEntity(assistantMsg.ID, action, 1)
+	dbAction := s.wsActionToEntity(messageID, action)
 	if err = s.BrowserAgentRepo.CreateAction(c, dbAction); err != nil {
 		return nil, err
 	}
 
+	action.ActionID = dbAction.ID
+
 	return action, nil
 }
 
-func (s *BrowserAgentService) HandleResult(c context.Context, conversationID int64, success bool, errMsg string, pageState *ws.PageState) (*ws.Action, bool, error) {
+func (s *BrowserAgentService) HandleResult(c context.Context, conversationID int64, actionID int64, success bool, errMsg string, executionTime int, pageState *ws.PageState) (*ws.Action, bool, error) {
+	var errPtr *string
+	if errMsg != "" {
+		errPtr = &errMsg
+	}
+	execTimePtr := &executionTime
+
 	if !success {
+		_ = s.BrowserAgentRepo.UpdateActionStatus(c, actionID, entity.ActionStatusFailed, errPtr, execTimePtr)
 		_ = s.BrowserAgentRepo.UpdateConversationState(c, conversationID, entity.ConversationStateError)
 		return nil, false, errors.New(errMsg)
 	}
 
+	_ = s.BrowserAgentRepo.UpdateActionStatus(c, actionID, entity.ActionStatusSuccess, nil, execTimePtr)
+
+	action, err := s.BrowserAgentRepo.GetActionByID(c, actionID)
+	if err != nil {
+		return nil, false, err
+	}
+
 	history, _ := s.BrowserAgentRepo.GetRecentMessages(c, conversationID, 20)
 
-	action, finished, err := s.decideNextAction(c, pageState, history)
+	nextAction, finished, err := s.decideNextAction(c, pageState, history)
 	if err != nil {
 		return nil, false, err
 	}
@@ -226,60 +225,20 @@ func (s *BrowserAgentService) HandleResult(c context.Context, conversationID int
 		return nil, true, nil
 	}
 
-	assistantMsg := &entity.BrowserAgentMessage{
-		ConversationID: conversationID,
-		Role:           entity.MessageRoleAssistant,
-		Content:        action.Action,
-	}
-	if err := s.BrowserAgentRepo.CreateMessage(c, assistantMsg); err != nil {
-		return nil, false, err
-	}
-
-	dbAction := s.wsActionToEntity(assistantMsg.ID, action, 1)
+	dbAction := s.wsActionToEntity(action.MessageID, nextAction)
 	if err := s.BrowserAgentRepo.CreateAction(c, dbAction); err != nil {
 		return nil, false, err
 	}
 
-	return action, false, nil
+	nextAction.ActionID = dbAction.ID
+
+	return nextAction, false, nil
 }
 
-func (s *BrowserAgentService) HandleResume(c context.Context, conversationID int64, pageState *ws.PageState) (*ws.Action, bool, error) {
-	_ = s.BrowserAgentRepo.UpdateConversationState(c, conversationID, entity.ConversationStateRunning)
-
-	history, _ := s.BrowserAgentRepo.GetRecentMessages(c, conversationID, 20)
-
-	action, finished, err := s.decideNextAction(c, pageState, history)
-	if err != nil {
-		return nil, false, err
-	}
-
-	if finished {
-		_ = s.BrowserAgentRepo.UpdateConversationState(c, conversationID, entity.ConversationStateFinished)
-		return nil, true, nil
-	}
-
-	assistantMsg := &entity.BrowserAgentMessage{
-		ConversationID: conversationID,
-		Role:           entity.MessageRoleAssistant,
-		Content:        action.Action,
-	}
-	if err := s.BrowserAgentRepo.CreateMessage(c, assistantMsg); err != nil {
-		return nil, false, err
-	}
-
-	dbAction := s.wsActionToEntity(assistantMsg.ID, action, 1)
-	if err := s.BrowserAgentRepo.CreateAction(c, dbAction); err != nil {
-		return nil, false, err
-	}
-
-	return action, false, nil
-}
-
-func (s *BrowserAgentService) wsActionToEntity(messageID int64, action *ws.Action, sequence int) *entity.BrowserAgentAction {
+func (s *BrowserAgentService) wsActionToEntity(messageID int64, action *ws.Action) *entity.BrowserAgentAction {
 	return &entity.BrowserAgentAction{
 		MessageID:  messageID,
 		ActionType: action.Action,
-		Sequence:   sequence,
 		Status:     entity.ActionStatusPending,
 		URL:        action.URL,
 		Selector:   action.Selector,
@@ -299,13 +258,13 @@ func (s *BrowserAgentService) callLLM(
 	promptText string,
 ) (string, error) {
 
-	provider, err := s.AIProviderRepo.GetAIProviderByIDWithCache(c, llmid.BrowserProviderZhipuID)
+	provider, err := s.AIProviderRepo.GetAIProviderByIDWithCache(c, llmid.BrowserProviderDeepSeekID)
 	if err != nil {
 		zap.L().Error("获取浏览器智谱模型供应商失败", zap.Error(err))
 		return "", fmt.Errorf("获取浏览器智谱模型供应商失败: %w", err)
 	}
 
-	modelInfo, err := s.AIModelRepo.GetAIModelByIDWithCache(c, llmid.BrowserModelZhipuID)
+	modelInfo, err := s.AIModelRepo.GetAIModelByIDWithCache(c, llmid.BrowserModelDeepSeekID)
 	if err != nil {
 		zap.L().Error("获取浏览器智谱模型失败", zap.Error(err))
 		return "", fmt.Errorf("获取浏览器智谱模型失败: %w", err)
@@ -339,7 +298,6 @@ func (s *BrowserAgentService) callLLM(
 		return "", errors.New("LLM 返回内容为空")
 	}
 
-	// ⭐ 核心：抽取 JSON
 	cleanJSON, err := ai.ExtractJSONFromLLMOutput(rawContent)
 	if err != nil {
 		zap.L().Error(
@@ -358,6 +316,7 @@ func (s *BrowserAgentService) callLLM(
 
 	return cleanJSON, nil
 }
+
 func (s *BrowserAgentService) decideAction(
 	c context.Context,
 	task string,
@@ -463,12 +422,12 @@ func (s *BrowserAgentService) buildHistorySection(history []*entity.BrowserAgent
 	}
 
 	var sb strings.Builder
-	sb.WriteString("【历史记录】\n")
+	sb.WriteString("【历史任务】\n")
 
-	for _, h := range history {
+	for i, h := range history {
 		sb.WriteString(fmt.Sprintf(
-			"- %s: %s\n",
-			h.Role,
+			"%d. %s\n",
+			i+1,
 			h.Content,
 		))
 	}

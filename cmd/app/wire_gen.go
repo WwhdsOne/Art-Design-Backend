@@ -123,6 +123,7 @@ func wireApp() *bootstrap.HTTPServer {
 		AIModelRepo:      aiModelRepo,
 		AIProviderRepo:   aiProviderRepo,
 		AIModelClient:    aiModelClient,
+		GormTX:           gormTransactionManager,
 	}
 	hub := bootstrap.InitWebSocketHub()
 	browserAgentController := controller.NewBrowserAgentController(engine, middlewares, browserAgentService, hub)

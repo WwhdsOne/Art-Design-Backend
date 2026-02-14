@@ -13,7 +13,6 @@ type ConversationResponse struct {
 type MessageResponse struct {
 	ID             int64     `json:"id,string"`
 	ConversationID int64     `json:"conversation_id,string"`
-	Role           string    `json:"role"`
 	Content        string    `json:"content"`
 	CreatedAt      time.Time `json:"created_at"`
 }

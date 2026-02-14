@@ -45,6 +45,7 @@ func NewBrowserAgentController(r *gin.Engine,
 		agent.POST("/conversation/rename", browserAgentCtrl.RenameConversation)
 		agent.DELETE("/conversation/delete", browserAgentCtrl.DeleteConversation)
 		agent.GET("/messages", browserAgentCtrl.ListMessages)
+		agent.POST("/message/create", browserAgentCtrl.CreateMessage)
 		agent.GET("/actions", browserAgentCtrl.ListActions)
 	}
 
@@ -93,11 +94,10 @@ func (ctrl *BrowserAgentController) ListConversations(c *gin.Context) {
 
 func (ctrl *BrowserAgentController) RenameConversation(c *gin.Context) {
 	var req request.RenameConversationRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
 		result.FailWithMessage(err.Error(), c)
 		return
 	}
-
 	if err := ctrl.service.RenameConversation(c, &req); err != nil {
 		_ = c.Error(err)
 		return
@@ -108,18 +108,34 @@ func (ctrl *BrowserAgentController) RenameConversation(c *gin.Context) {
 
 func (ctrl *BrowserAgentController) DeleteConversation(c *gin.Context) {
 	idStr := c.Query("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
+	conversationID, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		result.FailWithMessage("无效的ID", c)
 		return
 	}
 
-	if err := ctrl.service.DeleteConversation(c, id); err != nil {
+	if err = ctrl.service.DeleteConversation(c, conversationID); err != nil {
 		_ = c.Error(err)
 		return
 	}
 
 	result.OkWithMessage("删除成功", c)
+}
+
+func (ctrl *BrowserAgentController) CreateMessage(c *gin.Context) {
+	var req request.CreateMessageRequest
+	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
+		result.FailWithMessage(err.Error(), c)
+		return
+	}
+
+	resp, err := ctrl.service.CreateMessage(c, &req)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	result.OkWithData(resp, c)
 }
 
 func (ctrl *BrowserAgentController) ListMessages(c *gin.Context) {

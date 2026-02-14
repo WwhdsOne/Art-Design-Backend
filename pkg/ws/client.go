@@ -16,9 +16,8 @@ const (
 )
 
 type BrowserAgentService interface {
-	HandleTask(ctx context.Context, conversationID int64, task string, pageState *PageState) (*Action, error)
-	HandleResult(ctx context.Context, conversationID int64, success bool, errMsg string, pageState *PageState) (*Action, bool, error)
-	HandleResume(ctx context.Context, conversationID int64, pageState *PageState) (*Action, bool, error)
+	HandleTask(ctx context.Context, messageID int64, pageState *PageState) (*Action, error)
+	HandleResult(ctx context.Context, conversationID int64, actionID int64, success bool, errMsg string, executionTime int, pageState *PageState) (*Action, bool, error)
 }
 
 type Client struct {
@@ -62,8 +61,6 @@ func (c *Client) ReadPump() {
 			c.handleTask(&clientMsg)
 		case "result":
 			c.handleResult(&clientMsg)
-		case "resume":
-			c.handleResume(&clientMsg)
 		default:
 			c.sendError("未知的消息类型")
 		}
@@ -104,7 +101,7 @@ func (c *Client) Close() {
 }
 
 func (c *Client) handleTask(msg *ClientMessage) {
-	action, err := c.Service.HandleTask(c.Ctx, c.ConversationID, msg.Task, msg.PageState)
+	action, err := c.Service.HandleTask(c.Ctx, msg.MessageID, msg.PageState)
 	if err != nil {
 		c.sendError(err.Error())
 		return
@@ -113,20 +110,7 @@ func (c *Client) handleTask(msg *ClientMessage) {
 }
 
 func (c *Client) handleResult(msg *ClientMessage) {
-	action, finished, err := c.Service.HandleResult(c.Ctx, c.ConversationID, msg.Success, msg.Error, msg.PageState)
-	if err != nil {
-		c.sendError(err.Error())
-		return
-	}
-	if finished {
-		c.sendFinish("任务已完成")
-		return
-	}
-	c.sendAction(action)
-}
-
-func (c *Client) handleResume(msg *ClientMessage) {
-	action, finished, err := c.Service.HandleResume(c.Ctx, c.ConversationID, msg.PageState)
+	action, finished, err := c.Service.HandleResult(c.Ctx, c.ConversationID, msg.ActionID, msg.Success, msg.Error, msg.ExecutionTime, msg.PageState)
 	if err != nil {
 		c.sendError(err.Error())
 		return

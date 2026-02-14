@@ -1,6 +1,7 @@
 package ws
 
 type Action struct {
+	ActionID int64   `json:"action_id,string"`
 	Action   string  `json:"action"`
 	Selector *string `json:"selector,omitempty"`
 	Value    *string `json:"value,omitempty"`
@@ -23,11 +24,13 @@ type PageState struct {
 }
 
 type ClientMessage struct {
-	Type      string     `json:"type"`
-	Task      string     `json:"task,omitempty"`
-	PageState *PageState `json:"pageState,omitempty"`
-	Success   bool       `json:"success,omitempty"`
-	Error     string     `json:"error,omitempty"`
+	Type          string     `json:"type"`
+	MessageID     int64      `json:"message_id,string,omitempty"`
+	PageState     *PageState `json:"pageState,omitempty"`
+	ActionID      int64      `json:"action_id,string,omitempty"`
+	Success       bool       `json:"success,omitempty"`
+	Error         string     `json:"error,omitempty"`
+	ExecutionTime int        `json:"execution_time,omitempty"`
 }
 
 type ServerMessage struct {

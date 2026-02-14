@@ -17,7 +17,6 @@ type DeleteConversationRequest struct {
 
 type CreateMessageRequest struct {
 	ConversationID int64  `json:"conversation_id,string" binding:"required"`
-	Role           string `json:"role" binding:"required,oneof=user assistant"`
 	Content        string `json:"content" binding:"required"`
 }
 
