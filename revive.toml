@@ -87,7 +87,7 @@ exclude = [
 # [rule.add-constant]
 #   arguments = [{"maxLitCount": 3, "allowStrs": "", "allowInts": "", "allowFloats": ""}]  # 魔法数字检查
 
-[rule.flag-parameter]                     # 禁止布尔标志参数
+# [rule.flag-parameter]                     # 禁用：WebSocket接口等场景需要布尔标志参数
 
 # [rule.nested-structs]                  # 嵌套结构体检查（禁用：AI响应结构体）
 

@@ -18,7 +18,7 @@ type AIModelRepo struct {
 	*cache.AIModelCache
 }
 
-func (a *AIModelRepo) GetAIModelByID(c context.Context, id int64) (res *entity.AIModel, err error) {
+func (a *AIModelRepo) GetAIModelByIDWithCache(c context.Context, id int64) (res *entity.AIModel, err error) {
 	res, err = a.AIModelCache.GetModelInfo(id)
 	if err == nil {
 		// 缓存命中，直接返回

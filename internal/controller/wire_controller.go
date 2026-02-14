@@ -14,6 +14,7 @@ var ControllerSet = wire.NewSet(
 	DigitPredictSet,
 	AIModelCtrlSet,
 	KnowledgeBaseCtrlSet,
+	BrowserAgentCtrlSet,
 )
 
 var AuthCtrlSet = wire.NewSet(
@@ -49,4 +50,9 @@ var AIModelCtrlSet = wire.NewSet(
 var KnowledgeBaseCtrlSet = wire.NewSet(
 	NewKnowledgeBaseController,
 	wire.Struct(new(service.KnowledgeBaseService), "*"),
+)
+
+var BrowserAgentCtrlSet = wire.NewSet(
+	NewBrowserAgentController,
+	wire.Struct(new(service.BrowserAgentService), "*"),
 )

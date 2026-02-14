@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"Art-Design-Backend/config"
+	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/pkg/utils"
 	"context"
 	"fmt"
@@ -17,7 +18,7 @@ import (
 )
 
 // AutoMigrate 自动迁移
-func AutoMigrate(_ *gorm.DB) {
+func AutoMigrate(db *gorm.DB) {
 	//// 1. 操作日志
 	//db.AutoMigrate(&entity.OperationLog{})
 	//// 2. 用户
@@ -41,6 +42,10 @@ func AutoMigrate(_ *gorm.DB) {
 	//// 9. 会话
 	//db.AutoMigrate(&entity.Conversation{})
 	//db.AutoMigrate(&entity.Message{})
+	// 10. 浏览器智能体会话
+	_ = db.AutoMigrate(&entity.BrowserAgentConversation{})
+	_ = db.AutoMigrate(&entity.BrowserAgentMessage{})
+	_ = db.AutoMigrate(&entity.BrowserAgentAction{})
 }
 
 // snowflakeIDFieldsMap 存储类型和对应的ID字段名（缓存，提高效率）

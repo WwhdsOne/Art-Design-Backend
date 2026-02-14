@@ -97,7 +97,7 @@ func (k *KnowledgeBaseService) UploadAndVectorizeDocument(
 			batchChunks := chunks[i:end]
 
 			// 调用千问 Embedding API（每次最多 10 个）
-			batchEmbeddings, err := k.getQianwenEmbeddings(ctx, batchChunks)
+			batchEmbeddings, err := getQianwenEmbeddings(ctx, batchChunks, k.AIProviderRepo, k.AIModelClient)
 			if err != nil {
 				return fmt.Errorf("获取 Embedding 失败(batch %d-%d): %w", i, end-1, err)
 			}
@@ -140,25 +140,6 @@ func (k *KnowledgeBaseService) UploadAndVectorizeDocument(
 	}
 
 	return nil
-}
-
-// 获取嵌入向量
-func (k *KnowledgeBaseService) getQianwenEmbeddings(c context.Context, chunks []string) ([][]float32, error) {
-	const providerID int64 = 51088793876300041
-
-	provider, err := k.AIProviderRepo.GetAIProviderByIDWithCache(c, providerID)
-	if err != nil {
-		zap.L().Error("获取嵌入模型供应商失败", zap.Error(err))
-		return nil, fmt.Errorf("获取嵌入模型供应商失败: %w", err)
-	}
-
-	embeddings, err := k.AIModelClient.Embed(c, provider.APIKey, chunks)
-	if err != nil {
-		zap.L().Error("获取嵌入向量失败", zap.Error(err))
-		return nil, fmt.Errorf("获取嵌入向量失败: %w", err)
-	}
-
-	return embeddings, nil
 }
 
 func (k *KnowledgeBaseService) GetKnowledgeBaseFileList(

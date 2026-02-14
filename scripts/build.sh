@@ -15,9 +15,7 @@ ARCH=$(uname -m)
 
 echo "🔹 构建信息: OS=$OS ARCH=$ARCH VERSION=$VERSION BUILD_TIME=$BUILD_TIME"
 
-# 构建参数，启用 Greentea GC
 CGO_ENABLED=0 \
-GOEXPERIMENT=greenteagc \
 go build \
   -trimpath \
   -ldflags "-w -s -X main.version=${VERSION} -X main.buildTime=${BUILD_TIME}" \

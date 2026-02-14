@@ -11,6 +11,7 @@ import (
 	"Art-Design-Backend/pkg/ai"
 	"Art-Design-Backend/pkg/aliyun"
 	"Art-Design-Backend/pkg/authutils"
+	"Art-Design-Backend/pkg/constant/llmid"
 	"Art-Design-Backend/pkg/constant/prompt"
 	"context"
 	"fmt"
@@ -25,8 +26,6 @@ import (
 	"go.uber.org/zap"
 )
 
-const multiModelID = 61331207874412809
-
 type AIService struct {
 	AIModelClient     *ai.AIModelClient             // AI客户端
 	AIModelRepo       *repository.AIModelRepo       // 模型Repo
@@ -38,18 +37,15 @@ type AIService struct {
 }
 
 // 获取嵌入向量
-func (a *AIService) getQianwenEmbeddings(c context.Context, chunks []string) ([][]float32, error) {
+func getQianwenEmbeddings(c context.Context, chunks []string, aiProviderRepo *repository.AIProviderRepo, aiModelClient *ai.AIModelClient) ([][]float32, error) {
 	// qwen模型供应商ID
-	// todo后续写到配置文件
-	const providerID int64 = 51088793876300041
-
-	provider, err := a.AIProviderRepo.GetAIProviderByIDWithCache(c, providerID)
+	provider, err := aiProviderRepo.GetAIProviderByIDWithCache(c, llmid.EmbedProviderQwenID)
 	if err != nil {
 		zap.L().Error("获取嵌入模型供应商失败", zap.Error(err))
 		return nil, fmt.Errorf("获取嵌入模型供应商失败: %w", err)
 	}
 
-	embeddings, err := a.AIModelClient.Embed(c, provider.APIKey, chunks)
+	embeddings, err := aiModelClient.Embed(c, provider.APIKey, chunks)
 	if err != nil {
 		zap.L().Error("获取嵌入向量失败", zap.Error(err))
 		return nil, fmt.Errorf("获取嵌入向量失败: %w", err)
@@ -200,7 +196,7 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 	var conversation entity.Conversation
 
 	// Step 1: 获取模型信息
-	modelInfo, err := a.AIModelRepo.GetAIModelByID(c, modelID)
+	modelInfo, err := a.AIModelRepo.GetAIModelByIDWithCache(c, modelID)
 	if err != nil {
 		zap.L().Error("获取AI模型失败", zap.Int64("model_id", modelID), zap.Error(err))
 		return
@@ -233,7 +229,7 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 		} else {
 			// Step 3.2: 如果新对话提问信息过长，使用当前选择的对话大模型总结十个字作为会话标题
 			titleSummaryJSON, err := a.AIModelClient.ChatRequest(
-				c.Request.Context(),
+				c,
 				provider.BaseURL+modelInfo.APIPath,
 				provider.APIKey,
 				ai.DefaultChatRequest(modelInfo.Model,
@@ -278,7 +274,7 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 
 	// 4.1 向量检索
 	if r.KnowledgeBaseID != 0 {
-		embedding, err = a.getQianwenEmbeddings(c, []string{latestQuestion})
+		embedding, err = getQianwenEmbeddings(c, []string{latestQuestion}, a.AIProviderRepo, a.AIModelClient)
 		if err != nil {
 			return err
 		}
@@ -324,7 +320,7 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 	// 4.2 图片理解
 	if len(r.Files) > 0 {
 		var multiModel *entity.AIModel
-		multiModel, err = a.AIModelRepo.GetAIModelByID(c, multiModelID)
+		multiModel, err = a.AIModelRepo.GetAIModelByIDWithCache(c, llmid.MultiModelQwenID)
 		if err != nil {
 			zap.L().Error("获取多模态模型失败", zap.Error(err))
 			return

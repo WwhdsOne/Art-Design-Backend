@@ -13,4 +13,5 @@ var InitSet = wire.NewSet(
 	InitOSSClient,
 	InitJWT,
 	InitSlicer,
+	InitWebSocketHub,
 )

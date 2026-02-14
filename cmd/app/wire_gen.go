@@ -101,7 +101,10 @@ func wireApp() *bootstrap.HTTPServer {
 		OssClient:          ossClient,
 	}
 	digitPredictController := controller.NewDigitPredictController(engine, middlewares, digitPredictService)
-	aiModelClient := bootstrap.InitAIModelClient()
+	browserAgentDB := db.NewBrowserAgentDB(gormDB)
+	browserAgentRepo := &repository.BrowserAgentRepo{
+		BrowserAgentDB: browserAgentDB,
+	}
 	aiModelDB := db.NewAIModelDB(gormDB)
 	aiModelCache := cache.NewAIModelCache(redisWrapper)
 	aiModelRepo := &repository.AIModelRepo{
@@ -114,6 +117,15 @@ func wireApp() *bootstrap.HTTPServer {
 		AIProviderDB:    aiProviderDB,
 		AIProviderCache: aiProviderCache,
 	}
+	aiModelClient := bootstrap.InitAIModelClient()
+	browserAgentService := &service.BrowserAgentService{
+		BrowserAgentRepo: browserAgentRepo,
+		AIModelRepo:      aiModelRepo,
+		AIProviderRepo:   aiProviderRepo,
+		AIModelClient:    aiModelClient,
+	}
+	hub := bootstrap.InitWebSocketHub()
+	browserAgentController := controller.NewBrowserAgentController(engine, middlewares, browserAgentService, hub)
 	knowledgeBaseDB := db.NewKnowledgeBaseDB(gormDB)
 	fileChunkDB := db.NewFileChunkDB(gormDB)
 	chunkVectorDB := db.NewChunkVectorDB(gormDB)
@@ -159,6 +171,7 @@ func wireApp() *bootstrap.HTTPServer {
 		MenuController:          menuController,
 		RoleController:          roleController,
 		DigitPredictController:  digitPredictController,
+		BrowserAgentController:  browserAgentController,
 		AIController:            aiController,
 		KnowledgeBaseController: knowledgeBaseController,
 		Config:                  configConfig,

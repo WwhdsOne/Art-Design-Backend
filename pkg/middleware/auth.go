@@ -6,6 +6,7 @@ import (
 	"Art-Design-Backend/pkg/jwt"
 	"Art-Design-Backend/pkg/result"
 	"errors"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
@@ -45,6 +46,35 @@ func (m *Middlewares) AuthMiddleware() gin.HandlerFunc {
 		}
 
 		// 4. 认证通过，设置 claims 并继续请求
+		c.Set("claims", claims)
+		c.Next()
+	}
+}
+
+func (m *Middlewares) WSAuthMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		token := c.Query("token")
+		if token == "" {
+			c.Writer.WriteHeader(http.StatusUnauthorized)
+			c.Abort()
+			return
+		}
+
+		claims, err := m.Jwt.ParseToken(token)
+		if err != nil {
+			c.Writer.WriteHeader(http.StatusUnauthorized)
+			c.Abort()
+			return
+		}
+
+		_, err = m.Redis.Get(rediskey.LOGIN + token)
+		if err != nil {
+			c.Writer.WriteHeader(http.StatusUnauthorized)
+			c.Abort()
+			return
+		}
+
 		c.Set("claims", claims)
 		c.Next()
 	}

@@ -70,7 +70,7 @@ func (c *AIModelClient) Embed(ctx context.Context, apiKey string, input []string
 	}
 
 	var embeddingResp EmbeddingResponse
-	if err := sonic.Unmarshal(respData, &embeddingResp); err != nil {
+	if err = sonic.Unmarshal(respData, &embeddingResp); err != nil {
 		return nil, fmt.Errorf("failed to decode response with sonic: %w", err)
 	}
 

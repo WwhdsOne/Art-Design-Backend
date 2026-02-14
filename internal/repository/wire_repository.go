@@ -32,6 +32,7 @@ var DBSet = wire.NewSet(
 	db.NewKnowledgeBaseFileRelDB,
 	db.NewConversationDB,
 	db.NewMessageDB,
+	db.NewBrowserAgentDB,
 )
 
 var RepositorySet = wire.NewSet(
@@ -46,4 +47,5 @@ var RepositorySet = wire.NewSet(
 	wire.Struct(new(AIProviderRepo), "*"),
 	wire.Struct(new(KnowledgeBaseRepo), "*"),
 	wire.Struct(new(ConversationRepo), "*"),
+	wire.Struct(new(BrowserAgentRepo), "*"),
 )

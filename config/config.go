@@ -2,7 +2,6 @@ package config
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -10,6 +9,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/bytedance/sonic"
 	"gopkg.in/yaml.v3"
 )
 
@@ -73,7 +73,7 @@ func LoadConfig() *Config {
 	}
 
 	var kvs []consulKV
-	if err := json.Unmarshal(data, &kvs); err != nil || len(kvs) == 0 {
+	if err := sonic.Unmarshal(data, &kvs); err != nil || len(kvs) == 0 {
 		log.Fatalf("❌ 配置格式错误: %v", err)
 	}
 

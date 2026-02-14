@@ -56,7 +56,6 @@ type Tokens struct {
 
 // Rerank 使用sonic进行序列化的重排序调用方法
 func (c *AIModelClient) Rerank(token string, req RerankRequest, topK int) ([]string, error) {
-	// 使用sonic.Marshal替代json.Marshal
 	reqBody, err := sonic.Marshal(req)
 	if err != nil {
 		return nil, err
