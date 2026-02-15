@@ -3,7 +3,8 @@ package request
 import "Art-Design-Backend/internal/model/common"
 
 type CreateConversationRequest struct {
-	Title string `json:"title" binding:"required,max=100"`
+	Title       string `json:"title" binding:"required,max=100"`
+	BrowserType string `json:"browser_type" binding:"required"` // 新增：值为 "new" 或 "existing"
 }
 
 type RenameConversationRequest struct {

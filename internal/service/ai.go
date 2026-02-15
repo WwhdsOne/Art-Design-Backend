@@ -39,7 +39,7 @@ type AIService struct {
 // 获取嵌入向量
 func getQianwenEmbeddings(c context.Context, chunks []string, aiProviderRepo *repository.AIProviderRepo, aiModelClient *ai.AIModelClient) ([][]float32, error) {
 	// qwen模型供应商ID
-	provider, err := aiProviderRepo.GetAIProviderByIDWithCache(c, llmid.EmbedProviderQwenID)
+	provider, err := aiProviderRepo.GetAIProviderByIDWithCache(c, llmid.EmbedProviderID)
 	if err != nil {
 		zap.L().Error("获取嵌入模型供应商失败", zap.Error(err))
 		return nil, fmt.Errorf("获取嵌入模型供应商失败: %w", err)
@@ -320,7 +320,7 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 	// 4.2 图片理解
 	if len(r.Files) > 0 {
 		var multiModel *entity.AIModel
-		multiModel, err = a.AIModelRepo.GetAIModelByIDWithCache(c, llmid.MultiModelQwenID)
+		multiModel, err = a.AIModelRepo.GetAIModelByIDWithCache(c, llmid.MultiModelID)
 		if err != nil {
 			zap.L().Error("获取多模态模型失败", zap.Error(err))
 			return

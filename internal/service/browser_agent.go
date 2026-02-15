@@ -37,8 +37,9 @@ type BrowserAgentService struct {
 
 func (s *BrowserAgentService) CreateConversation(c *gin.Context, req *request.CreateConversationRequest) (*response.ConversationResponse, error) {
 	conv := &entity.BrowserAgentConversation{
-		Title: req.Title,
-		State: entity.ConversationStateRunning,
+		Title:       req.Title,
+		State:       entity.ConversationStateRunning,
+		BrowserType: req.BrowserType,
 	}
 	if err := s.BrowserAgentRepo.CreateConversation(c, conv); err != nil {
 		return nil, err
@@ -176,9 +177,28 @@ func (s *BrowserAgentService) HandleTask(c context.Context, messageID int64, pag
 		return nil, err
 	}
 
-	history, _ := s.BrowserAgentRepo.GetRecentMessages(c, msg.ConversationID, 10)
+	zap.L().Info("========== 收到新任务 ==========",
+		zap.Int64("messageID", messageID),
+		zap.Int64("conversationID", msg.ConversationID),
+		zap.String("task", msg.Content),
+	)
 
-	action, err := s.decideAction(c, msg.Content, pageState, history)
+	if pageState != nil {
+		zap.L().Info("页面状态",
+			zap.String("url", pageState.URL),
+			zap.String("title", pageState.Title),
+			zap.Int("elementsCount", len(pageState.Elements)),
+		)
+		if len(pageState.Elements) > 0 {
+			var elements []string
+			for i, elem := range pageState.Elements {
+				elements = append(elements, fmt.Sprintf("%d.[%s]%s", i+1, elem.Tag, elem.Text))
+			}
+			zap.L().Info("可交互元素", zap.Strings("elements", elements))
+		}
+	}
+
+	action, err := s.decideAction(c, msg.Content, pageState)
 	if err != nil {
 		return nil, err
 	}
@@ -190,47 +210,79 @@ func (s *BrowserAgentService) HandleTask(c context.Context, messageID int64, pag
 
 	action.ActionID = dbAction.ID
 
+	s.logAction("首次决策", action)
+
 	return action, nil
 }
 
-func (s *BrowserAgentService) HandleResult(c context.Context, conversationID int64, actionID int64, success bool, errMsg string, executionTime int, pageState *ws.PageState) (*ws.Action, bool, error) {
+func (s *BrowserAgentService) HandleResult(c context.Context, conversationID int64, msg *ws.ClientMessage) (*ws.Action, bool, error) {
+	zap.L().Info("========== 收到执行结果 ==========",
+		zap.Int64("actionID", msg.ActionID),
+		zap.Bool("success", msg.Success),
+		zap.Int("executionTime(ms)", msg.ExecutionTime),
+	)
+
 	var errPtr *string
-	if errMsg != "" {
-		errPtr = &errMsg
+	if msg.Error != "" {
+		errPtr = &msg.Error
 	}
-	execTimePtr := &executionTime
+	execTimePtr := &msg.ExecutionTime
 
-	if !success {
-		_ = s.BrowserAgentRepo.UpdateActionStatus(c, actionID, entity.ActionStatusFailed, errPtr, execTimePtr)
-		_ = s.BrowserAgentRepo.UpdateConversationState(c, conversationID, entity.ConversationStateError)
-		return nil, false, errors.New(errMsg)
+	if !msg.Success {
+		zap.L().Error("操作执行失败",
+			zap.Int64("actionID", msg.ActionID),
+			zap.String("error", msg.Error),
+		)
+		if err := s.GormTX.Transaction(c, func(ctx context.Context) (err error) {
+			if err = s.BrowserAgentRepo.UpdateActionStatus(ctx, msg.ActionID, entity.ActionStatusFailed, errPtr, execTimePtr); err != nil {
+				return
+			}
+			if err = s.BrowserAgentRepo.UpdateConversationState(ctx, conversationID, entity.ConversationStateError); err != nil {
+				return
+			}
+			return
+		}); err != nil {
+			return nil, false, err
+		}
+
+		return nil, false, errors.New(msg.Error)
 	}
 
-	_ = s.BrowserAgentRepo.UpdateActionStatus(c, actionID, entity.ActionStatusSuccess, nil, execTimePtr)
+	_ = s.BrowserAgentRepo.UpdateActionStatus(c, msg.ActionID, entity.ActionStatusSuccess, nil, execTimePtr)
 
-	action, err := s.BrowserAgentRepo.GetActionByID(c, actionID)
+	action, err := s.BrowserAgentRepo.GetActionByID(c, msg.ActionID)
 	if err != nil {
 		return nil, false, err
 	}
 
-	history, _ := s.BrowserAgentRepo.GetRecentMessages(c, conversationID, 20)
+	pageState := msg.PageState
+	if pageState != nil {
+		zap.L().Info("当前页面状态",
+			zap.String("url", pageState.URL),
+			zap.String("title", pageState.Title),
+			zap.Int("elementsCount", len(pageState.Elements)),
+		)
+	}
 
-	nextAction, finished, err := s.decideNextAction(c, pageState, history)
+	nextAction, finished, err := s.decideNextAction(c, pageState, msg.Task)
 	if err != nil {
 		return nil, false, err
 	}
 
 	if finished {
+		zap.L().Info("任务完成", zap.Int64("conversationID", conversationID))
 		_ = s.BrowserAgentRepo.UpdateConversationState(c, conversationID, entity.ConversationStateFinished)
 		return nil, true, nil
 	}
 
 	dbAction := s.wsActionToEntity(action.MessageID, nextAction)
-	if err := s.BrowserAgentRepo.CreateAction(c, dbAction); err != nil {
+	if err = s.BrowserAgentRepo.CreateAction(c, dbAction); err != nil {
 		return nil, false, err
 	}
 
 	nextAction.ActionID = dbAction.ID
+
+	s.logAction("下一步决策", nextAction)
 
 	return nextAction, false, nil
 }
@@ -248,6 +300,44 @@ func (s *BrowserAgentService) wsActionToEntity(messageID int64, action *ws.Actio
 	}
 }
 
+func (s *BrowserAgentService) logAction(stage string, action *ws.Action) {
+	fields := []zap.Field{
+		zap.String("stage", stage),
+		zap.Int64("actionID", action.ActionID),
+		zap.String("action", action.Action),
+	}
+
+	switch action.Action {
+	case "goto":
+		if action.URL != nil {
+			fields = append(fields, zap.String("url", *action.URL))
+		}
+	case "click":
+		if action.Selector != nil {
+			fields = append(fields, zap.String("selector", *action.Selector))
+		}
+	case "input", "select":
+		if action.Selector != nil {
+			fields = append(fields, zap.String("selector", *action.Selector))
+		}
+		if action.Value != nil {
+			fields = append(fields, zap.String("value", *action.Value))
+		}
+	case "scroll":
+		if action.Distance != nil {
+			fields = append(fields, zap.Int("distance", *action.Distance))
+		}
+	case "wait":
+		if action.Timeout != nil {
+			fields = append(fields, zap.Int("timeout(ms)", *action.Timeout))
+		}
+	case "close_browser":
+		// 无额外字段
+	}
+
+	zap.L().Info("========== 发送操作指令 ==========", fields...)
+}
+
 // =========================
 // 5. 大模型相关
 // =========================
@@ -258,13 +348,13 @@ func (s *BrowserAgentService) callLLM(
 	promptText string,
 ) (string, error) {
 
-	provider, err := s.AIProviderRepo.GetAIProviderByIDWithCache(c, llmid.BrowserProviderDeepSeekID)
+	provider, err := s.AIProviderRepo.GetAIProviderByIDWithCache(c, llmid.BrowserProviderID)
 	if err != nil {
 		zap.L().Error("获取浏览器智谱模型供应商失败", zap.Error(err))
 		return "", fmt.Errorf("获取浏览器智谱模型供应商失败: %w", err)
 	}
 
-	modelInfo, err := s.AIModelRepo.GetAIModelByIDWithCache(c, llmid.BrowserModelDeepSeekID)
+	modelInfo, err := s.AIModelRepo.GetAIModelByIDWithCache(c, llmid.BrowserModelID)
 	if err != nil {
 		zap.L().Error("获取浏览器智谱模型失败", zap.Error(err))
 		return "", fmt.Errorf("获取浏览器智谱模型失败: %w", err)
@@ -283,8 +373,8 @@ func (s *BrowserAgentService) callLLM(
 		),
 	)
 	if err != nil {
-		zap.L().Error("调用智谱LLM失败", zap.String("promptText", promptText), zap.Error(err))
-		return "", fmt.Errorf("调用智谱LLM失败: %w", err)
+		zap.L().Error("调用LLM失败", zap.String("promptText", promptText), zap.Error(err))
+		return "", fmt.Errorf("调用LLM失败: %w", err)
 	}
 
 	var browserResp ai.ChatCompletionResponse
@@ -321,10 +411,15 @@ func (s *BrowserAgentService) decideAction(
 	c context.Context,
 	task string,
 	pageState *ws.PageState,
-	history []*entity.BrowserAgentMessage,
 ) (*ws.Action, error) {
 
-	decidePrompt := s.buildPrompt(task, pageState, history)
+	zap.L().Info(
+		"开始智能任务处理",
+		zap.String("task", task),
+		zap.Any("pageState", pageState),
+	)
+
+	decidePrompt := s.buildPrompt(task, pageState)
 
 	resp, err := s.callLLM(c, prompt.BrowserSystemPrompt, decidePrompt)
 	if err != nil {
@@ -342,10 +437,10 @@ func (s *BrowserAgentService) decideAction(
 func (s *BrowserAgentService) decideNextAction(
 	c context.Context,
 	pageState *ws.PageState,
-	history []*entity.BrowserAgentMessage,
+	task string,
 ) (*ws.Action, bool, error) {
 
-	nextActionPrompt := s.buildNextPrompt(pageState, history)
+	nextActionPrompt := s.buildNextPrompt(pageState, task)
 
 	resp, err := s.callLLM(c, prompt.BrowserSystemPrompt, nextActionPrompt)
 	if err != nil {
@@ -372,23 +467,21 @@ func (s *BrowserAgentService) decideNextAction(
 func (s *BrowserAgentService) buildPrompt(
 	task string,
 	pageState *ws.PageState,
-	history []*entity.BrowserAgentMessage,
 ) string {
 
 	return "【用户目标】\n" +
 		task + "\n\n" +
-		s.buildPageStateSection(pageState) +
-		s.buildHistorySection(history)
+		s.buildPageStateSection(pageState)
 }
 
 func (s *BrowserAgentService) buildNextPrompt(
 	pageState *ws.PageState,
-	history []*entity.BrowserAgentMessage,
+	task string,
 ) string {
 
 	return "【继续执行当前任务】\n\n" +
-		s.buildPageStateSection(pageState) +
-		s.buildHistorySection(history)
+		"原始任务:" + task + "\n\n" +
+		s.buildPageStateSection(pageState)
 }
 
 func (s *BrowserAgentService) buildPageStateSection(pageState *ws.PageState) string {
@@ -399,18 +492,27 @@ func (s *BrowserAgentService) buildPageStateSection(pageState *ws.PageState) str
 	var sb strings.Builder
 	sb.WriteString("【页面状态】\n")
 	sb.WriteString("URL: " + pageState.URL + "\n")
+	if pageState.Title != "" {
+		sb.WriteString("标题: " + pageState.Title + "\n")
+	}
 	sb.WriteString("可交互元素:\n")
 
 	for i, elem := range pageState.Elements {
-		if elem.Visible && !elem.Disabled {
-			sb.WriteString(fmt.Sprintf(
-				"%d. <%s> %s | selector=%s\n",
-				i+1,
-				elem.Tag,
-				elem.Text,
-				elem.Selector,
-			))
+		// 前端已过滤，无需再判断 Visible/Disabled
+
+		var valueInfo string
+		if elem.Value != nil && *elem.Value != "" {
+			valueInfo = fmt.Sprintf(" | value=%s", *elem.Value)
 		}
+
+		sb.WriteString(fmt.Sprintf(
+			"%d. <%s> %s | selector=%s%s\n",
+			i+1,
+			elem.Tag,
+			elem.Text,
+			elem.Selector,
+			valueInfo,
+		))
 	}
 
 	return sb.String()

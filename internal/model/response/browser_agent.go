@@ -3,11 +3,12 @@ package response
 import "time"
 
 type ConversationResponse struct {
-	ID        int64     `json:"id,string"`
-	Title     string    `json:"title"`
-	State     string    `json:"state"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID          int64     `json:"id,string"`
+	Title       string    `json:"title"`
+	State       string    `json:"state"`
+	BrowserType string    `json:"browser_type"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 type MessageResponse struct {

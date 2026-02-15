@@ -17,7 +17,7 @@ const (
 
 type BrowserAgentService interface {
 	HandleTask(ctx context.Context, messageID int64, pageState *PageState) (*Action, error)
-	HandleResult(ctx context.Context, conversationID int64, actionID int64, success bool, errMsg string, executionTime int, pageState *PageState) (*Action, bool, error)
+	HandleResult(ctx context.Context, conversationID int64, msg *ClientMessage) (*Action, bool, error)
 }
 
 type Client struct {
@@ -110,7 +110,7 @@ func (c *Client) handleTask(msg *ClientMessage) {
 }
 
 func (c *Client) handleResult(msg *ClientMessage) {
-	action, finished, err := c.Service.HandleResult(c.Ctx, c.ConversationID, msg.ActionID, msg.Success, msg.Error, msg.ExecutionTime, msg.PageState)
+	action, finished, err := c.Service.HandleResult(c.Ctx, c.ConversationID, msg)
 	if err != nil {
 		c.sendError(err.Error())
 		return

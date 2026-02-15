@@ -133,33 +133,6 @@ func (r *BrowserAgentDB) ListMessagesIDListByConversationID(ctx context.Context,
 	}
 	return
 }
-func (r *BrowserAgentDB) GetRecentMessages(ctx context.Context, conversationID int64, limit int) (messages []*entity.BrowserAgentMessage, err error) {
-	if err = DB(ctx, r.db).Model(&entity.BrowserAgentMessage{}).
-		Where("conversation_id = ?", conversationID).
-		Order("created_at DESC").
-		Limit(limit).
-		Find(&messages).Error; err != nil {
-		return nil, errors.WrapDBError(err, "查询最近的浏览器智能体消息失败")
-	}
-
-	for i, j := 0, len(messages)-1; i < j; i, j = i+1, j-1 {
-		messages[i], messages[j] = messages[j], messages[i]
-	}
-	return
-}
-
-func (r *BrowserAgentDB) GetRecentMessage(ctx context.Context, conversationID int64) (msg *entity.BrowserAgentMessage, err error) {
-	if err = DB(ctx, r.db).Model(&entity.BrowserAgentMessage{}).
-		Where("conversation_id = ?", conversationID).
-		Order("created_at DESC").
-		First(&msg).Error; err != nil {
-		if gorm.ErrRecordNotFound == err {
-			return nil, errors.NewDBError("消息不存在")
-		}
-		return nil, errors.WrapDBError(err, "查询最近的浏览器智能体消息失败")
-	}
-	return
-}
 
 // =========================
 // Action CRUD
