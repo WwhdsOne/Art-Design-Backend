@@ -2,23 +2,22 @@ package bootstrap
 
 import (
 	"Art-Design-Backend/config"
+	"Art-Design-Backend/internal/repository/db"
 	"Art-Design-Backend/pkg/jwt"
 	"Art-Design-Backend/pkg/middleware"
 	"Art-Design-Backend/pkg/redisx"
-
-	"gorm.io/gorm"
 )
 
 func InitMiddleware(
 	cfg *config.Config,
-	db *gorm.DB,
 	redis *redisx.RedisWrapper,
 	jwtService *jwt.JWT,
+	operationLogDB *db.OperationLogDB,
 ) *middleware.Middlewares {
 	return &middleware.Middlewares{
-		Config: &cfg.Middleware,
-		Db:     db,
-		Redis:  redis,
-		Jwt:    jwtService,
+		Config:         &cfg.Middleware,
+		Redis:          redis,
+		Jwt:            jwtService,
+		OperationLogDB: operationLogDB,
 	}
 }

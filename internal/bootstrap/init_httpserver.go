@@ -26,6 +26,7 @@ type HTTPServer struct {
 	BrowserAgentController  *controller.BrowserAgentController  // 浏览器代理Ctrl
 	AIController            *controller.AIController            // AI模型Ctrl
 	KnowledgeBaseController *controller.KnowledgeBaseController // 知识库文件Ctrl
+	OperationLogController  *controller.OperationLogController  // 操作日志Ctrl
 	Config                  *config.Config                      // 服务器配置
 }
 

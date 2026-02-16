@@ -22,11 +22,12 @@ import (
 // wire.Struct则只需要构造一个结构体
 func wireApp() *bootstrap.HTTPServer {
 	configConfig := config.LoadConfig()
-	logger := bootstrap.InitLogger(configConfig)
-	gormDB := bootstrap.InitGorm(configConfig, logger)
 	redisWrapper := bootstrap.InitRedis(configConfig)
 	jwt := bootstrap.InitJWT(configConfig)
-	middlewares := bootstrap.InitMiddleware(configConfig, gormDB, redisWrapper, jwt)
+	logger := bootstrap.InitLogger(configConfig)
+	gormDB := bootstrap.InitGorm(configConfig, logger)
+	operationLogDB := db.NewOperationLogDB(gormDB)
+	middlewares := bootstrap.InitMiddleware(configConfig, redisWrapper, jwt, operationLogDB)
 	middleware := config.ProviderMiddlewareConfig()
 	engine := bootstrap.InitGin(middlewares, logger, middleware)
 	userDB := db.NewUserDB(gormDB)
@@ -164,6 +165,13 @@ func wireApp() *bootstrap.HTTPServer {
 		UserRepo:          userRepo,
 	}
 	knowledgeBaseController := controller.NewKnowledgeBaseController(engine, middlewares, knowledgeBaseService)
+	operationLogRepo := &repository.OperationLogRepo{
+		OperationLogDB: operationLogDB,
+	}
+	operationLogService := &service.OperationLogService{
+		OperationLogRepo: operationLogRepo,
+	}
+	operationLogController := controller.NewOperationLogController(engine, middlewares, operationLogService)
 	httpServer := &bootstrap.HTTPServer{
 		Engine:                  engine,
 		Logger:                  logger,
@@ -175,6 +183,7 @@ func wireApp() *bootstrap.HTTPServer {
 		BrowserAgentController:  browserAgentController,
 		AIController:            aiController,
 		KnowledgeBaseController: knowledgeBaseController,
+		OperationLogController:  operationLogController,
 		Config:                  configConfig,
 	}
 	return httpServer

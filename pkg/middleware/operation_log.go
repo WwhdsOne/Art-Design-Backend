@@ -4,6 +4,7 @@ import (
 	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/pkg/authutils"
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"strings"
@@ -58,7 +59,7 @@ func (m *Middlewares) OperationLoggerMiddleware() gin.HandlerFunc {
 			logItem.OS = parsed.OS
 			logItem.Platform = parsed.Platform
 
-			if err := m.Db.Create(logItem).Error; err != nil {
+			if err := m.OperationLogDB.CreateOperationLog(context.Background(), logItem); err != nil {
 				zap.L().Error("保存操作日志失败", zap.Error(err))
 			}
 		}
