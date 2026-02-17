@@ -180,10 +180,6 @@ func (s *BrowserAgentService) HandleTask(c context.Context, messageID int64, pag
 		zap.Int("elementsCount", elementsCount),
 	)
 
-	if elementsCount == 0 {
-		return nil, errors.New("页面元素为空")
-	}
-
 	elements := make([]string, elementsCount)
 
 	for i, elem := range pageState.Elements {
