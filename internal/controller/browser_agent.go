@@ -25,7 +25,8 @@ type BrowserAgentController struct {
 	upgrader                     websocket.Upgrader
 }
 
-func NewBrowserAgentController(r *gin.Engine,
+func NewBrowserAgentController(
+	r *gin.Engine,
 	mws *middleware.Middlewares,
 	bas *service.BrowserAgentService, bads *service.BrowserAgentDashboardService,
 	hub *ws.Hub) *BrowserAgentController {
@@ -41,9 +42,11 @@ func NewBrowserAgentController(r *gin.Engine,
 			},
 		},
 	}
-	agent := r.Group("/api").Group("/browser-agent")
-	agent.Use(mws.AuthMiddleware())
+
 	{
+		agent := r.Group("/api").
+			Group("/browser-agent")
+		agent.Use(mws.AuthMiddleware())
 		agent.POST("/conversation/create", browserAgentCtrl.CreateConversation)
 		agent.GET("/conversation/list", browserAgentCtrl.ListConversations)
 		agent.POST("/conversation/rename", browserAgentCtrl.RenameConversation)
@@ -53,8 +56,13 @@ func NewBrowserAgentController(r *gin.Engine,
 		agent.GET("/actions", browserAgentCtrl.ListActions)
 	}
 
-	adminDashboard := agent.Group("/dashboard/admin")
 	{
+		adminDashboard := r.
+			Group("/api").
+			Group("/browser-agent").
+			Group("/dashboard").
+			Group("/admin")
+		adminDashboard.Use(mws.AuthMiddleware())
 		adminDashboard.GET("/summary", browserAgentCtrl.GetAdminSummary)
 		adminDashboard.GET("/weekly-task-volume", browserAgentCtrl.GetAdminWeeklyTaskVolume)
 		adminDashboard.GET("/weekly-task-success-rate", browserAgentCtrl.GetAdminWeeklyTaskSuccessRate)
@@ -69,8 +77,13 @@ func NewBrowserAgentController(r *gin.Engine,
 		adminDashboard.GET("/actions", browserAgentCtrl.GetActionsByMessageID)
 	}
 
-	userDashboard := agent.Group("/dashboard/user")
 	{
+		userDashboard := r.
+			Group("/api").
+			Group("/browser-agent").
+			Group("/dashboard").
+			Group("/user")
+		userDashboard.Use(mws.AuthMiddleware())
 		userDashboard.GET("/summary", browserAgentCtrl.GetUserSummary)
 		userDashboard.GET("/weekly-task-volume", browserAgentCtrl.GetUserWeeklyTaskVolume)
 		userDashboard.GET("/weekly-task-success-rate", browserAgentCtrl.GetUserWeeklyTaskSuccessRate)
@@ -78,9 +91,9 @@ func NewBrowserAgentController(r *gin.Engine,
 		userDashboard.GET("/task-trend", browserAgentCtrl.GetUserTaskTrend)
 	}
 
-	wsGroup := r.Group("/api").Group("/browser-agent").Group("/ws")
-	wsGroup.Use(mws.WSAuthMiddleware())
 	{
+		wsGroup := r.Group("/api").Group("/browser-agent").Group("/ws")
+		wsGroup.Use(mws.WSAuthMiddleware())
 		wsGroup.GET("/:conversationId", browserAgentCtrl.HandleWebSocket)
 	}
 	return browserAgentCtrl

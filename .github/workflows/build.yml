@@ -16,7 +16,7 @@ jobs:
       OSS_ACCESS_KEY_ID: ${{ secrets.OSS_ACCESS_KEY_ID }}
       OSS_ACCESS_KEY_SECRET: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
       SERVER_IP: ${{ secrets.SERVER_IP }}
-      SSH_USER:  ${{ secrets.SSH_USER }}
+      SSH_USER: ${{ secrets.SSH_USER }}
       SERVER_PORT: ${{ secrets.SERVER_PORT }}
       SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
     steps:
@@ -111,7 +111,7 @@ jobs:
             --network docker-compose_app-net \
             --name ${{ env.CONTAINER_NAME }} \
             --restart unless-stopped \
-            -e GIN_MODE=release \
+            -e GIN_MODE=debug \
             -e CONSUL_ADDR=${{ env.CONSUL_ADDR }} \
             -e CONSUL_CONFIG_KEY=${{ env.CONSUL_CONFIG_KEY }} \
             -e OSS_ACCESS_KEY_ID=${{ env.OSS_ACCESS_KEY_ID }} \
