@@ -126,8 +126,11 @@ func wireApp() *bootstrap.HTTPServer {
 		AIModelClient:    aiModelClient,
 		GormTX:           gormTransactionManager,
 	}
+	browserAgentDashboardService := &service.BrowserAgentDashboardService{
+		BrowserAgentRepo: browserAgentRepo,
+	}
 	hub := bootstrap.InitWebSocketHub()
-	browserAgentController := controller.NewBrowserAgentController(engine, middlewares, browserAgentService, hub)
+	browserAgentController := controller.NewBrowserAgentController(engine, middlewares, browserAgentService, browserAgentDashboardService, hub)
 	knowledgeBaseDB := db.NewKnowledgeBaseDB(gormDB)
 	fileChunkDB := db.NewFileChunkDB(gormDB)
 	chunkVectorDB := db.NewChunkVectorDB(gormDB)

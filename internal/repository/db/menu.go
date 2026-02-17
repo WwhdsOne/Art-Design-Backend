@@ -134,10 +134,53 @@ func (m *MenuDB) UpdateMenuAuth(c context.Context, menu *entity.Menu) (err error
 }
 
 func (m *MenuDB) UpdateMenu(c context.Context, menu *entity.Menu) (err error) {
-	if err = DB(c, m.db).Where("id = ?", menu.ID).Updates(menu).Error; err != nil {
+	/*
+		⚠️ 这里必须使用 map[string]interface{} 进行更新，而不能直接用 Updates(struct)
+
+		原因：
+		GORM 在使用 Updates(struct) 时，只会更新“非零值”字段。
+		而 Go 中 bool 的零值是 false，
+		如果 IsInMainContainer = false，
+		GORM 会认为这是零值，从而忽略该字段，不会写入数据库。
+
+		例如：
+			IsInMainContainer = false
+		将不会出现在 UPDATE SQL 里。
+
+		因此这里改为 map 更新方式：
+			map 更新会无条件更新指定字段（包括 false、0、"" 等零值）
+
+		这是生产环境推荐写法，避免 bool/int/string 零值被静默忽略。
+	*/
+
+	updateData := map[string]interface{}{
+		"name":                 menu.Name,
+		"type":                 menu.Type,
+		"path":                 menu.Path,
+		"component":            menu.Component,
+		"parent_id":            menu.ParentID,
+		"title":                menu.Title,
+		"icon":                 menu.Icon,
+		"show_badge":           menu.ShowBadge,
+		"show_text_badge":      menu.ShowTextBadge,
+		"is_hide":              menu.IsHide,
+		"is_hide_tab":          menu.IsHideTab,
+		"link":                 menu.Link,
+		"is_iframe":            menu.IsIframe,
+		"keep_alive":           menu.KeepAlive,
+		"auth_code":            menu.AuthCode,
+		"is_in_main_container": menu.IsInMainContainer,
+		"sort":                 menu.Sort,
+	}
+
+	if err = DB(c, m.db).
+		Model(&entity.Menu{}).
+		Where("id = ?", menu.ID).
+		Updates(updateData).Error; err != nil {
 		return errors.NewDBError("更新菜单失败")
 	}
-	return
+
+	return nil
 }
 
 func (m *MenuDB) GetMenuIDListByRoleIDList(c context.Context, roleIDList []int64) (menuIDList []int64, err error) {

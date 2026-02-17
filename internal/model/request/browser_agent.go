@@ -4,7 +4,7 @@ import "Art-Design-Backend/internal/model/common"
 
 type CreateConversationRequest struct {
 	Title       string `json:"title" binding:"required,max=100"`
-	BrowserType string `json:"browser_type" binding:"required"` // 新增：值为 "new" 或 "existing"
+	BrowserType string `json:"browser_type" binding:"required"`
 }
 
 type RenameConversationRequest struct {
@@ -38,4 +38,12 @@ type CreateActionRequest struct {
 
 type GetActionsRequest struct {
 	MessageID int64 `form:"message_id" binding:"required"`
+}
+
+type YearRequest struct {
+	Year int `form:"year"`
+}
+
+type LimitRequest struct {
+	Limit int `form:"limit" binding:"min=1,max=10"`
 }

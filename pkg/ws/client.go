@@ -17,7 +17,7 @@ const (
 
 type BrowserAgentService interface {
 	HandleTask(ctx context.Context, messageID int64, pageState *PageState) (*Action, error)
-	HandleResult(ctx context.Context, conversationID int64, msg *ClientMessage) (*Action, bool, error)
+	HandleResult(ctx context.Context, msg *ClientMessage) (*Action, bool, error)
 }
 
 type Client struct {
@@ -51,7 +51,7 @@ func (c *Client) ReadPump() {
 		}
 
 		var clientMsg ClientMessage
-		if err := sonic.Unmarshal(message, &clientMsg); err != nil {
+		if err = sonic.Unmarshal(message, &clientMsg); err != nil {
 			c.sendError("消息格式错误")
 			continue
 		}
@@ -110,7 +110,7 @@ func (c *Client) handleTask(msg *ClientMessage) {
 }
 
 func (c *Client) handleResult(msg *ClientMessage) {
-	action, finished, err := c.Service.HandleResult(c.Ctx, c.ConversationID, msg)
+	action, finished, err := c.Service.HandleResult(c.Ctx, msg)
 	if err != nil {
 		c.sendError(err.Error())
 		return

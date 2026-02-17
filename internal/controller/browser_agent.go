@@ -11,6 +11,7 @@ import (
 	"context"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -18,20 +19,23 @@ import (
 )
 
 type BrowserAgentController struct {
-	service  *service.BrowserAgentService
-	hub      *ws.Hub
-	upgrader websocket.Upgrader
+	browserAgentService          *service.BrowserAgentService
+	browserAgentDashboardService *service.BrowserAgentDashboardService
+	hub                          *ws.Hub
+	upgrader                     websocket.Upgrader
 }
 
 func NewBrowserAgentController(r *gin.Engine,
-	mws *middleware.Middlewares, svc *service.BrowserAgentService, hub *ws.Hub) *BrowserAgentController {
+	mws *middleware.Middlewares,
+	bas *service.BrowserAgentService, bads *service.BrowserAgentDashboardService,
+	hub *ws.Hub) *BrowserAgentController {
 	browserAgentCtrl := &BrowserAgentController{
-		service: svc,
-		hub:     hub,
+		browserAgentService:          bas,
+		browserAgentDashboardService: bads,
+		hub:                          hub,
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  65536,
 			WriteBufferSize: 65536,
-			// 允许所有源
 			CheckOrigin: func(_ *http.Request) bool {
 				return true
 			},
@@ -49,9 +53,30 @@ func NewBrowserAgentController(r *gin.Engine,
 		agent.GET("/actions", browserAgentCtrl.ListActions)
 	}
 
+	adminDashboard := agent.Group("/dashboard/admin")
+	{
+		adminDashboard.GET("/summary", browserAgentCtrl.GetAdminSummary)
+		adminDashboard.GET("/weekly-task-volume", browserAgentCtrl.GetAdminWeeklyTaskVolume)
+		adminDashboard.GET("/weekly-task-success-rate", browserAgentCtrl.GetAdminWeeklyTaskSuccessRate)
+		adminDashboard.GET("/total-task-volume", browserAgentCtrl.GetAdminTotalTaskVolume)
+		adminDashboard.GET("/task-classification", browserAgentCtrl.GetAdminTaskClassification)
+		adminDashboard.GET("/weekly-operation-volume", browserAgentCtrl.GetAdminWeeklyOperationVolume)
+		adminDashboard.GET("/weekly-operation-success-rate", browserAgentCtrl.GetAdminWeeklyOperationSuccessRate)
+		adminDashboard.GET("/active-sessions", browserAgentCtrl.GetAdminActiveSessions)
+		adminDashboard.GET("/annual-task-stats", browserAgentCtrl.GetAdminAnnualTaskStats)
+		adminDashboard.GET("/hot-task-list", browserAgentCtrl.GetAdminHotTaskList)
+	}
+
+	userDashboard := agent.Group("/dashboard/user")
+	{
+		userDashboard.GET("/summary", browserAgentCtrl.GetUserSummary)
+		userDashboard.GET("/weekly-task-volume", browserAgentCtrl.GetUserWeeklyTaskVolume)
+		userDashboard.GET("/weekly-task-success-rate", browserAgentCtrl.GetUserWeeklyTaskSuccessRate)
+		userDashboard.GET("/task-overview", browserAgentCtrl.GetUserTaskOverview)
+		userDashboard.GET("/task-trend", browserAgentCtrl.GetUserTaskTrend)
+	}
+
 	wsGroup := r.Group("/api").Group("/browser-agent").Group("/ws")
-	// ws必须使用ws特别鉴权，否则会导致当作普通http返回
-	// 因为ws请求头无法修改，必须放在url里面
 	wsGroup.Use(mws.WSAuthMiddleware())
 	{
 		wsGroup.GET("/:conversationId", browserAgentCtrl.HandleWebSocket)
@@ -66,7 +91,7 @@ func (ctrl *BrowserAgentController) CreateConversation(c *gin.Context) {
 		return
 	}
 
-	resp, err := ctrl.service.CreateConversation(c, &req)
+	resp, err := ctrl.browserAgentService.CreateConversation(c, &req)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -83,7 +108,7 @@ func (ctrl *BrowserAgentController) ListConversations(c *gin.Context) {
 	}
 
 	userID := authutils.GetUserID(c)
-	resp, err := ctrl.service.ListConversations(c, userID, &queryParam)
+	resp, err := ctrl.browserAgentService.ListConversations(c, userID, &queryParam)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -98,7 +123,7 @@ func (ctrl *BrowserAgentController) RenameConversation(c *gin.Context) {
 		result.FailWithMessage(err.Error(), c)
 		return
 	}
-	if err := ctrl.service.RenameConversation(c, &req); err != nil {
+	if err := ctrl.browserAgentService.RenameConversation(c, &req); err != nil {
 		_ = c.Error(err)
 		return
 	}
@@ -114,7 +139,7 @@ func (ctrl *BrowserAgentController) DeleteConversation(c *gin.Context) {
 		return
 	}
 
-	if err = ctrl.service.DeleteConversation(c, conversationID); err != nil {
+	if err = ctrl.browserAgentService.DeleteConversation(c, conversationID); err != nil {
 		_ = c.Error(err)
 		return
 	}
@@ -129,7 +154,7 @@ func (ctrl *BrowserAgentController) CreateMessage(c *gin.Context) {
 		return
 	}
 
-	resp, err := ctrl.service.CreateMessage(c, &req)
+	resp, err := ctrl.browserAgentService.CreateMessage(c, &req)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -145,7 +170,7 @@ func (ctrl *BrowserAgentController) ListMessages(c *gin.Context) {
 		return
 	}
 
-	resp, err := ctrl.service.ListMessages(c, &req)
+	resp, err := ctrl.browserAgentService.ListMessages(c, &req)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -161,7 +186,7 @@ func (ctrl *BrowserAgentController) ListActions(c *gin.Context) {
 		return
 	}
 
-	resp, err := ctrl.service.ListActions(c, &req)
+	resp, err := ctrl.browserAgentService.ListActions(c, &req)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -192,7 +217,7 @@ func (ctrl *BrowserAgentController) HandleWebSocket(c *gin.Context) {
 		ConversationID: conversationID,
 		UserID:         authutils.GetUserID(c),
 		Send:           make(chan []byte, 256),
-		Service:        ctrl.service,
+		Service:        ctrl.browserAgentService,
 		Ctx:            clientCtx,
 		Cancel:         cancel,
 	}
@@ -200,4 +225,165 @@ func (ctrl *BrowserAgentController) HandleWebSocket(c *gin.Context) {
 	ctrl.hub.Register(client)
 	go client.WritePump()
 	client.ReadPump()
+}
+
+func (ctrl *BrowserAgentController) GetAdminSummary(c *gin.Context) {
+	resp, err := ctrl.browserAgentDashboardService.GetAdminSummary(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithData(resp, c)
+}
+
+func (ctrl *BrowserAgentController) GetAdminWeeklyTaskVolume(c *gin.Context) {
+	resp, err := ctrl.browserAgentDashboardService.GetAdminWeeklyTaskVolume(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithData(resp, c)
+}
+
+func (ctrl *BrowserAgentController) GetAdminWeeklyTaskSuccessRate(c *gin.Context) {
+	resp, err := ctrl.browserAgentDashboardService.GetAdminWeeklyTaskSuccessRate(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithData(resp, c)
+}
+
+func (ctrl *BrowserAgentController) GetAdminTotalTaskVolume(c *gin.Context) {
+	resp, err := ctrl.browserAgentDashboardService.GetAdminTotalTaskVolume(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithData(resp, c)
+}
+
+func (ctrl *BrowserAgentController) GetAdminTaskClassification(c *gin.Context) {
+	resp, err := ctrl.browserAgentDashboardService.GetAdminTaskClassification(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithData(resp, c)
+}
+
+func (ctrl *BrowserAgentController) GetAdminWeeklyOperationVolume(c *gin.Context) {
+	resp, err := ctrl.browserAgentDashboardService.GetAdminWeeklyOperationVolume(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithData(resp, c)
+}
+
+func (ctrl *BrowserAgentController) GetAdminWeeklyOperationSuccessRate(c *gin.Context) {
+	resp, err := ctrl.browserAgentDashboardService.GetAdminWeeklyOperationSuccessRate(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithData(resp, c)
+}
+
+func (ctrl *BrowserAgentController) GetAdminActiveSessions(c *gin.Context) {
+	resp, err := ctrl.browserAgentDashboardService.GetAdminActiveSessions(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithData(resp, c)
+}
+
+func (ctrl *BrowserAgentController) GetAdminAnnualTaskStats(c *gin.Context) {
+	var req request.YearRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		req.Year = time.Now().Year()
+	}
+	if req.Year == 0 {
+		req.Year = time.Now().Year()
+	}
+
+	resp, err := ctrl.browserAgentDashboardService.GetAdminAnnualTaskStats(c, req.Year)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithData(resp, c)
+}
+
+func (ctrl *BrowserAgentController) GetAdminHotTaskList(c *gin.Context) {
+	var req request.LimitRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		req.Limit = 6
+	}
+
+	resp, err := ctrl.browserAgentDashboardService.GetAdminHotTaskList(c, req.Limit)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithData(resp, c)
+}
+
+func (ctrl *BrowserAgentController) GetUserSummary(c *gin.Context) {
+	userID := authutils.GetUserID(c)
+	resp, err := ctrl.browserAgentDashboardService.GetUserSummary(c, userID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithData(resp, c)
+}
+
+func (ctrl *BrowserAgentController) GetUserWeeklyTaskVolume(c *gin.Context) {
+	userID := authutils.GetUserID(c)
+	resp, err := ctrl.browserAgentDashboardService.GetUserWeeklyTaskVolume(c, userID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithData(resp, c)
+}
+
+func (ctrl *BrowserAgentController) GetUserWeeklyTaskSuccessRate(c *gin.Context) {
+	userID := authutils.GetUserID(c)
+	resp, err := ctrl.browserAgentDashboardService.GetUserWeeklyTaskSuccessRate(c, userID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithData(resp, c)
+}
+
+func (ctrl *BrowserAgentController) GetUserTaskOverview(c *gin.Context) {
+	userID := authutils.GetUserID(c)
+	resp, err := ctrl.browserAgentDashboardService.GetUserTaskOverview(c, userID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithData(resp, c)
+}
+
+func (ctrl *BrowserAgentController) GetUserTaskTrend(c *gin.Context) {
+	var req request.YearRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		req.Year = time.Now().Year()
+	}
+	if req.Year == 0 {
+		req.Year = time.Now().Year()
+	}
+
+	userID := authutils.GetUserID(c)
+	resp, err := ctrl.browserAgentDashboardService.GetUserTaskTrend(c, userID, req.Year)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithData(resp, c)
 }
