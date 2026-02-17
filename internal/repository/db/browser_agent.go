@@ -126,6 +126,27 @@ func (r *BrowserAgentDB) ListMessagesByConversationID(ctx context.Context, conve
 	return
 }
 
+func (r *BrowserAgentDB) ListMessagesPage(ctx context.Context, queryParam *query.BrowserAgentMessage) (messages []*entity.BrowserAgentMessage, total int64, err error) {
+	db := DB(ctx, r.db).Model(&entity.BrowserAgentMessage{})
+
+	if queryParam.ConversationID > 0 {
+		db = db.Where("conversation_id = ?", queryParam.ConversationID)
+	}
+	if queryParam.State != "" {
+		db = db.Where("state = ?", queryParam.State)
+	}
+
+	if err = db.Count(&total).Error; err != nil {
+		return nil, 0, errors.WrapDBError(err, "统计消息数量失败")
+	}
+
+	if err = db.Scopes(queryParam.Paginate()).Order("created_at DESC").Find(&messages).Error; err != nil {
+		return nil, 0, errors.WrapDBError(err, "查询消息列表失败")
+	}
+
+	return
+}
+
 func (r *BrowserAgentDB) ListMessagesIDListByConversationID(ctx context.Context, conversationID int64) (messageIDList []int64, err error) {
 	if err = DB(ctx, r.db).
 		Model(&entity.BrowserAgentMessage{}).

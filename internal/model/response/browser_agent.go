@@ -15,6 +15,7 @@ type MessageResponse struct {
 	ID             int64     `json:"id,string"`
 	ConversationID int64     `json:"conversation_id,string"`
 	Content        string    `json:"content"`
+	State          string    `json:"state"`
 	CreatedAt      time.Time `json:"created_at"`
 }
 
@@ -22,7 +23,6 @@ type ActionResponse struct {
 	ID            int64     `json:"id,string"`
 	MessageID     int64     `json:"message_id,string"`
 	ActionType    string    `json:"action_type"`
-	Sequence      int       `json:"sequence"`
 	Status        string    `json:"status"`
 	URL           *string   `json:"url,omitempty"`
 	Selector      *string   `json:"selector,omitempty"`

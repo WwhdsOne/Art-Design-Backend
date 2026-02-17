@@ -10,7 +10,7 @@ type BrowserAgentConversation struct {
 
 type BrowserAgentMessage struct {
 	ConversationID int64  `json:"conversation_id" form:"conversation_id"`
-	Role           string `json:"role" form:"role"`
+	State          string `json:"state" form:"state"`
 	common.PaginationReq
 }
 

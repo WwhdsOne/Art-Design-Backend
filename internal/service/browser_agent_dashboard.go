@@ -1,13 +1,17 @@
 package service
 
 import (
+	"Art-Design-Backend/internal/model/common"
 	"Art-Design-Backend/internal/model/entity"
+	"Art-Design-Backend/internal/model/query"
 	"Art-Design-Backend/internal/model/response"
 	"Art-Design-Backend/internal/repository"
 	"context"
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/jinzhu/copier"
 )
 
 type BrowserAgentDashboardService struct {
@@ -303,6 +307,20 @@ func (s *BrowserAgentDashboardService) GetAdminHotTaskList(ctx context.Context, 
 	}
 
 	return result, nil
+}
+
+func (s *BrowserAgentDashboardService) GetMessagePage(ctx context.Context, queryParam *query.BrowserAgentMessage) (*common.PaginationResp[response.MessageResponse], error) {
+	messages, total, err := s.BrowserAgentRepo.ListMessagesPage(ctx, queryParam)
+	if err != nil {
+		return nil, err
+	}
+
+	responses := make([]response.MessageResponse, len(messages))
+	for i := range messages {
+		_ = copier.Copy(&responses[i], &messages[i])
+	}
+
+	return common.BuildPageResp[response.MessageResponse](responses, total, queryParam.PaginationReq), nil
 }
 
 // =========================

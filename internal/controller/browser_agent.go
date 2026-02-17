@@ -65,6 +65,8 @@ func NewBrowserAgentController(r *gin.Engine,
 		adminDashboard.GET("/active-sessions", browserAgentCtrl.GetAdminActiveSessions)
 		adminDashboard.GET("/annual-task-stats", browserAgentCtrl.GetAdminAnnualTaskStats)
 		adminDashboard.GET("/hot-task-list", browserAgentCtrl.GetAdminHotTaskList)
+		adminDashboard.POST("/messages", browserAgentCtrl.GetMessagePage)
+		adminDashboard.GET("/actions", browserAgentCtrl.GetActionsByMessageID)
 	}
 
 	userDashboard := agent.Group("/dashboard/user")
@@ -330,6 +332,21 @@ func (ctrl *BrowserAgentController) GetAdminHotTaskList(c *gin.Context) {
 	result.OkWithData(resp, c)
 }
 
+func (ctrl *BrowserAgentController) GetMessagePage(c *gin.Context) {
+	var queryParam query.BrowserAgentMessage
+	if err := c.ShouldBindBodyWithJSON(&queryParam); err != nil {
+		result.FailWithMessage(err.Error(), c)
+		return
+	}
+
+	resp, err := ctrl.browserAgentDashboardService.GetMessagePage(c, &queryParam)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	result.OkWithData(resp, c)
+}
+
 func (ctrl *BrowserAgentController) GetUserSummary(c *gin.Context) {
 	userID := authutils.GetUserID(c)
 	resp, err := ctrl.browserAgentDashboardService.GetUserSummary(c, userID)
@@ -385,5 +402,21 @@ func (ctrl *BrowserAgentController) GetUserTaskTrend(c *gin.Context) {
 		_ = c.Error(err)
 		return
 	}
+	result.OkWithData(resp, c)
+}
+
+func (ctrl *BrowserAgentController) GetActionsByMessageID(c *gin.Context) {
+	var req request.GetActionsRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		result.FailWithMessage(err.Error(), c)
+		return
+	}
+
+	resp, err := ctrl.browserAgentService.ListActions(c, &req)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
 	result.OkWithData(resp, c)
 }
