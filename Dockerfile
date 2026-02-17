@@ -10,7 +10,7 @@ RUN apk add --no-cache tzdata && \
     echo "Asia/Shanghai" > /etc/timezone
 
 # 将编译好的二进制文件复制到容器中
-COPY myapp /app/myapp
+COPY bin/myapp /app/myapp
 
 # 赋予执行权限
 RUN chmod +x /app/myapp

@@ -111,7 +111,7 @@ jobs:
             --network docker-compose_app-net \
             --name ${{ env.CONTAINER_NAME }} \
             --restart unless-stopped \
-            -e GIN_MODE=debug \
+            -e GIN_MODE=release \
             -e CONSUL_ADDR=${{ env.CONSUL_ADDR }} \
             -e CONSUL_CONFIG_KEY=${{ env.CONSUL_CONFIG_KEY }} \
             -e OSS_ACCESS_KEY_ID=${{ env.OSS_ACCESS_KEY_ID }} \
