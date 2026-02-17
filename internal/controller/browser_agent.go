@@ -42,7 +42,7 @@ func NewBrowserAgentController(
 			},
 		},
 	}
-
+	zap.L().Info("初始化浏览器智能体服务！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！")
 	{
 		agent := r.Group("/api").
 			Group("/browser-agent")
