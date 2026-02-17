@@ -385,33 +385,60 @@ func (s *BrowserAgentDashboardService) GetUserWeeklyTaskVolume(ctx context.Conte
 	}, nil
 }
 
-func (s *BrowserAgentDashboardService) GetUserWeeklyTaskSuccessRate(ctx context.Context, userID int64) (*response.RateDataResponse, error) {
+func (s *BrowserAgentDashboardService) GetUserWeeklyTaskSuccessRate(
+	ctx context.Context, userID int64,
+) (*response.RateDataResponse, error) {
+
 	now := time.Now()
+	location := now.Location()
+
+	// 构建本周日期数组（7天），日期归零
 	days := make([]time.Time, 7)
 	for i := 0; i < 7; i++ {
-		days[i] = now.AddDate(0, 0, -6+i)
+		t := now.AddDate(0, 0, -6+i) // 从6天前到今天
+		days[i] = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, location)
 	}
 
-	chartData, _ := s.BrowserAgentRepo.CountActionsSuccessRateByDays(ctx, userID, days)
-	currentRate := int64(0)
-	if len(chartData) > 0 {
-		currentRate = chartData[len(chartData)-1]
+	// 查询本周每天成功率数据 + 本周总操作数和成功数
+	chartData, totalSum, totalSuccess, err := s.BrowserAgentRepo.CountActionsSuccessRateByDays(ctx, userID, days)
+	if err != nil {
+		return nil, err
 	}
 
+	// 计算本周整周成功率（总成功数 / 总操作数）
+	var currentRate int64
+	if totalSum > 0 {
+		currentRate = totalSuccess * 100 / totalSum
+	} else {
+		currentRate = 0
+	}
+
+	// 构建上周日期数组（7天），日期归零
 	lastWeekDays := make([]time.Time, 7)
 	for i := 0; i < 7; i++ {
-		lastWeekDays[i] = now.AddDate(0, 0, -13+i)
-	}
-	lastWeekData, _ := s.BrowserAgentRepo.CountActionsSuccessRateByDays(ctx, userID, lastWeekDays)
-	lastWeekRate := int64(0)
-	if len(lastWeekData) > 0 {
-		lastWeekRate = lastWeekData[len(lastWeekData)-1]
+		t := now.AddDate(0, 0, -13+i) // 上周同样7天
+		lastWeekDays[i] = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, location)
 	}
 
+	// 查询上周每天成功率数据 + 上周总操作数和成功数
+	_, lastWeekTotal, lastWeekSuccess, err := s.BrowserAgentRepo.CountActionsSuccessRateByDays(ctx, userID, lastWeekDays)
+	if err != nil {
+		return nil, err
+	}
+
+	// 计算上周整周成功率（总成功数 / 总操作数）
+	var lastWeekRate int64
+	if lastWeekTotal > 0 {
+		lastWeekRate = lastWeekSuccess * 100 / lastWeekTotal
+	} else {
+		lastWeekRate = 0
+	}
+
+	// 返回结果
 	return &response.RateDataResponse{
-		Rate:      int(currentRate),
+		Rate:      int(currentRate), // 本周总成功率
 		Growth:    calcChange(currentRate, lastWeekRate),
-		ChartData: chartData,
+		ChartData: chartData, // 每日成功率图表
 	}, nil
 }
 

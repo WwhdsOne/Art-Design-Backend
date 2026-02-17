@@ -6,6 +6,7 @@ import (
 	"Art-Design-Backend/pkg/constant/tablename"
 	"Art-Design-Backend/pkg/errors"
 	"context"
+	"fmt"
 	"time"
 
 	"gorm.io/gorm"
@@ -690,29 +691,41 @@ func (r *BrowserAgentDB) CountConversationsByDays(ctx context.Context, userID in
 	return result, nil
 }
 
-func (r *BrowserAgentDB) CountActionsSuccessRateByDays(ctx context.Context, userID int64, days []time.Time) ([]int64, error) {
-	result := make([]int64, len(days))
+func (r *BrowserAgentDB) CountActionsSuccessRateByDays(
+	ctx context.Context, userID int64, days []time.Time,
+) (result []int64, totalSum int64, successSum int64, err error) {
+	result = make([]int64, len(days))
+
 	for i, day := range days {
 		dayStart := time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, day.Location())
 		dayEnd := dayStart.Add(24 * time.Hour)
+
 		var total, success int64
-		if err := DB(ctx, r.db).Table("browser_agent_action a").
+		db := DB(ctx, r.db).
+			Table(fmt.Sprintf("%s a", tablename.BrowserAgentActionTableName)).
 			Joins("JOIN browser_agent_message m ON a.message_id = m.id").
 			Joins("JOIN browser_agent_conversation c ON m.conversation_id = c.id").
-			Where("c.created_by = ? AND a.created_at >= ? AND a.created_at < ?", userID, dayStart, dayEnd).
-			Count(&total).Error; err != nil {
-			return nil, err
+			Where("c.created_by = ? AND a.created_at >= ? AND a.created_at < ?", userID, dayStart, dayEnd)
+
+		// 总动作数
+		if err := db.Count(&total).Error; err != nil {
+			return nil, 0, 0, err
 		}
-		if err := DB(ctx, r.db).Table("browser_agent_action a").
-			Joins("JOIN browser_agent_message m ON a.message_id = m.id").
-			Joins("JOIN browser_agent_conversation c ON m.conversation_id = c.id").
-			Where("c.created_by = ? AND a.created_at >= ? AND a.created_at < ? AND a.status = ?", userID, dayStart, dayEnd, "success").
-			Count(&success).Error; err != nil {
-			return nil, err
+		// 成功动作数
+		if err := db.Where("a.status = ?", "success").Count(&success).Error; err != nil {
+			return nil, 0, 0, err
 		}
+
 		if total > 0 {
 			result[i] = success * 100 / total
+		} else {
+			result[i] = 0
 		}
+
+		// 累加整周总数
+		totalSum += total
+		successSum += success
 	}
-	return result, nil
+
+	return result, totalSum, successSum, nil
 }
