@@ -6,6 +6,7 @@ import (
 
 	"github.com/bytedance/sonic"
 	"github.com/gorilla/websocket"
+	"go.uber.org/zap"
 )
 
 const (
@@ -53,6 +54,7 @@ func (c *Client) ReadPump() {
 		var clientMsg ClientMessage
 		if err = sonic.Unmarshal(message, &clientMsg); err != nil {
 			c.sendError("消息格式错误")
+			zap.L().Error("解析消息失败", zap.Error(err))
 			continue
 		}
 

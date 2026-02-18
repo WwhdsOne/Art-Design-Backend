@@ -11,6 +11,7 @@ import (
 	"Art-Design-Backend/pkg/ai"
 	"Art-Design-Backend/pkg/constant/llmid"
 	"Art-Design-Backend/pkg/constant/prompt"
+	"Art-Design-Backend/pkg/constant/scheduler"
 	"Art-Design-Backend/pkg/ws"
 	"context"
 	"errors"
@@ -20,6 +21,7 @@ import (
 	"github.com/bytedance/sonic"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
+	"github.com/robfig/cron"
 	"go.uber.org/zap"
 )
 
@@ -29,6 +31,36 @@ type BrowserAgentService struct {
 	AIProviderRepo   *repository.AIProviderRepo
 	AIModelClient    *ai.AIModelClient
 	GormTX           *db.GormTransactionManager
+}
+
+func NewBrowserAgentService(
+	browserAgentRepo *repository.BrowserAgentRepo,
+	aiModelRepo *repository.AIModelRepo,
+	aiProviderRepo *repository.AIProviderRepo,
+	aiModelClient *ai.AIModelClient,
+	gormTX *db.GormTransactionManager,
+) *BrowserAgentService {
+	c := cron.New()
+	b := &BrowserAgentService{
+		BrowserAgentRepo: browserAgentRepo,
+		AIModelRepo:      aiModelRepo,
+		AIProviderRepo:   aiProviderRepo,
+		AIModelClient:    aiModelClient,
+		GormTX:           gormTX,
+	}
+	_ = c.AddFunc(scheduler.BrowserAgentStaleActionCron, func() {
+		if err := b.BrowserAgentRepo.
+			MarkStaleActionsFailed(context.Background(), scheduler.BrowserAgentActionMaxDuration); err != nil {
+			zap.L().Error("更新旧动作状态失败", zap.Error(err))
+		}
+		if err := b.BrowserAgentRepo.
+			MarkStaleAndFailedMessages(context.Background(), scheduler.BrowserAgentMessageMaxDuration); err != nil {
+			zap.L().Error("更新旧任务状态为失败", zap.Error(err))
+		}
+		zap.L().Info("未完成旧任务状态已更新为失败")
+	})
+	c.Start()
+	return b
 }
 
 // =========================
@@ -326,7 +358,8 @@ func (s *BrowserAgentService) logAction(stage string, action *ws.Action) {
 		if action.Timeout != nil {
 			fields = append(fields, zap.Int("timeout(ms)", *action.Timeout))
 		}
-	case "close_browser":
+	case "finish_task":
+		fields = append(fields, zap.String("message", "任务完成"))
 	}
 
 	zap.L().Info("========== 发送操作指令 ==========", fields...)
@@ -441,8 +474,8 @@ func (s *BrowserAgentService) decideNextAction(
 		return nil, false, err
 	}
 
-	if strings.Contains(resp, `"action":"close_browser"`) ||
-		strings.Contains(resp, `"action": "close_browser"`) {
+	if strings.Contains(resp, `"action":"finish_task"`) ||
+		strings.Contains(resp, `"action": "finish_task"`) {
 		return nil, true, nil
 	}
 
@@ -489,10 +522,22 @@ func (s *BrowserAgentService) buildPageStateSection(pageState *ws.PageState) str
 	if pageState.Title != "" {
 		sb.WriteString("标题: " + pageState.Title + "\n")
 	}
+
+	// 输出滚动信息（如果存在）
+	if pageState.ScrollInfo != nil {
+		si := pageState.ScrollInfo
+		sb.WriteString(fmt.Sprintf(
+			"滚动信息: scrollTop=%f / clientHeight=%f / scrollHeight=%f | hasMoreAbove=%t, hasMoreBelow=%t\n",
+			si.ScrollTop,
+			si.ClientHeight,
+			si.ScrollHeight,
+			si.HasMoreAbove,
+			si.HasMoreBelow,
+		))
+	}
+
 	sb.WriteString("可交互元素:\n")
-
 	for i, elem := range pageState.Elements {
-
 		var valueInfo string
 		if elem.Value != nil && *elem.Value != "" {
 			valueInfo = fmt.Sprintf(" | value=%s", *elem.Value)
@@ -545,13 +590,13 @@ func (s *BrowserAgentService) parseAction(resp string) (*ws.Action, error) {
 
 func (s *BrowserAgentService) validateAction(action *ws.Action) error {
 	validActions := map[string]bool{
-		"goto":          true,
-		"click":         true,
-		"input":         true,
-		"select":        true,
-		"scroll":        true,
-		"wait":          true,
-		"close_browser": true,
+		"goto":        true,
+		"click":       true,
+		"input":       true,
+		"select":      true,
+		"scroll":      true,
+		"wait":        true,
+		"finish_task": true,
 	}
 
 	if !validActions[action.Action] {

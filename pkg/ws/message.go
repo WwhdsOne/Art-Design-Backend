@@ -19,10 +19,19 @@ type PageElement struct {
 	Disabled bool    `json:"disabled"` // 保留，前端不再传，默认 false
 }
 
+type ScrollInfo struct {
+	ScrollHeight float64 `json:"scrollHeight"` // 文档总高度
+	ClientHeight float64 `json:"clientHeight"` // 可视区域高度
+	ScrollTop    float64 `json:"scrollTop"`    // 当前滚动位置
+	HasMoreBelow bool    `json:"hasMoreBelow"` // 下方是否还有内容
+	HasMoreAbove bool    `json:"hasMoreAbove"` // 上方是否还有内容
+}
+
 type PageState struct {
-	URL      string        `json:"url"`
-	Title    string        `json:"title"` // 新增
-	Elements []PageElement `json:"elements"`
+	URL        string        `json:"url"`
+	Title      string        `json:"title"`                // 页面标题
+	Elements   []PageElement `json:"elements"`             // 页面元素列表
+	ScrollInfo *ScrollInfo   `json:"scrollInfo,omitempty"` // 滚动信息，可选
 }
 
 type ClientMessage struct {

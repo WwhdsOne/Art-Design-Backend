@@ -119,13 +119,7 @@ func wireApp() *bootstrap.HTTPServer {
 		AIProviderCache: aiProviderCache,
 	}
 	aiModelClient := bootstrap.InitAIModelClient()
-	browserAgentService := &service.BrowserAgentService{
-		BrowserAgentRepo: browserAgentRepo,
-		AIModelRepo:      aiModelRepo,
-		AIProviderRepo:   aiProviderRepo,
-		AIModelClient:    aiModelClient,
-		GormTX:           gormTransactionManager,
-	}
+	browserAgentService := service.NewBrowserAgentService(browserAgentRepo, aiModelRepo, aiProviderRepo, aiModelClient, gormTransactionManager)
 	browserAgentDashboardService := &service.BrowserAgentDashboardService{
 		BrowserAgentRepo: browserAgentRepo,
 	}

@@ -166,6 +166,46 @@ func (r *BrowserAgentDB) UpdateMessageState(ctx context.Context, id int64, state
 	return nil
 }
 
+func (r *BrowserAgentDB) MarkStaleAndFailedMessages(ctx context.Context, duration time.Duration) error {
+	cutoff := time.Now().Add(-duration)
+
+	// ===============================
+	// 1️⃣ 一个小时前的不成功 message 直接更新
+	// ===============================
+	if err := DB(ctx, r.db).
+		Model(&entity.BrowserAgentMessage{}).
+		Where("created_at < ?", cutoff).
+		Where("state != ?", entity.MessageStateFinished). // 避免覆盖已经成功的
+		Update("state", entity.MessageStateError).Error; err != nil {
+		return errors.WrapDBError(err, "更新一小时前不成功的 message 失败")
+	}
+
+	// ===============================
+	// 2️⃣ 其他 message 判断最新 action
+	// ===============================
+
+	// 使用子查询，找每个 message_id 最新的 action id
+	subQuery := DB(ctx, r.db).
+		Model(&entity.BrowserAgentAction{}).
+		Select("MAX(id)").
+		Group("message_id")
+
+	// 数据库直接批量更新，不拉 ID 到内存
+	if err := DB(ctx, r.db).
+		Model(&entity.BrowserAgentMessage{}).
+		Where("id IN (?)", DB(ctx, r.db).
+			Model(&entity.BrowserAgentAction{}).
+			Where("id IN (?)", subQuery).
+			Where("status != ?", entity.ActionStatusSuccess).
+			Select("message_id"),
+		).
+		Update("state", entity.MessageStateError).Error; err != nil {
+		return errors.WrapDBError(err, "更新最新 action 不成功的 message 失败")
+	}
+
+	return nil
+}
+
 // =========================
 // Action CRUD
 // =========================
@@ -206,13 +246,6 @@ func (r *BrowserAgentDB) ListActionsByMessageID(ctx context.Context, messageID i
 	return
 }
 
-func (r *BrowserAgentDB) UpdateAction(ctx context.Context, action *entity.BrowserAgentAction) error {
-	if err := DB(ctx, r.db).Save(action).Error; err != nil {
-		return errors.WrapDBError(err, "更新浏览器智能体操作失败")
-	}
-	return nil
-}
-
 func (r *BrowserAgentDB) UpdateActionStatus(ctx context.Context, id int64, status string, errMsg *string, execTime *int) error {
 	updates := map[string]interface{}{"status": status}
 	if errMsg != nil {
@@ -237,6 +270,15 @@ func (r *BrowserAgentDB) GetPendingActionsByMessageID(ctx context.Context, messa
 		return nil, errors.WrapDBError(err, "查询待执行操作失败")
 	}
 	return
+}
+
+func (r *BrowserAgentDB) MarkStaleActionsFailed(ctx context.Context, duration time.Duration) error {
+	cutoff := time.Now().Add(-duration)
+	result := DB(ctx, r.db).Model(&entity.BrowserAgentAction{}).
+		Where("status != ?", entity.ActionStatusSuccess). // 没有成功的任务
+		Where("created_at < ?", cutoff).                  // 创建时间超过阈值
+		Update("status", entity.ActionStatusFailed)
+	return result.Error
 }
 
 // =========================
@@ -658,7 +700,7 @@ func (r *BrowserAgentDB) GetHotTasksWithDetails(
 	//  - SUM(CASE WHEN a.status = 'success' THEN 1 ELSE 0 END) as success_count: 成功动作数
 	//  - COUNT(a.id) as total_actions: 总动作数（包括失败动作）
 	err := DB(ctx, r.db).
-		Table("browser_agent_message m").
+		Table(tablename.BrowserAgentMessageTableName + " AS m").
 		Select(`
 			m.content,
 			COUNT(DISTINCT m.id) AS count,

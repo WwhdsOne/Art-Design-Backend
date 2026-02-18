@@ -55,7 +55,7 @@ var KnowledgeBaseCtrlSet = wire.NewSet(
 
 var BrowserAgentCtrlSet = wire.NewSet(
 	NewBrowserAgentController,
-	wire.Struct(new(service.BrowserAgentService), "*"),
+	service.NewBrowserAgentService,
 	wire.Struct(new(service.BrowserAgentDashboardService), "*"),
 )
 

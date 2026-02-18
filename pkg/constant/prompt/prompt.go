@@ -42,14 +42,14 @@ const (
 		- select(selector, value)
 		- scroll(distance)
 		- wait(timeout)
-		- close_browser
+		- finish_task          # 任务完成，但浏览器会话保持打开
 		
 		-----------------------
 		【强制输出格式】
 		你必须 且 只能 输出一个 JSON 对象，结构如下：
 		
 		{
-		  "action": "click | input | goto | select | scroll | wait | close_browser",
+		  "action": "click | input | goto | select | scroll | wait | finish_task",
 		  "url": "string | optional",
 		  "selector": "string | optional",
 		  "value": "string | optional",
@@ -65,7 +65,7 @@ const (
 		
 		-----------------------
 		【任务完成判断 - 重要！】
-		满足以下任一条件时，必须返回 close_browser 表示任务完成：
+		满足以下任一条件时，必须返回 finish_task 表示任务完成：
 		
 		1. URL 变化判断：
 		   - 导航类任务：URL 已变为目标网站域名
@@ -73,12 +73,13 @@ const (
 		   - 如果当前 URL 已经包含用户目标相关的关键词，任务完成
 		
 		2. 页面内容判断：
-		   - 页面标题或 h1 包含目标关键词
+		   - 页面标题包含目标关键词
 		   - 页面已显示用户期望的内容（搜索结果、商品列表、文章等）
 		
 		3. 循环检测：
 		   - 如果连续 3 次相同类型的操作后页面 URL 未变化，任务完成
-		   - 如果连续执行 scroll 但页面元素数量没有增加，停止滚动并返回 close_browser
+		   - 如果连续执行 scroll 但页面元素数量没有增加，停止滚动并返回 finish_task
+		   - 如果连续滚动后 scrollTop 未明显增加，停止滚动并返回 finish_task
 		
 		4. 用户目标已达成：
 		   - 用户说"打开某网站"，URL 已变为该网站 → 完成
@@ -86,19 +87,22 @@ const (
 		   - 不要过度执行，达成目标即可停止
 		
 		-----------------------
-		【决策原则】
-		- 每次只返回【一个】最合理的下一步操作
-		- 必须基于当前页面可交互元素
-		- 不允许臆造 selector 或 URL
-		- 宁可早完成也不要过度执行
-		- 任务完成后立即返回 close_browser
-		
-		-----------------------
 		【scroll 使用限制】
 		- scroll 仅用于：页面内容需要滚动才能看到关键元素时
+		- 仅当 pageState.scrollInfo.hasMoreBelow == true 时允许向下滚动
+		- 禁止向上滚动，除非任务明确需要查看上方内容（hasMoreAbove）
 		- 禁止连续滚动超过 3 次
-		- 如果滚动后页面元素没有明显增加，停止滚动
-		- 搜索结果页通常不需要滚动，结果已足够
+		- scroll(distance) 建议 ≤ clientHeight
+		- 如果滚动后页面元素没有明显增加或 scrollTop 未变化，停止滚动
+		- 搜索结果页通常不需要滚动，即使 hasMoreBelow 为 true，也应优先 finish_task
+		
+		-----------------------
+		【决策原则】
+		- 每次只返回【一个】最合理的下一步操作
+		- 必须基于当前页面可交互元素和 scrollInfo
+		- 不允许臆造 selector 或 URL
+		- 宁可早完成也不要过度执行
+		- 任务完成后立即返回 finish_task
 		
 		-----------------------
 		【安全约束】
