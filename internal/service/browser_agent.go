@@ -523,11 +523,10 @@ func (s *BrowserAgentService) buildPageStateSection(pageState *ws.PageState) str
 		sb.WriteString("标题: " + pageState.Title + "\n")
 	}
 
-	// 输出滚动信息（如果存在）
 	if pageState.ScrollInfo != nil {
 		si := pageState.ScrollInfo
 		sb.WriteString(fmt.Sprintf(
-			"滚动信息: scrollTop=%f / clientHeight=%f / scrollHeight=%f | hasMoreAbove=%t, hasMoreBelow=%t\n",
+			"滚动: scrollTop=%.0f / clientHeight=%.0f / scrollHeight=%.0f | hasMoreAbove=%t, hasMoreBelow=%t\n",
 			si.ScrollTop,
 			si.ClientHeight,
 			si.ScrollHeight,
@@ -536,21 +535,44 @@ func (s *BrowserAgentService) buildPageStateSection(pageState *ws.PageState) str
 		))
 	}
 
-	sb.WriteString("可交互元素:\n")
+	sb.WriteString("\n【可交互元素】\n")
 	for i, elem := range pageState.Elements {
-		var valueInfo string
-		if elem.Value != nil && *elem.Value != "" {
-			valueInfo = fmt.Sprintf(" | value=%s", *elem.Value)
+		sb.WriteString(fmt.Sprintf("%d. ", i+1))
+
+		switch elem.Tag {
+		case "input", "textarea":
+			typeInfo := "text"
+			if elem.Type != nil {
+				typeInfo = *elem.Type
+			}
+			labelInfo := elem.Text
+			if elem.Label != nil && *elem.Label != "" {
+				labelInfo = *elem.Label
+			}
+			sb.WriteString(fmt.Sprintf("[%s] label=\"%s\"", typeInfo, labelInfo))
+			if elem.Value != nil && *elem.Value != "" {
+				sb.WriteString(fmt.Sprintf(" value=\"%s\"", *elem.Value))
+			}
+			sb.WriteString(fmt.Sprintf(" selector=%s", elem.Selector))
+
+		case "select":
+			labelInfo := elem.Text
+			if elem.Label != nil && *elem.Label != "" {
+				labelInfo = *elem.Label
+			}
+			sb.WriteString(fmt.Sprintf("[select] label=\"%s\" selector=%s", labelInfo, elem.Selector))
+
+		case "button":
+			sb.WriteString(fmt.Sprintf("[button] text=\"%s\" selector=%s", elem.Text, elem.Selector))
+
+		case "a":
+			sb.WriteString(fmt.Sprintf("[link] text=\"%s\" selector=%s", elem.Text, elem.Selector))
+
+		default:
+			sb.WriteString(fmt.Sprintf("[%s] text=\"%s\" selector=%s", elem.Tag, elem.Text, elem.Selector))
 		}
 
-		sb.WriteString(fmt.Sprintf(
-			"%d. <%s> %s | selector=%s%s\n",
-			i+1,
-			elem.Tag,
-			elem.Text,
-			elem.Selector,
-			valueInfo,
-		))
+		sb.WriteString("\n")
 	}
 
 	return sb.String()

@@ -10,28 +10,36 @@ type Action struct {
 	Timeout  *int    `json:"timeout,omitempty"`
 }
 
+type Position struct {
+	X      float64 `json:"x"`
+	Y      float64 `json:"y"`
+	Width  float64 `json:"width"`
+	Height float64 `json:"height"`
+}
+
 type PageElement struct {
-	Tag      string  `json:"tag"`
-	Text     string  `json:"text"`
-	Selector string  `json:"selector"`
-	Value    *string `json:"value,omitempty"`
-	Visible  bool    `json:"visible"`  // 保留，前端不再传，默认 false
-	Disabled bool    `json:"disabled"` // 保留，前端不再传，默认 false
+	Tag      string    `json:"tag"`
+	Text     string    `json:"text"`
+	Selector string    `json:"selector"`
+	Value    *string   `json:"value,omitempty"`
+	Type     *string   `json:"type,omitempty"`
+	Label    *string   `json:"label,omitempty"`
+	Position *Position `json:"position,omitempty"`
 }
 
 type ScrollInfo struct {
-	ScrollHeight float64 `json:"scrollHeight"` // 文档总高度
-	ClientHeight float64 `json:"clientHeight"` // 可视区域高度
-	ScrollTop    float64 `json:"scrollTop"`    // 当前滚动位置
-	HasMoreBelow bool    `json:"hasMoreBelow"` // 下方是否还有内容
-	HasMoreAbove bool    `json:"hasMoreAbove"` // 上方是否还有内容
+	ScrollHeight float64 `json:"scrollHeight"`
+	ClientHeight float64 `json:"clientHeight"`
+	ScrollTop    float64 `json:"scrollTop"`
+	HasMoreBelow bool    `json:"hasMoreBelow"`
+	HasMoreAbove bool    `json:"hasMoreAbove"`
 }
 
 type PageState struct {
 	URL        string        `json:"url"`
-	Title      string        `json:"title"`                // 页面标题
-	Elements   []PageElement `json:"elements"`             // 页面元素列表
-	ScrollInfo *ScrollInfo   `json:"scrollInfo,omitempty"` // 滚动信息，可选
+	Title      string        `json:"title"`
+	Elements   []PageElement `json:"elements"`
+	ScrollInfo *ScrollInfo   `json:"scrollInfo,omitempty"`
 }
 
 type ClientMessage struct {
@@ -42,7 +50,7 @@ type ClientMessage struct {
 	Success       bool       `json:"success,omitempty"`
 	Error         string     `json:"error,omitempty"`
 	ExecutionTime int        `json:"execution_time,omitempty"`
-	Task          string     `json:"task,omitempty"` // 新增
+	Task          string     `json:"task,omitempty"`
 }
 
 type ServerMessage struct {
