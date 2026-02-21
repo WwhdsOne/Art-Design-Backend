@@ -71,7 +71,6 @@ func (p *snowflakeIDPlugin) initialize(db *gorm.DB) (err error) {
 // detectSnowflakeIDField 递归查找结构体中的主键字段名（如ID），用于自动生成雪花ID
 func detectSnowflakeIDField(t reflect.Type) string {
 	for field := range t.Fields() {
-		field := field
 
 		// 如果是匿名嵌套字段（如 BaseModel），递归查找
 		if field.Anonymous && field.Type.Kind() == reflect.Struct {

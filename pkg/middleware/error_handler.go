@@ -35,7 +35,6 @@ func getFieldLabel(obj any, fieldName string) string {
 		// 初始化标签映射
 		labelMap = make(map[string]string)
 		for field := range t.Fields() {
-			field := field
 			labelMap[field.Name] = field.Tag.Get("label")
 		}
 
