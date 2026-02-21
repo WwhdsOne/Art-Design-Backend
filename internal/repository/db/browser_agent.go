@@ -247,7 +247,7 @@ func (r *BrowserAgentDB) ListActionsByMessageID(ctx context.Context, messageID i
 }
 
 func (r *BrowserAgentDB) UpdateActionStatus(ctx context.Context, id int64, status string, errMsg *string, execTime *int) error {
-	updates := map[string]interface{}{"status": status}
+	updates := map[string]any{"status": status}
 	if errMsg != nil {
 		updates["error_message"] = *errMsg
 	}

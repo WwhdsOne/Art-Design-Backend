@@ -70,8 +70,8 @@ func (p *snowflakeIDPlugin) initialize(db *gorm.DB) (err error) {
 
 // detectSnowflakeIDField 递归查找结构体中的主键字段名（如ID），用于自动生成雪花ID
 func detectSnowflakeIDField(t reflect.Type) string {
-	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
+	for field := range t.Fields() {
+		field := field
 
 		// 如果是匿名嵌套字段（如 BaseModel），递归查找
 		if field.Anonymous && field.Type.Kind() == reflect.Struct {
@@ -97,7 +97,7 @@ func detectSnowflakeIDField(t reflect.Type) string {
 
 // getFieldByName 获取字段值，支持递归嵌套结构体中查找字段
 func getFieldByName(v reflect.Value, name string) reflect.Value {
-	if v.Kind() == reflect.Ptr {
+	if v.Kind() == reflect.Pointer {
 		v = v.Elem()
 	}
 	if !v.IsValid() {
@@ -140,7 +140,7 @@ func (p *snowflakeIDPlugin) generateID(db *gorm.DB) {
 		modelType = modelType.Elem()
 	}
 	// 如果是指针类型，取实际结构体类型
-	if modelType.Kind() == reflect.Ptr {
+	if modelType.Kind() == reflect.Pointer {
 		modelType = modelType.Elem()
 	}
 	// 不是结构体则跳过
@@ -180,19 +180,19 @@ func (z *zapGormLogger) LogMode(level logger.LogLevel) logger.Interface {
 	return &newLogger
 }
 
-func (z *zapGormLogger) Info(_ context.Context, msg string, data ...interface{}) {
+func (z *zapGormLogger) Info(_ context.Context, msg string, data ...any) {
 	if z.logLevel >= logger.Info {
 		z.zapLogger.Sugar().Infof(msg, data...)
 	}
 }
 
-func (z *zapGormLogger) Warn(_ context.Context, msg string, data ...interface{}) {
+func (z *zapGormLogger) Warn(_ context.Context, msg string, data ...any) {
 	if z.logLevel >= logger.Warn {
 		z.zapLogger.Sugar().Warnf(msg, data...)
 	}
 }
 
-func (z *zapGormLogger) Error(_ context.Context, msg string, data ...interface{}) {
+func (z *zapGormLogger) Error(_ context.Context, msg string, data ...any) {
 	if z.logLevel >= logger.Error {
 		z.zapLogger.Sugar().Errorf(msg, data...)
 	}

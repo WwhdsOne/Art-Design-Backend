@@ -37,6 +37,11 @@ lint-full:
 	@echo "运行 golangci-lint..."
 	go tool golangci-lint run ./...
 
+# 使用go1.26.0新工具修复代码
+fix:
+	@echo "运行 go fix ./..."
+	go fix ./...
+
 # 依赖注入代码生成（Wire）
 wire:
 	@echo "运行 wire 生成依赖注入代码..."

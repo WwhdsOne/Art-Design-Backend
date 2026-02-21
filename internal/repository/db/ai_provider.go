@@ -33,7 +33,7 @@ func (a *AIProviderDB) CheckAIDuplicate(c context.Context, provider *entity.AIPr
 	}
 
 	var queryCondition strings.Builder
-	args := make([]interface{}, 0)
+	args := make([]any, 0)
 	conditions := make([]string, 0)
 
 	if provider.Name != "" {

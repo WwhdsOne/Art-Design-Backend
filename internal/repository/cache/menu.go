@@ -7,7 +7,7 @@ import (
 	"Art-Design-Backend/pkg/errors"
 	"Art-Design-Backend/pkg/redisx"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/bytedance/sonic"
@@ -75,9 +75,7 @@ func (m *MenuCache) InvalidAllMenuCache() (err error) {
 }
 
 func buildMenuCacheKey(roleIDList []int64) string {
-	sort.Slice(roleIDList, func(i, j int) bool {
-		return roleIDList[i] < roleIDList[j]
-	})
+	slices.Sort(roleIDList)
 	return fmt.Sprintf(rediskey.MenuListRole+"%s", strings.Join(strings.Split(fmt.Sprint(roleIDList), " "), "_"))
 }
 func (m *MenuCache) GetMenuListByRoleIDListFromCache(roleIDList []int64) (menu []*response.Menu, err error) {

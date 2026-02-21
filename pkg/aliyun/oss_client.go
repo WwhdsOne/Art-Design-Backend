@@ -21,8 +21,8 @@ func (o *OssClient) uploadToFolder(c context.Context, folderKey, filename string
 	folder := o.Folders[folderKey]
 	uploadFileName := utils.StdUUID() + filepath.Ext(filename)
 	request := oss.PutObjectRequest{
-		Bucket: oss.Ptr(o.BucketName),
-		Key:    oss.Ptr(folder + "/" + uploadFileName),
+		Bucket: new(o.BucketName),
+		Key:    new(folder + "/" + uploadFileName),
 		Body:   reader,
 	}
 	if _, err = o.Client.PutObject(c, &request); err != nil {

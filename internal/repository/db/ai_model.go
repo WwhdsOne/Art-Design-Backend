@@ -36,7 +36,7 @@ func (a *AIModelDB) CheckAIDuplicate(c context.Context, model *entity.AIModel) (
 	}
 
 	var queryCondition strings.Builder
-	args := make([]interface{}, 0)
+	args := make([]any, 0)
 	conditions := make([]string, 0)
 
 	if model.Model != "" {

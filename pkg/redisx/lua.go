@@ -10,7 +10,7 @@ func isNoScriptErr(err error) bool {
 }
 
 // Eval 执行 Lua 脚本（自动缓存 SHA，自动降级）
-func (r *RedisWrapper) Eval(script string, keys []string, args ...interface{}) (result interface{}, err error) {
+func (r *RedisWrapper) Eval(script string, keys []string, args ...any) (result any, err error) {
 	timeout, cancel := context.WithTimeout(context.Background(), r.operationTimeout)
 	defer cancel()
 

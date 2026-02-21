@@ -22,7 +22,7 @@ func (r *RedisWrapper) SMembers(key string) (val []string) {
 
 // SAdd 添加元素
 // 永久存在
-func (r *RedisWrapper) SAdd(key string, vals ...interface{}) (err error) {
+func (r *RedisWrapper) SAdd(key string, vals ...any) (err error) {
 	timeout, cancelFunc := context.WithTimeout(context.Background(), r.operationTimeout)
 	defer cancelFunc()
 	_, err = r.client.SAdd(timeout, key, vals...).Result()
@@ -34,7 +34,7 @@ func (r *RedisWrapper) SAdd(key string, vals ...interface{}) (err error) {
 }
 
 // SRem 删除元素
-func (r *RedisWrapper) SRem(key string, members ...interface{}) (err error) {
+func (r *RedisWrapper) SRem(key string, members ...any) (err error) {
 	timeout, cancelFunc := context.WithTimeout(context.Background(), r.operationTimeout)
 	defer cancelFunc()
 	_, err = r.client.SRem(timeout, key, members...).Result()

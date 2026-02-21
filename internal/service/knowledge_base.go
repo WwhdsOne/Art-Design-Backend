@@ -90,10 +90,7 @@ func (k *KnowledgeBaseService) UploadAndVectorizeDocument(
 		batchSize := 10
 		allEmbeddings := make([][]float32, 0, len(chunkList))
 		for i := 0; i < len(chunks); i += batchSize {
-			end := i + batchSize
-			if end > len(chunks) {
-				end = len(chunks)
-			}
+			end := min(i+batchSize, len(chunks))
 			batchChunks := chunks[i:end]
 
 			// 调用千问 Embedding API（每次最多 10 个）

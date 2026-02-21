@@ -34,7 +34,7 @@ func (m *MenuDB) CheckMenuDuplicate(c context.Context, menu *entity.Menu) (err e
 	}
 
 	var query strings.Builder
-	args := make([]interface{}, 0)
+	args := make([]any, 0)
 	conditions := make([]string, 0)
 
 	if menu.Name != nil && *menu.Name != "" {
@@ -153,7 +153,7 @@ func (m *MenuDB) UpdateMenu(c context.Context, menu *entity.Menu) (err error) {
 		这是生产环境推荐写法，避免 bool/int/string 零值被静默忽略。
 	*/
 
-	updateData := map[string]interface{}{
+	updateData := map[string]any{
 		"name":                 menu.Name,
 		"type":                 menu.Type,
 		"path":                 menu.Path,

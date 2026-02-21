@@ -35,7 +35,7 @@ func (r *RoleDB) CheckRoleDuplicate(c context.Context, role *entity.Role) (err e
 
 	// 构建动态查询条件
 	var queryCondition strings.Builder
-	args := make([]interface{}, 0)
+	args := make([]any, 0)
 	conditions := make([]string, 0)
 
 	// 只检查非空字段

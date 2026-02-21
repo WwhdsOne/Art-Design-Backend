@@ -14,7 +14,7 @@ type ChatCompletionStreamResponse struct {
 type StreamChoice struct {
 	Index        int          `json:"index"`
 	Delta        DeltaContent `json:"delta"`
-	Logprobs     interface{}  `json:"logprobs,omitempty"`
+	Logprobs     any          `json:"logprobs,omitempty"`
 	FinishReason *string      `json:"finish_reason,omitempty"`
 }
 

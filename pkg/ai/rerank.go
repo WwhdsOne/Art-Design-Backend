@@ -120,7 +120,7 @@ func (c *AIModelClient) Rerank(token string, req RerankRequest, topK int) ([]str
 	})
 
 	topKDocuments := make([]string, topK)
-	for i := 0; i < topK; i++ {
+	for i := range topK {
 		topKDocuments[i] = resultsWithDoc[i].Doc
 	}
 

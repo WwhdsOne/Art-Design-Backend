@@ -36,7 +36,7 @@ func (u *UserDB) CheckUserDuplicate(c context.Context, user *entity.User) (err e
 
 	// 构建动态查询条件
 	var queryConditions strings.Builder
-	args := make([]interface{}, 0)
+	args := make([]any, 0)
 	conditions := make([]string, 0)
 
 	// 只检查非空字段

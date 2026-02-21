@@ -24,13 +24,13 @@ func ParseDuration(d string) time.Duration {
 
 	// 如果包含 "d"，表示有天数部分
 	if strings.Contains(d, "d") {
-		index := strings.Index(d, "d")
+		before, after, _ := strings.Cut(d, "d")
 		// 解析 "d" 前面的天数
-		hour, _ := strconv.Atoi(d[:index])
+		hour, _ := strconv.Atoi(before)
 		dr = time.Hour * 24 * time.Duration(hour)
 
 		// 解析 "d" 后面的部分作为剩余时间
-		ndr, _ := time.ParseDuration(d[index+1:])
+		ndr, _ := time.ParseDuration(after)
 		return dr + ndr
 	}
 

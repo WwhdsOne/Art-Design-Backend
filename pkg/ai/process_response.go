@@ -11,8 +11,8 @@ func ExtractJSONFromLLMOutput(raw string) (string, error) {
 	raw = strings.TrimSpace(raw)
 
 	// 情况 1：```json ... ```
-	if strings.HasPrefix(raw, "```") {
-		raw = strings.TrimPrefix(raw, "```")
+	if after, ok := strings.CutPrefix(raw, "```"); ok {
+		raw = after
 		raw = strings.TrimPrefix(raw, "json")
 		raw = strings.TrimSuffix(raw, "```")
 		raw = strings.TrimSpace(raw)

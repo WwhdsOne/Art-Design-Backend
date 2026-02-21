@@ -56,7 +56,7 @@ func (s *BrowserAgentDashboardService) GetAdminSummary(ctx context.Context) (*re
 func (s *BrowserAgentDashboardService) GetAdminWeeklyTaskVolume(ctx context.Context) (*response.VolumeDataResponse, error) {
 	now := time.Now()
 	days := make([]time.Time, 7)
-	for i := 0; i < 7; i++ {
+	for i := range 7 {
 		days[i] = now.AddDate(0, 0, -6+i)
 	}
 
@@ -67,7 +67,7 @@ func (s *BrowserAgentDashboardService) GetAdminWeeklyTaskVolume(ctx context.Cont
 	}
 
 	lastWeekDays := make([]time.Time, 7)
-	for i := 0; i < 7; i++ {
+	for i := range 7 {
 		lastWeekDays[i] = now.AddDate(0, 0, -13+i)
 	}
 	lastWeekData, _ := s.BrowserAgentRepo.CountAllMessagesByDays(ctx, lastWeekDays)
@@ -177,7 +177,7 @@ func (s *BrowserAgentDashboardService) GetAdminTaskClassification(ctx context.Co
 func (s *BrowserAgentDashboardService) GetAdminWeeklyOperationVolume(ctx context.Context) (*response.VolumeDataResponse, error) {
 	now := time.Now()
 	days := make([]time.Time, 7)
-	for i := 0; i < 7; i++ {
+	for i := range 7 {
 		days[i] = now.AddDate(0, 0, -6+i)
 	}
 
@@ -188,7 +188,7 @@ func (s *BrowserAgentDashboardService) GetAdminWeeklyOperationVolume(ctx context
 	}
 
 	lastWeekDays := make([]time.Time, 7)
-	for i := 0; i < 7; i++ {
+	for i := range 7 {
 		lastWeekDays[i] = now.AddDate(0, 0, -13+i)
 	}
 	lastWeekData, _ := s.BrowserAgentRepo.CountAllActionsByDays(ctx, lastWeekDays)
@@ -227,7 +227,7 @@ func (s *BrowserAgentDashboardService) GetAdminActiveSessions(
 
 	// ===== 本周 7 天 =====
 	days := make([]time.Time, 7)
-	for i := 0; i < 7; i++ {
+	for i := range 7 {
 		days[i] = today.AddDate(0, 0, -6+i)
 	}
 
@@ -244,7 +244,7 @@ func (s *BrowserAgentDashboardService) GetAdminActiveSessions(
 
 	// ===== 上周 7 天 =====
 	lastWeekDays := make([]time.Time, 7)
-	for i := 0; i < 7; i++ {
+	for i := range 7 {
 		lastWeekDays[i] = today.AddDate(0, 0, -13+i)
 	}
 
@@ -358,7 +358,7 @@ func (s *BrowserAgentDashboardService) GetUserSummary(ctx context.Context, userI
 func (s *BrowserAgentDashboardService) GetUserWeeklyTaskVolume(ctx context.Context, userID int64) (*response.VolumeDataResponse, error) {
 	now := time.Now()
 	days := make([]time.Time, 7)
-	for i := 0; i < 7; i++ {
+	for i := range 7 {
 		days[i] = now.AddDate(0, 0, -6+i)
 	}
 
@@ -369,7 +369,7 @@ func (s *BrowserAgentDashboardService) GetUserWeeklyTaskVolume(ctx context.Conte
 	}
 
 	lastWeekDays := make([]time.Time, 7)
-	for i := 0; i < 7; i++ {
+	for i := range 7 {
 		lastWeekDays[i] = now.AddDate(0, 0, -13+i)
 	}
 	lastWeekData, _ := s.BrowserAgentRepo.CountMessagesByDays(ctx, userID, lastWeekDays)
@@ -394,7 +394,7 @@ func (s *BrowserAgentDashboardService) GetUserWeeklyTaskSuccessRate(
 
 	// 构建本周日期数组（7天），日期归零
 	days := make([]time.Time, 7)
-	for i := 0; i < 7; i++ {
+	for i := range 7 {
 		t := now.AddDate(0, 0, -6+i) // 从6天前到今天
 		days[i] = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, location)
 	}
@@ -415,7 +415,7 @@ func (s *BrowserAgentDashboardService) GetUserWeeklyTaskSuccessRate(
 
 	// 构建上周日期数组（7天），日期归零
 	lastWeekDays := make([]time.Time, 7)
-	for i := 0; i < 7; i++ {
+	for i := range 7 {
 		t := now.AddDate(0, 0, -13+i) // 上周同样7天
 		lastWeekDays[i] = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, location)
 	}
@@ -458,7 +458,7 @@ func (s *BrowserAgentDashboardService) GetUserTaskOverview(ctx context.Context, 
 
 	now := time.Now()
 	days := make([]time.Time, 7)
-	for i := 0; i < 7; i++ {
+	for i := range 7 {
 		days[i] = now.AddDate(0, 0, -6+i)
 	}
 	chartData, _ := s.BrowserAgentRepo.CountMessagesByDays(ctx, userID, days)
@@ -516,7 +516,7 @@ type dayCountFetcher func(ctx context.Context, days []time.Time) ([]dayCountRow,
 
 func makeWeekDays(today time.Time, startOffset int) []time.Time {
 	days := make([]time.Time, 7)
-	for i := 0; i < 7; i++ {
+	for i := range 7 {
 		days[i] = today.AddDate(0, 0, startOffset+i)
 	}
 	return days

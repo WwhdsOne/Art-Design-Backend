@@ -74,7 +74,7 @@ func (j *JWT) CreateToken(baseClaims BaseClaims) (tokenStr string, err error) {
 // ParseToken 解析 token
 func (j *JWT) ParseToken(tokenString string) (*CustomClaims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &CustomClaims{},
-		func(_ *jwt.Token) (interface{}, error) {
+		func(_ *jwt.Token) (any, error) {
 			return j.SigningKey, nil
 		},
 	)

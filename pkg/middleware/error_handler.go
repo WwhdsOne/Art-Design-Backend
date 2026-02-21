@@ -19,9 +19,9 @@ var (
 	mu          sync.RWMutex
 )
 
-func getFieldLabel(obj interface{}, fieldName string) string {
+func getFieldLabel(obj any, fieldName string) string {
 	t := reflect.TypeOf(obj)
-	for t.Kind() == reflect.Ptr {
+	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
 	typeName := t.PkgPath() + "." + t.Name()
@@ -34,8 +34,8 @@ func getFieldLabel(obj interface{}, fieldName string) string {
 	if !ok {
 		// 初始化标签映射
 		labelMap = make(map[string]string)
-		for i := 0; i < t.NumField(); i++ {
-			field := t.Field(i)
+		for field := range t.Fields() {
+			field := field
 			labelMap[field.Name] = field.Tag.Get("label")
 		}
 

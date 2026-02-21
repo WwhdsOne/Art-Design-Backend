@@ -7,15 +7,15 @@ type MultiModeChatRequest struct {
 	MaxTokens        *int                   `json:"max_tokens,omitempty"`
 	PresencePenalty  *float64               `json:"presence_penalty,omitempty"`
 	ResponseFormat   *ResponseFormat        `json:"response_format,omitempty"`
-	Stop             interface{}            `json:"stop,omitempty"` // string / []string / nil
+	Stop             any                    `json:"stop,omitempty"` // string / []string / nil
 	Stream           bool                   `json:"stream,omitempty"`
 	StreamOptions    *StreamOptions         `json:"stream_options,omitempty"`
 	Temperature      *float64               `json:"temperature,omitempty"`
 	TopP             *float64               `json:"top_p,omitempty"`
-	Tools            interface{}            `json:"tools,omitempty"`       // []Tool / nil
+	Tools            any                    `json:"tools,omitempty"`       // []Tool / nil
 	ToolChoice       string                 `json:"tool_choice,omitempty"` // "none", "auto", "required"
 	Logprobs         bool                   `json:"logprobs,omitempty"`
-	TopLogprobs      interface{}            `json:"top_logprobs,omitempty"` // int / nil
+	TopLogprobs      any                    `json:"top_logprobs,omitempty"` // int / nil
 }
 
 type MultiModeChatMessage struct {
@@ -49,15 +49,15 @@ type ChatRequest struct {
 	MaxTokens        *int            `json:"max_tokens,omitempty"`
 	PresencePenalty  *float64        `json:"presence_penalty,omitempty"`
 	ResponseFormat   *ResponseFormat `json:"response_format,omitempty"`
-	Stop             interface{}     `json:"stop,omitempty"` // string / []string / nil
+	Stop             any             `json:"stop,omitempty"` // string / []string / nil
 	Stream           bool            `json:"stream,omitempty"`
 	StreamOptions    *StreamOptions  `json:"stream_options,omitempty"`
 	Temperature      *float64        `json:"temperature,omitempty"`
 	TopP             *float64        `json:"top_p,omitempty"`
-	Tools            interface{}     `json:"tools,omitempty"`       // []Tool / nil
+	Tools            any             `json:"tools,omitempty"`       // []Tool / nil
 	ToolChoice       string          `json:"tool_choice,omitempty"` // "none", "auto", "required"
 	Logprobs         bool            `json:"logprobs,omitempty"`
-	TopLogprobs      interface{}     `json:"top_logprobs,omitempty"` // int / nil
+	TopLogprobs      any             `json:"top_logprobs,omitempty"` // int / nil
 }
 
 func DefaultStreamChatRequest(model string, messages []ChatMessage) ChatRequest {

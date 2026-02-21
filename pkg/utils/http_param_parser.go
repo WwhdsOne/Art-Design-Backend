@@ -14,8 +14,8 @@ func ParseIDs(c *gin.Context) (ids []int64, err error) {
 	if idsParam == "" {
 		return nil, errors.New("IDs 为空")
 	}
-	idStrings := strings.Split(idsParam, ",")
-	for _, idStr := range idStrings {
+	idStrings := strings.SplitSeq(idsParam, ",")
+	for idStr := range idStrings {
 		var id int64
 		id, err = strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
