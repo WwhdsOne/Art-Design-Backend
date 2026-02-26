@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"mime/multipart"
 	"net/http"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
@@ -404,10 +405,31 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 		})
 	}
 
-	// Step 5: 追加用户原始消息
-	fullMessages = append(fullMessages, r.Messages...)
+	// Step 5: 先计算后追加用户原始消息
+	totalToken := 0
+	for _, message := range fullMessages {
+		// +6 是因为每个消息的 role 和 content 都要占用部分token
+		// 通常是 3 ~ 8 token 这里取 6 token
+		totalToken += ai.EstimateTokens(message.Content) + 6
+	}
+	//  Step 5.1: 拼接历史对话
+	trimmed := make([]ai.ChatMessage, 0)
 
-	// Step 6: 在新对话中返回对话ID
+	for i := len(r.Messages) - 1; i >= 0; i-- {
+		t := ai.EstimateTokens(r.Messages[i].Content) + 6
+
+		if totalToken+t > modelInfo.MaxContextTokens {
+			break
+		}
+
+		totalToken += t
+		trimmed = append(trimmed, r.Messages[i]) // 直接追加（倒序）
+	}
+	// 反转一下确保最新的历史对话在前面
+	slices.Reverse(trimmed)
+	fullMessages = append(fullMessages, trimmed...)
+
+	// Step 6: 在新对话中返回对话ID和对话标题
 	if r.ConversationID == 0 {
 		var newConversationResp response.Conversation
 		_ = copier.Copy(&newConversationResp, conversation)

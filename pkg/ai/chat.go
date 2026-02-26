@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/bytedance/sonic"
 	"go.uber.org/zap"
@@ -158,4 +159,19 @@ func (c *AIModelClient) ChatStreamWithWriter(
 			}
 		}
 	}
+}
+
+// EstimateTokens 估计文本的 token 数
+func EstimateTokens(text string) int {
+	if text == "" {
+		return 0
+	}
+
+	// 按字符数计算（支持中文）
+	runeCount := utf8.RuneCountInString(text)
+
+	// 安全系数 1.2
+	tokens := int(float64(runeCount) * 1.2)
+
+	return tokens
 }
