@@ -16,7 +16,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/bytedance/sonic"
 	"github.com/gin-gonic/gin"
@@ -31,6 +34,12 @@ type BrowserAgentService struct {
 	AIProviderRepo   *repository.AIProviderRepo
 	AIModelClient    *ai.AIModelClient
 	GormTX           *db.GormTransactionManager
+
+	// LLM 配置内存缓存（每 10 分钟刷新一次）
+	llmCacheMu     sync.Mutex
+	llmProvider    *entity.AIProvider
+	llmModel       *entity.AIModel
+	llmCacheExpire time.Time
 }
 
 func NewBrowserAgentService(
@@ -188,7 +197,7 @@ func (s *BrowserAgentService) ListActions(c *gin.Context, req *request.GetAction
 // 4. 任务处理
 // =========================
 
-func (s *BrowserAgentService) HandleTask(c context.Context, messageID int64, pageState *ws.PageState) (*ws.Action, error) {
+func (s *BrowserAgentService) HandleTask(c context.Context, messageID int64, pageState *ws.PageState) ([]*ws.Action, error) {
 	msg, err := s.BrowserAgentRepo.GetMessageByID(c, messageID)
 	if err != nil {
 		return nil, err
@@ -220,24 +229,29 @@ func (s *BrowserAgentService) HandleTask(c context.Context, messageID int64, pag
 
 	zap.L().Info("可交互元素", zap.Strings("elements", elements))
 
-	action, err := s.decideAction(c, msg.Content, pageState)
+	actions, err := s.decideAction(c, msg.Content, pageState)
 	if err != nil {
 		return nil, err
 	}
 
-	dbAction := s.wsActionToEntity(messageID, action)
-	if err = s.BrowserAgentRepo.CreateAction(c, dbAction); err != nil {
-		return nil, err
+	// 所有动作存入数据库
+	for _, action := range actions {
+		dbAction := s.wsActionToEntity(messageID, action)
+		if err = s.BrowserAgentRepo.CreateAction(c, dbAction); err != nil {
+			return nil, err
+		}
+		action.ActionID = dbAction.ID
 	}
 
-	action.ActionID = dbAction.ID
+	s.logAction("首次决策", actions[0])
+	if len(actions) > 1 {
+		zap.L().Info("多动作模式", zap.Int("count", len(actions)))
+	}
 
-	s.logAction("首次决策", action)
-
-	return action, nil
+	return actions, nil
 }
 
-func (s *BrowserAgentService) HandleResult(c context.Context, msg *ws.ClientMessage) (*ws.Action, bool, error) {
+func (s *BrowserAgentService) HandleResult(c context.Context, msg *ws.ClientMessage) ([]*ws.Action, bool, error) {
 	zap.L().Info("========== 收到执行结果 ==========",
 		zap.Int64("actionID", msg.ActionID),
 		zap.Int64("messageID", msg.MessageID),
@@ -247,9 +261,9 @@ func (s *BrowserAgentService) HandleResult(c context.Context, msg *ws.ClientMess
 
 	var errPtr *string
 	if msg.Error != "" {
-		errPtr = &msg.Error
+		errPtr = new(msg.Error)
 	}
-	execTimePtr := &msg.ExecutionTime
+	execTimePtr := new(msg.ExecutionTime)
 
 	if !msg.Success {
 		zap.L().Error("操作执行失败",
@@ -289,7 +303,7 @@ func (s *BrowserAgentService) HandleResult(c context.Context, msg *ws.ClientMess
 		)
 	}
 
-	nextAction, finished, err := s.decideNextAction(c, pageState, msg.Task)
+	nextActions, finished, err := s.decideNextAction(c, pageState, msg.Task, action.MessageID)
 	if err != nil {
 		return nil, false, err
 	}
@@ -302,28 +316,34 @@ func (s *BrowserAgentService) HandleResult(c context.Context, msg *ws.ClientMess
 		return nil, true, nil
 	}
 
-	dbAction := s.wsActionToEntity(action.MessageID, nextAction)
-	if err = s.BrowserAgentRepo.CreateAction(c, dbAction); err != nil {
-		return nil, false, err
+	// 所有动作存入数据库
+	for _, nextAction := range nextActions {
+		dbAction := s.wsActionToEntity(action.MessageID, nextAction)
+		if err = s.BrowserAgentRepo.CreateAction(c, dbAction); err != nil {
+			return nil, false, err
+		}
+		nextAction.ActionID = dbAction.ID
 	}
 
-	nextAction.ActionID = dbAction.ID
+	s.logAction("下一步决策", nextActions[0])
+	if len(nextActions) > 1 {
+		zap.L().Info("多动作模式", zap.Int("count", len(nextActions)))
+	}
 
-	s.logAction("下一步决策", nextAction)
-
-	return nextAction, false, nil
+	return nextActions, false, nil
 }
 
 func (s *BrowserAgentService) wsActionToEntity(messageID int64, action *ws.Action) *entity.BrowserAgentAction {
 	return &entity.BrowserAgentAction{
-		MessageID:  messageID,
-		ActionType: action.Action,
-		Status:     entity.ActionStatusPending,
-		URL:        action.URL,
-		Selector:   action.Selector,
-		Value:      action.Value,
-		Distance:   action.Distance,
-		Timeout:    action.Timeout,
+		MessageID:    messageID,
+		ActionType:   action.Action,
+		ElementIndex: action.Index,
+		Status:       entity.ActionStatusPending,
+		URL:          action.URL,
+		Selector:     action.Selector,
+		Value:        action.Value,
+		Distance:     action.Distance,
+		Timeout:      action.Timeout,
 	}
 }
 
@@ -332,6 +352,10 @@ func (s *BrowserAgentService) logAction(stage string, action *ws.Action) {
 		zap.String("stage", stage),
 		zap.Int64("actionID", action.ActionID),
 		zap.String("action", action.Action),
+	}
+
+	if action.Index != nil {
+		fields = append(fields, zap.Int("index", *action.Index))
 	}
 
 	switch action.Action {
@@ -375,37 +399,48 @@ func (s *BrowserAgentService) callLLM(
 	promptText string,
 ) (string, error) {
 
-	provider, err := s.AIProviderRepo.GetAIProviderByIDWithCache(c, llmid.BrowserProviderID)
+	// 获取 LLM 配置（内存缓存 10 分钟，过期后重新查 Redis）
+	provider, modelInfo, err := s.getLLMConfig(c)
 	if err != nil {
-		zap.L().Error("获取浏览器智谱模型供应商失败", zap.Error(err))
-		return "", fmt.Errorf("获取浏览器智谱模型供应商失败: %w", err)
+		return "", err
 	}
 
-	modelInfo, err := s.AIModelRepo.GetAIModelByIDWithCache(c, llmid.BrowserModelID)
-	if err != nil {
-		zap.L().Error("获取浏览器智谱模型失败", zap.Error(err))
-		return "", fmt.Errorf("获取浏览器智谱模型失败: %w", err)
+	const maxRetries = 3
+	var respJSON []byte
+	var lastErr error
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		respJSON, lastErr = s.AIModelClient.ChatRequest(
+			c,
+			provider.BaseURL+modelInfo.APIPath,
+			provider.APIKey,
+			ai.DefaultChatRequest(
+				modelInfo.Model,
+				[]ai.ChatMessage{
+					{Role: "system", Content: systemPrompt},
+					{Role: "user", Content: promptText},
+				},
+			),
+		)
+		if lastErr == nil {
+			break
+		}
+		zap.L().Warn("调用LLM失败，准备重试",
+			zap.Int("attempt", attempt),
+			zap.Int("maxRetries", maxRetries),
+			zap.Error(lastErr),
+		)
+		if attempt < maxRetries {
+			time.Sleep(time.Duration(attempt) * time.Second)
+		}
 	}
-
-	respJSON, err := s.AIModelClient.ChatRequest(
-		c,
-		provider.BaseURL+modelInfo.APIPath,
-		provider.APIKey,
-		ai.DefaultChatRequest(
-			modelInfo.Model,
-			[]ai.ChatMessage{
-				{Role: "system", Content: systemPrompt},
-				{Role: "user", Content: promptText},
-			},
-		),
-	)
-	if err != nil {
-		zap.L().Error("调用LLM失败", zap.String("promptText", promptText), zap.Error(err))
-		return "", fmt.Errorf("调用LLM失败: %w", err)
+	if lastErr != nil {
+		zap.L().Error("调用LLM失败（已重试"+strconv.Itoa(maxRetries)+"次）",
+			zap.String("promptText", promptText), zap.Error(lastErr))
+		return "", fmt.Errorf("调用LLM失败（已重试%d次）: %w", maxRetries, lastErr)
 	}
 
 	var browserResp ai.ChatCompletionResponse
-	if err = sonic.Unmarshal(respJSON, &browserResp); err != nil {
+	if err := sonic.Unmarshal(respJSON, &browserResp); err != nil {
 		zap.L().Error("解析 LLM 原始响应失败", zap.Error(err))
 		return "", fmt.Errorf("解析 LLM 原始响应失败: %w", err)
 	}
@@ -434,11 +469,45 @@ func (s *BrowserAgentService) callLLM(
 	return cleanJSON, nil
 }
 
+// getLLMConfig 获取 LLM 供应商和模型配置，内存缓存 10 分钟
+func (s *BrowserAgentService) getLLMConfig(c context.Context) (*entity.AIProvider, *entity.AIModel, error) {
+	s.llmCacheMu.Lock()
+	defer s.llmCacheMu.Unlock()
+
+	now := time.Now()
+	if s.llmProvider != nil && s.llmModel != nil && now.Before(s.llmCacheExpire) {
+		return s.llmProvider, s.llmModel, nil
+	}
+
+	// 缓存过期或首次调用，重新查询
+	provider, err := s.AIProviderRepo.GetAIProviderByIDWithCache(c, llmid.BrowserProviderID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("获取浏览器模型供应商失败: %w", err)
+	}
+
+	model, err := s.AIModelRepo.GetAIModelByIDWithCache(c, llmid.BrowserModelID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("获取浏览器模型失败: %w", err)
+	}
+
+	s.llmProvider = provider
+	s.llmModel = model
+	s.llmCacheExpire = now.Add(scheduler.BrowserAgentLLMCacheTTL)
+
+	zap.L().Debug("LLM 配置缓存已刷新",
+		zap.String("provider", provider.Name),
+		zap.String("model", model.Model),
+		zap.Time("nextRefresh", s.llmCacheExpire),
+	)
+
+	return provider, model, nil
+}
+
 func (s *BrowserAgentService) decideAction(
 	c context.Context,
 	task string,
 	pageState *ws.PageState,
-) (*ws.Action, error) {
+) ([]*ws.Action, error) {
 
 	zap.L().Info(
 		"开始智能任务处理",
@@ -453,21 +522,30 @@ func (s *BrowserAgentService) decideAction(
 		return nil, err
 	}
 
-	action, err := s.parseAction(resp)
+	actions, err := s.parseAgentOutput(resp)
 	if err != nil {
 		return nil, err
 	}
 
-	return action, s.validateAction(action)
+	for _, action := range actions {
+		if err = s.validateAction(action); err != nil {
+			return nil, err
+		}
+	}
+
+	return actions, nil
 }
 
 func (s *BrowserAgentService) decideNextAction(
 	c context.Context,
 	pageState *ws.PageState,
 	task string,
-) (*ws.Action, bool, error) {
+	messageID int64,
+) ([]*ws.Action, bool, error) {
 
-	nextActionPrompt := s.buildNextPrompt(pageState, task)
+	// 获取已完成的操作历史，帮助 AI 判断任务进度
+	completedActions := s.buildCompletedActionsSummary(c, messageID)
+	nextActionPrompt := s.buildNextPrompt(pageState, task, completedActions)
 
 	resp, err := s.callLLM(c, prompt.BrowserSystemPrompt, nextActionPrompt)
 	if err != nil {
@@ -479,12 +557,121 @@ func (s *BrowserAgentService) decideNextAction(
 		return nil, true, nil
 	}
 
-	action, err := s.parseAction(resp)
+	actions, err := s.parseAgentOutput(resp)
 	if err != nil {
 		return nil, false, err
 	}
 
-	return action, false, s.validateAction(action)
+	for _, action := range actions {
+		if err = s.validateAction(action); err != nil {
+			return nil, false, err
+		}
+	}
+
+	return actions, false, nil
+}
+
+// parseAgentOutput 解析 LLM 返回的结构化输出
+// 支持单动作和多动作格式，返回动作列表
+func (s *BrowserAgentService) parseAgentOutput(resp string) ([]*ws.Action, error) {
+	var output ws.AgentOutput
+	zap.L().Debug("LLM返回结果", zap.String("response", resp))
+	if err := sonic.Unmarshal([]byte(resp), &output); err != nil {
+		// 降级：尝试直接作为 Action 解析（兼容旧格式）
+		var action ws.Action
+		if err2 := sonic.Unmarshal([]byte(resp), &action); err2 == nil && action.Action != "" {
+			return []*ws.Action{&action}, nil
+		}
+		return nil, fmt.Errorf("解析 AgentOutput 失败: %w", err)
+	}
+
+	// 记录结构化思维
+	if output.Thinking != "" {
+		zap.L().Debug("思维链", zap.String("thinking", output.Thinking))
+	}
+	if output.Evaluation != "" {
+		zap.L().Debug("上步评估", zap.String("evaluation", output.Evaluation))
+	}
+	if output.Memory != "" {
+		zap.L().Debug("任务记忆", zap.String("memory", output.Memory))
+	}
+	if output.NextGoal != "" {
+		zap.L().Debug("下一步目标", zap.String("next_goal", output.NextGoal))
+	}
+
+	// 优先处理多动作
+	if len(output.Actions) > 0 {
+		actions := make([]*ws.Action, 0, len(output.Actions))
+		for _, a := range output.Actions {
+			action := &ws.Action{
+				Action: a.Action,
+				Index:  a.Index,
+			}
+			if a.Selector != nil {
+				action.Selector = a.Selector
+			}
+			if a.Value != nil {
+				action.Value = a.Value
+			}
+			if a.URL != nil {
+				action.URL = a.URL
+			}
+			if a.Distance != nil {
+				action.Distance = a.Distance
+			}
+			if a.Timeout != nil {
+				action.Timeout = a.Timeout
+			}
+			actions = append(actions, action)
+		}
+		return actions, nil
+	}
+
+	// 单动作模式
+	if output.Action != "" {
+		action := &ws.Action{
+			Action: output.Action,
+		}
+
+		// 从原始 JSON 提取 index、selector、value 等字段
+		var rawMap map[string]any
+		if err := sonic.Unmarshal([]byte(resp), &rawMap); err == nil {
+			if idx, ok := rawMap["index"]; ok {
+				if idxFloat, ok := idx.(float64); ok {
+					action.Index = new(int(idxFloat))
+				}
+			}
+			if sel, ok := rawMap["selector"]; ok {
+				if selStr, ok := sel.(string); ok {
+					action.Selector = new(selStr)
+				}
+			}
+			if val, ok := rawMap["value"]; ok {
+				if valStr, ok := val.(string); ok {
+					action.Value = new(valStr)
+				}
+			}
+			if url, ok := rawMap["url"]; ok {
+				if urlStr, ok := url.(string); ok {
+					action.URL = new(urlStr)
+				}
+			}
+			if dist, ok := rawMap["distance"]; ok {
+				if distFloat, ok := dist.(float64); ok {
+					action.Distance = new(int(distFloat))
+				}
+			}
+			if timeout, ok := rawMap["timeout"]; ok {
+				if timeoutFloat, ok := timeout.(float64); ok {
+					action.Timeout = new(int(timeoutFloat))
+				}
+			}
+		}
+
+		return []*ws.Action{action}, nil
+	}
+
+	return nil, errors.New("LLM 输出中未找到有效动作")
 }
 
 // =========================
@@ -501,14 +688,108 @@ func (s *BrowserAgentService) buildPrompt(
 		s.buildPageStateSection(pageState)
 }
 
+// buildCompletedActionsSummary 生成已执行操作的摘要，供 AI 评估任务进度
+func (s *BrowserAgentService) buildCompletedActionsSummary(c context.Context, messageID int64) []string {
+	actions, err := s.BrowserAgentRepo.ListActionsByMessageID(c, messageID)
+	if err != nil {
+		return nil
+	}
+
+	var summary []string
+	step := 0
+	for _, a := range actions {
+		// 跳过未执行的操作（多动作批次中排在后面的）
+		if a.Status == entity.ActionStatusPending || a.Status == entity.ActionStatusRunning {
+			continue
+		}
+		step++
+		desc := fmt.Sprintf("%d. [%s]", step, a.ActionType)
+		switch a.ActionType {
+		case "goto":
+			if a.URL != nil {
+				desc += fmt.Sprintf(" %s", *a.URL)
+			}
+		case "click":
+			if a.ElementIndex != nil {
+				desc += fmt.Sprintf(" 元素[%d]", *a.ElementIndex)
+			} else if a.Selector != nil {
+				desc += fmt.Sprintf(" %s", *a.Selector)
+			}
+		case "input":
+			if a.ElementIndex != nil {
+				desc += fmt.Sprintf(" 元素[%d]", *a.ElementIndex)
+			} else if a.Selector != nil {
+				desc += fmt.Sprintf(" %s", *a.Selector)
+			}
+			if a.Value != nil {
+				desc += fmt.Sprintf(": \"%s\"", *a.Value)
+			}
+		case "select":
+			if a.ElementIndex != nil {
+				desc += fmt.Sprintf(" 元素[%d]", *a.ElementIndex)
+			} else if a.Selector != nil {
+				desc += fmt.Sprintf(" %s", *a.Selector)
+			}
+			if a.Value != nil {
+				desc += fmt.Sprintf(" → \"%s\"", *a.Value)
+			}
+		case "scroll":
+			if a.Distance != nil {
+				desc += fmt.Sprintf(" 距离%d", *a.Distance)
+			}
+		case "wait":
+			if a.Timeout != nil {
+				desc += fmt.Sprintf(" %dms", *a.Timeout)
+			}
+		}
+		// 标记失败的操作
+		if a.Status == entity.ActionStatusFailed {
+			desc += " (失败)"
+		}
+		summary = append(summary, desc)
+	}
+	return summary
+}
+
 func (s *BrowserAgentService) buildNextPrompt(
 	pageState *ws.PageState,
 	task string,
+	completedActions []string,
 ) string {
+	var sb strings.Builder
+	sb.WriteString("【任务进度评估】\n\n")
+	sb.WriteString("原始任务: " + task + "\n\n")
 
-	return "【继续执行当前任务】\n\n" +
-		"原始任务:" + task + "\n\n" +
-		s.buildPageStateSection(pageState)
+	if len(completedActions) > 0 {
+		sb.WriteString(fmt.Sprintf("已完成操作（共 %d 步）:\n", len(completedActions)))
+		for _, a := range completedActions {
+			sb.WriteString(a + "\n")
+		}
+		sb.WriteString("\n")
+	}
+
+	sb.WriteString(s.buildPageStateSection(pageState))
+
+	sb.WriteString("\n请先判断原始任务是否已完成：\n")
+	sb.WriteString("- 对比「原始任务」和「已完成操作」，确认所有步骤是否已执行\n")
+	sb.WriteString("- 如果任务目标已达成，返回 finish_task\n")
+	sb.WriteString("- 如果还有未完成步骤，返回下一步操作\n")
+
+	return sb.String()
+}
+
+// maxElementsInPrompt 限制发送给 LLM 的最大元素数量，超出时截断以减少 token 消耗
+const maxElementsInPrompt = 60
+
+// truncateElementText 截断客户端传来的元素索引文本，保留前 max 行
+func truncateElementText(text string, maxLines int) string {
+	lines := strings.Split(text, "\n")
+	if len(lines) <= maxLines {
+		return text
+	}
+	truncated := strings.Join(lines[:maxLines], "\n")
+	truncated += fmt.Sprintf("\n\n... 已省略 %d 个元素（共 %d 个）", len(lines)-maxLines, len(lines))
+	return truncated
 }
 
 func (s *BrowserAgentService) buildPageStateSection(pageState *ws.PageState) string {
@@ -535,47 +816,75 @@ func (s *BrowserAgentService) buildPageStateSection(pageState *ws.PageState) str
 		))
 	}
 
-	sb.WriteString("\n【可交互元素】\n")
-	for i, elem := range pageState.Elements {
-		sb.WriteString(fmt.Sprintf("%d. ", i+1))
-
-		switch elem.Tag {
-		case "input", "textarea":
-			typeInfo := "text"
-			if elem.Type != nil {
-				typeInfo = *elem.Type
-			}
-			labelInfo := elem.Text
-			if elem.Label != nil && *elem.Label != "" {
-				labelInfo = *elem.Label
-			}
-			sb.WriteString(fmt.Sprintf("[%s] label=\"%s\"", typeInfo, labelInfo))
-			if elem.Value != nil && *elem.Value != "" {
-				sb.WriteString(fmt.Sprintf(" value=\"%s\"", *elem.Value))
-			}
-			sb.WriteString(fmt.Sprintf(" selector=%s", elem.Selector))
-
-		case "select":
-			labelInfo := elem.Text
-			if elem.Label != nil && *elem.Label != "" {
-				labelInfo = *elem.Label
-			}
-			sb.WriteString(fmt.Sprintf("[select] label=\"%s\" selector=%s", labelInfo, elem.Selector))
-
-		case "button":
-			sb.WriteString(fmt.Sprintf("[button] text=\"%s\" selector=%s", elem.Text, elem.Selector))
-
-		case "a":
-			sb.WriteString(fmt.Sprintf("[link] text=\"%s\" selector=%s", elem.Text, elem.Selector))
-
-		default:
-			sb.WriteString(fmt.Sprintf("[%s] text=\"%s\" selector=%s", elem.Tag, elem.Text, elem.Selector))
+	// 优先使用客户端生成的编号索引文本
+	if pageState.ElementText != "" {
+		sb.WriteString("\n【可交互元素】\n")
+		sb.WriteString(truncateElementText(pageState.ElementText, maxElementsInPrompt))
+	} else {
+		// 降级：使用旧格式
+		sb.WriteString("\n【可交互元素】\n")
+		elements := pageState.Elements
+		if len(elements) > maxElementsInPrompt {
+			zap.L().Warn("元素数量超出上限，已截断",
+				zap.Int("total", len(elements)),
+				zap.Int("kept", maxElementsInPrompt),
+			)
+			elements = elements[:maxElementsInPrompt]
 		}
-
-		sb.WriteString("\n")
+		for i, elem := range elements {
+			sb.WriteString(fmt.Sprintf("%d. ", i))
+			sb.WriteString(s.formatElementText(&elem))
+			sb.WriteString("\n")
+		}
 	}
 
 	return sb.String()
+}
+
+func (s *BrowserAgentService) formatElementText(elem *ws.PageElement) string {
+	tag := elem.Tag
+	attrs := []string{}
+
+	if elem.Type != nil && *elem.Type != tag {
+		attrs = append(attrs, fmt.Sprintf(`type="%s"`, *elem.Type))
+	}
+	if elem.Role != nil {
+		attrs = append(attrs, fmt.Sprintf(`role="%s"`, *elem.Role))
+	}
+	if elem.AriaLabel != nil {
+		attrs = append(attrs, fmt.Sprintf(`aria-label="%s"`, *elem.AriaLabel))
+	}
+	if elem.AriaExpanded != nil {
+		attrs = append(attrs, fmt.Sprintf(`aria-expanded="%s"`, *elem.AriaExpanded))
+	}
+	if elem.AriaChecked != nil {
+		attrs = append(attrs, fmt.Sprintf(`aria-checked="%s"`, *elem.AriaChecked))
+	}
+	if elem.Required != nil && *elem.Required {
+		attrs = append(attrs, "required")
+	}
+	if elem.Disabled != nil && *elem.Disabled {
+		attrs = append(attrs, "disabled")
+	}
+
+	attrStr := ""
+	if len(attrs) > 0 {
+		attrStr = " " + strings.Join(attrs, " ")
+	}
+
+	text := elem.Text
+	if elem.Label != nil && *elem.Label != "" && *elem.Label != text {
+		text = *elem.Label
+	}
+	if elem.Value != nil && *elem.Value != "" && *elem.Type != "password" {
+		val := *elem.Value
+		if len(val) > 50 {
+			val = val[:50] + "..."
+		}
+		return fmt.Sprintf(`<%s%s> %s (当前值: "%s")`, tag, attrStr, text, val)
+	}
+
+	return fmt.Sprintf(`<%s%s> %s`, tag, attrStr, text)
 }
 
 func (s *BrowserAgentService) buildHistorySection(history []*entity.BrowserAgentMessage) string {
@@ -631,12 +940,16 @@ func (s *BrowserAgentService) validateAction(action *ws.Action) error {
 			return errors.New("goto 缺少 url")
 		}
 	case "click":
-		if action.Selector == nil || *action.Selector == "" {
-			return errors.New("click 缺少 selector")
+		// 支持 index 或 selector 两种定位方式
+		if action.Index == nil && (action.Selector == nil || *action.Selector == "") {
+			return errors.New("click 缺少 index 或 selector")
 		}
 	case "input", "select":
-		if action.Selector == nil || action.Value == nil {
-			return errors.New("input/select 缺少 selector 或 value")
+		if action.Index == nil && (action.Selector == nil || *action.Selector == "") {
+			return fmt.Errorf("%s 缺少 index 或 selector", action.Action)
+		}
+		if action.Value == nil {
+			return fmt.Errorf("%s 缺少 value", action.Action)
 		}
 	case "scroll":
 		if action.Distance == nil {

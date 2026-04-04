@@ -11,4 +11,7 @@ const (
 
 	// BrowserAgentMessageMaxDuration 消息最大允许执行时间
 	BrowserAgentMessageMaxDuration = 60 * time.Minute
+
+	// BrowserAgentLLMCacheTTL LLM 配置（Provider/Model）内存缓存刷新间隔
+	BrowserAgentLLMCacheTTL = 10 * time.Minute
 )

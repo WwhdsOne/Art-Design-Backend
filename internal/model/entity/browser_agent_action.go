@@ -19,6 +19,7 @@ type BrowserAgentAction struct {
 	ID            int64     `gorm:"type:bigint;primaryKey;comment:雪花ID"`
 	MessageID     int64     `gorm:"column:message_id;not null;index;comment:消息ID"`
 	ActionType    string    `gorm:"column:action_type;type:varchar(30);not null;comment:操作类型(goto/click/input/select/scroll/wait)"`
+	ElementIndex  *int      `gorm:"column:element_index;comment:元素编号索引"`
 	Status        string    `gorm:"column:status;type:varchar(20);default:pending;comment:状态"`
 	URL           *string   `gorm:"column:url;type:varchar(500);comment:URL(goto)"`
 	Selector      *string   `gorm:"column:selector;type:varchar(500);comment:选择器(click/input/select)"`

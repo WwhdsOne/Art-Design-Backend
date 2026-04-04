@@ -161,17 +161,34 @@ func (c *AIModelClient) ChatStreamWithWriter(
 	}
 }
 
-// EstimateTokens 估计文本的 token 数
+const (
+	// MessageOverheadTokens represents approximate tokens for role+content metadata per message
+	// Tokenizers vary; typical range is 3-8 tokens. We use 6 for safety to avoid exceeding context limits.
+	MessageOverheadTokens = 6
+
+	// TokenEstimateRatio is a safety factor for character→token estimation
+	// Different tokenizers have different ratios; this is a conservative estimate for mixed content
+	TokenEstimateRatio = 1.2
+
+	// TokenSafetyMargin reserves buffer for response overhead and estimation errors
+	TokenSafetyMargin = 100
+)
+
+// EstimateTokens estimates token count based on character count (supports Chinese)
+// TODO: Replace with tiktoken for model-specific accuracy
 func EstimateTokens(text string) int {
 	if text == "" {
 		return 0
 	}
 
-	// 按字符数计算（支持中文）
+	// Use rune count for proper Chinese character support
 	runeCount := utf8.RuneCountInString(text)
 
-	// 安全系数 1.2
-	tokens := int(float64(runeCount) * 1.2)
+	// Integer arithmetic: 1.2x = x + x/5 (more efficient than float multiplication)
+	return runeCount + runeCount/5
+}
 
-	return tokens
+// EstimateMessageTokens estimates total tokens for a message including overhead
+func EstimateMessageTokens(msg ChatMessage) int {
+	return EstimateTokens(msg.Content) + MessageOverheadTokens
 }

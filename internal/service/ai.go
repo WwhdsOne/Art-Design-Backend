@@ -17,7 +17,6 @@ import (
 	"fmt"
 	"mime/multipart"
 	"net/http"
-	"slices"
 	"strings"
 	"unicode/utf8"
 
@@ -405,29 +404,59 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 		})
 	}
 
-	// Step 5: 先计算后追加用户原始消息
-	totalToken := 0
-	for _, message := range fullMessages {
-		// +6 是因为每个消息的 role 和 content 都要占用部分token
-		// 通常是 3 ~ 8 token 这里取 6 token
-		totalToken += ai.EstimateTokens(message.Content) + 6
+	// Step 5: Trim conversation history to fit within token limits
+	// Reserve buffer for API overhead and estimation errors
+	maxAllowedTokens := modelInfo.MaxContextTokens - ai.TokenSafetyMargin
+	if maxAllowedTokens <= 0 {
+		zap.L().Error("Invalid MaxContextTokens: too small after safety margin",
+			zap.Int("max_context_tokens", modelInfo.MaxContextTokens),
+			zap.Int("safety_margin", ai.TokenSafetyMargin))
+		return fmt.Errorf("invalid MaxContextTokens: %d (too small after safety margin)", modelInfo.MaxContextTokens)
 	}
-	//  Step 5.1: 拼接历史对话
-	trimmed := make([]ai.ChatMessage, 0)
 
-	for i := len(r.Messages) - 1; i >= 0; i-- {
-		t := ai.EstimateTokens(r.Messages[i].Content) + 6
+	// Count tokens in system messages
+	currentTokenCount := 0
+	for _, message := range fullMessages {
+		currentTokenCount += ai.EstimateMessageTokens(message)
+	}
 
-		if totalToken+t > modelInfo.MaxContextTokens {
-			break
+	// Fit as many recent messages as possible (pre-calculate to avoid duplicate work)
+	if len(r.Messages) > 0 {
+		// Pre-calculate token counts for all messages
+		messageTokens := make([]int, len(r.Messages))
+		for i, msg := range r.Messages {
+			messageTokens[i] = ai.EstimateMessageTokens(msg)
 		}
 
-		totalToken += t
-		trimmed = append(trimmed, r.Messages[i]) // 直接追加（倒序）
+		// Find how many messages fit from most recent backwards
+		fittingCount := 0
+		for i := len(r.Messages) - 1; i >= 0; i-- {
+			if currentTokenCount+messageTokens[i] > maxAllowedTokens {
+				break
+			}
+			currentTokenCount += messageTokens[i]
+			fittingCount++
+		}
+
+		// Extract the fitting slice (already in chronological order)
+		if fittingCount > 0 {
+			trimmed := r.Messages[len(r.Messages)-fittingCount:]
+			fullMessages = append(fullMessages, trimmed...)
+
+			if fittingCount < len(r.Messages) {
+				zap.L().Info("Trimmed conversation history to fit token limit",
+					zap.Int("original_messages", len(r.Messages)),
+					zap.Int("kept_messages", fittingCount),
+					zap.Int("tokens_used", currentTokenCount),
+					zap.Int("max_tokens", maxAllowedTokens))
+			}
+		} else {
+			zap.L().Warn("No messages fit within token limit",
+				zap.Int("total_messages", len(r.Messages)),
+				zap.Int("current_tokens", currentTokenCount),
+				zap.Int("max_tokens", maxAllowedTokens))
+		}
 	}
-	// 反转一下确保最新的历史对话在前面
-	slices.Reverse(trimmed)
-	fullMessages = append(fullMessages, trimmed...)
 
 	// Step 6: 在新对话中返回对话ID和对话标题
 	if r.ConversationID == 0 {

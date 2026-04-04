@@ -17,8 +17,8 @@ const (
 )
 
 type BrowserAgentService interface {
-	HandleTask(ctx context.Context, messageID int64, pageState *PageState) (*Action, error)
-	HandleResult(ctx context.Context, msg *ClientMessage) (*Action, bool, error)
+	HandleTask(ctx context.Context, messageID int64, pageState *PageState) ([]*Action, error)
+	HandleResult(ctx context.Context, msg *ClientMessage) ([]*Action, bool, error)
 }
 
 type Client struct {
@@ -103,16 +103,16 @@ func (c *Client) Close() {
 }
 
 func (c *Client) handleTask(msg *ClientMessage) {
-	action, err := c.Service.HandleTask(c.Ctx, msg.MessageID, msg.PageState)
+	actions, err := c.Service.HandleTask(c.Ctx, msg.MessageID, msg.PageState)
 	if err != nil {
 		c.sendError(err.Error())
 		return
 	}
-	c.sendAction(action)
+	c.sendActions(actions)
 }
 
 func (c *Client) handleResult(msg *ClientMessage) {
-	action, finished, err := c.Service.HandleResult(c.Ctx, msg)
+	actions, finished, err := c.Service.HandleResult(c.Ctx, msg)
 	if err != nil {
 		c.sendError(err.Error())
 		return
@@ -121,11 +121,36 @@ func (c *Client) handleResult(msg *ClientMessage) {
 		c.sendFinish("任务已完成")
 		return
 	}
-	c.sendAction(action)
+	c.sendActions(actions)
 }
 
 func (c *Client) sendAction(action *Action) {
 	msg := ServerMessage{Type: "action", Action: action}
+	data, _ := sonic.Marshal(msg)
+	c.Send <- data
+}
+
+// sendActions 根据动作数量选择发送方式：
+// 单动作 → ServerMessage.Action（向后兼容）
+// 多动作 → ServerMessage.Actions + StopOnPageChange
+func (c *Client) sendActions(actions []*Action) {
+	if len(actions) == 0 {
+		return
+	}
+	if len(actions) == 1 {
+		c.sendAction(actions[0])
+		return
+	}
+	// 多动作模式
+	wsActions := make([]Action, len(actions))
+	for i, a := range actions {
+		wsActions[i] = *a
+	}
+	msg := ServerMessage{
+		Type:             "action",
+		Actions:          wsActions,
+		StopOnPageChange: new(true),
+	}
 	data, _ := sonic.Marshal(msg)
 	c.Send <- data
 }

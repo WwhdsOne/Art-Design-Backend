@@ -3,6 +3,7 @@ package ws
 type Action struct {
 	ActionID int64   `json:"action_id,string"`
 	Action   string  `json:"action"`
+	Index    *int    `json:"index,omitempty"`
 	Selector *string `json:"selector,omitempty"`
 	Value    *string `json:"value,omitempty"`
 	URL      *string `json:"url,omitempty"`
@@ -17,14 +18,28 @@ type Position struct {
 	Height float64 `json:"height"`
 }
 
+type SelectOption struct {
+	Value string `json:"value"`
+	Text  string `json:"text"`
+}
+
 type PageElement struct {
-	Tag      string    `json:"tag"`
-	Text     string    `json:"text"`
-	Selector string    `json:"selector"`
-	Value    *string   `json:"value,omitempty"`
-	Type     *string   `json:"type,omitempty"`
-	Label    *string   `json:"label,omitempty"`
-	Position *Position `json:"position,omitempty"`
+	Index       int            `json:"index"`
+	Tag         string         `json:"tag"`
+	Text        string         `json:"text"`
+	Selector    string         `json:"selector"`
+	Value       *string        `json:"value,omitempty"`
+	Type        *string        `json:"type,omitempty"`
+	Label       *string        `json:"label,omitempty"`
+	Role        *string        `json:"role,omitempty"`
+	AriaLabel   *string        `json:"ariaLabel,omitempty"`
+	AriaExpanded *string       `json:"ariaExpanded,omitempty"`
+	AriaChecked  *string       `json:"ariaChecked,omitempty"`
+	Required    *bool          `json:"required,omitempty"`
+	Disabled    *bool          `json:"disabled,omitempty"`
+	Options     []SelectOption `json:"options,omitempty"`
+	IsNew       *bool          `json:"isNew,omitempty"`
+	Position    *Position      `json:"position,omitempty"`
 }
 
 type ScrollInfo struct {
@@ -36,10 +51,21 @@ type ScrollInfo struct {
 }
 
 type PageState struct {
-	URL        string        `json:"url"`
-	Title      string        `json:"title"`
-	Elements   []PageElement `json:"elements"`
-	ScrollInfo *ScrollInfo   `json:"scrollInfo,omitempty"`
+	URL         string        `json:"url"`
+	Title       string        `json:"title"`
+	Elements    []PageElement `json:"elements"`
+	ElementText string       `json:"elementText,omitempty"`
+	ScrollInfo  *ScrollInfo   `json:"scrollInfo,omitempty"`
+}
+
+// AgentOutput 结构化思维输出（LLM 返回的 JSON）
+type AgentOutput struct {
+	Thinking     string   `json:"thinking,omitempty"`
+	Evaluation   string   `json:"evaluation_previous_goal,omitempty"`
+	Memory       string   `json:"memory,omitempty"`
+	NextGoal     string   `json:"next_goal,omitempty"`
+	Action       string   `json:"action,omitempty"`
+	Actions      []Action `json:"actions,omitempty"`
 }
 
 type ClientMessage struct {
@@ -51,10 +77,21 @@ type ClientMessage struct {
 	Error         string     `json:"error,omitempty"`
 	ExecutionTime int        `json:"execution_time,omitempty"`
 	Task          string     `json:"task,omitempty"`
+	// 多动作结果
+	Results       []ActionResult `json:"results,omitempty"`
+}
+
+type ActionResult struct {
+	ActionID      string `json:"action_id"`
+	Success       bool   `json:"success"`
+	ExecutionTime int    `json:"execution_time"`
+	Error         string `json:"error,omitempty"`
 }
 
 type ServerMessage struct {
-	Type    string  `json:"type"`
-	Action  *Action `json:"action,omitempty"`
-	Message string  `json:"message,omitempty"`
+	Type             string    `json:"type"`
+	Action           *Action   `json:"action,omitempty"`
+	Actions          []Action  `json:"actions,omitempty"`
+	StopOnPageChange *bool     `json:"stop_on_page_change,omitempty"`
+	Message          string    `json:"message,omitempty"`
 }

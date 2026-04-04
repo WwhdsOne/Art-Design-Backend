@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+注意，请使用中文回答所有问题和交流
+与用户的所有互动都应该使用中文，包括代码解释和注释，错误信息和建议
 ## Development Commands
 
 ### Build & Test
@@ -238,3 +240,117 @@ Configuration: `.golangci.yml` and `revive.toml`
    - Gzip → Logger → Recovery → ErrorHandler → OperationLogger → RateLimiter → Auth (per-route)
 
 5. **Strong password validator**: Custom validator requires passwords to have uppercase, lowercase, and numbers
+
+## Go 版本新特性（1.25 & 1.26）
+
+项目当前使用 Go 1.26。以下是 1.25（2025.8）和 1.26（2026.2）中常见的、可在本项目中使用的 API 和语法更新。写代码时优先使用新写法。
+
+### Go 1.25 新特性
+
+#### `testing/synctest` 包（稳定版）
+用于测试涉及并发代码（goroutine、channel、定时器）的场景，可精确控制时间推进。
+```go
+import "testing/synctest"
+
+func TestWithTime(t *testing.T) {
+    synctest.Test(t, func(d time.Duration) {
+        // d 是虚拟时钟，可精确控制时间流逝
+        // 适用于测试超时、重试、缓存过期等逻辑
+    })
+}
+```
+
+#### `sync.WaitGroup.Go` 方法
+简化 goroutine 启动模式，替代 `wg.Add(1); go func() { defer wg.Done(); ... }()`。
+```go
+var wg sync.WaitGroup
+wg.Go(func() {
+    // 自动处理 Add/Done
+    doWork()
+})
+wg.Wait()
+```
+
+#### Container 感知的 `GOMAXPROCS`
+在 Docker/Kubernetes 中运行时，`runtime.GOMAXPROCS(0)` 自动感知 cgroup CPU 限制，不再需要手动设置 `automaxprocs`。
+
+#### `os.Root` 类型
+提供安全的文件系统操作根目录，防止路径穿越（path traversal）。
+```go
+root, _ := os.OpenRoot("/data")
+f, _ := root.Open("safe/path.txt")   // 不允许 "../" 等逃逸路径
+```
+
+#### `reflect.TypeAssert` 方法
+类型断言的反射版本，比传统的 `Type.Implements()` 更直接。
+
+### Go 1.26 新特性
+
+#### 表达式 `new()` — 最实用
+`new()` 现在可以接受任意表达式，不再仅限于类型名。大幅简化复合字面量中的指针创建。
+```go
+// 旧写法
+x := 42
+p := &x
+
+// 新写法 — 直接 new 表达式
+p := new(42)
+p := new(3.14)
+p := new(someFunc())
+p := new(User{Name: "test"})
+```
+
+#### 自引用泛型
+类型参数可以引用自身，实现递归类型约束。
+```go
+type Adder[A Adder[A]] interface {
+    Add(A) A
+}
+```
+
+#### `errors.AsType` — 泛型错误匹配
+`errors.As` 的泛型版本，无需声明变量、无需类型断言。
+```go
+// 旧写法
+var timeoutErr *net.OpError
+if errors.As(err, &timeoutErr) {
+    fmt.Println(timeoutErr.Op)
+}
+
+// 新写法 — 更简洁
+if timeoutErr, ok := errors.AsType[*net.OpError](err); ok {
+    fmt.Println(timeoutErr.Op)
+}
+```
+
+#### Green Tea GC（默认启用）
+新一代垃圾回收器，降低 CPU 开销 10-40%。无需代码改动，自动生效。
+
+#### `reflect` 迭代器
+新增 `Type.Fields()`、`Type.Methods()`、`Value.Fields()` 等迭代器方法，替代繁琐的手动遍历。
+```go
+// 遍历结构体字段
+for field, ok := t.Fields(); ok; {
+    fmt.Println(field.Name)
+}
+```
+
+#### `io.ReadAll` 性能提升
+`io.ReadAll` 速度提升约 2x，无需任何代码改动。
+
+#### `bytes.Buffer.Peek` 方法
+`bytes.Buffer` 新增 `Peek(n)` 方法，查看缓冲区前 n 字节但不消耗。
+```go
+buf := bytes.NewBuffer([]byte("hello world"))
+peek, _ := buf.Peek(5)  // "hello"，buf 中的数据不被消耗
+```
+
+#### `log/slog.NewMultiHandler`
+将日志同时输出到多个 handler。
+```go
+handler := slog.NewMultiHandler(fileHandler, consoleHandler)
+logger := slog.New(handler)
+```
+
+#### `go fix` 现代化工具
+`go fix` 全面升级，内置 modernizers 自动将旧写法更新为新写法（如 `errors.AsType` 替换 `errors.As`）。项目 `make fix` 已集成。

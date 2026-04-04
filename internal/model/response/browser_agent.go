@@ -23,6 +23,7 @@ type ActionResponse struct {
 	ID            int64     `json:"id,string"`
 	MessageID     int64     `json:"message_id,string"`
 	ActionType    string    `json:"action_type"`
+	ElementIndex  *int      `json:"element_index,omitempty"`
 	Status        string    `json:"status"`
 	URL           *string   `json:"url,omitempty"`
 	Selector      *string   `json:"selector,omitempty"`
