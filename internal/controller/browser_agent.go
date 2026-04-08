@@ -35,7 +35,7 @@ func NewBrowserAgentController(
 		browserAgentDashboardService: bads,
 		hub:                          hub,
 		upgrader: websocket.Upgrader{
-			ReadBufferSize:  65536,
+			ReadBufferSize:  2 * 1024 * 1024, // 2MB，支持带截图的 PageState
 			WriteBufferSize: 65536,
 			CheckOrigin: func(_ *http.Request) bool {
 				return true

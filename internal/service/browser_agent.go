@@ -40,6 +40,12 @@ type BrowserAgentService struct {
 	llmProvider    *entity.AIProvider
 	llmModel       *entity.AIModel
 	llmCacheExpire time.Time
+
+	// 视觉模型配置缓存
+	visionCacheMu     sync.Mutex
+	visionProvider    *entity.AIProvider
+	visionModel       *entity.AIModel
+	visionCacheExpire time.Time
 }
 
 func NewBrowserAgentService(
@@ -503,6 +509,180 @@ func (s *BrowserAgentService) getLLMConfig(c context.Context) (*entity.AIProvide
 	return provider, model, nil
 }
 
+// getVisionConfig 获取视觉模型供应商和模型配置，内存缓存 10 分钟
+func (s *BrowserAgentService) getVisionConfig(c context.Context) (*entity.AIProvider, *entity.AIModel, error) {
+	s.visionCacheMu.Lock()
+	defer s.visionCacheMu.Unlock()
+
+	now := time.Now()
+	if s.visionProvider != nil && s.visionModel != nil && now.Before(s.visionCacheExpire) {
+		return s.visionProvider, s.visionModel, nil
+	}
+
+	provider, err := s.AIProviderRepo.GetAIProviderByIDWithCache(c, llmid.BrowserVisionProvider)
+	if err != nil {
+		return nil, nil, fmt.Errorf("获取视觉模型供应商失败: %w", err)
+	}
+
+	model, err := s.AIModelRepo.GetAIModelByIDWithCache(c, llmid.BrowserVisionModel)
+	if err != nil {
+		return nil, nil, fmt.Errorf("获取视觉模型失败: %w", err)
+	}
+
+	s.visionProvider = provider
+	s.visionModel = model
+	s.visionCacheExpire = now.Add(scheduler.BrowserAgentLLMCacheTTL)
+
+	zap.L().Debug("视觉模型配置缓存已刷新",
+		zap.String("provider", provider.Name),
+		zap.String("model", model.Model),
+		zap.Time("nextRefresh", s.visionCacheExpire),
+	)
+
+	return provider, model, nil
+}
+
+// callVisionModel 调用视觉模型（GLM-4V-Flash），传入带标签截图和元素文本，返回目标元素索引
+func (s *BrowserAgentService) callVisionModel(
+	c context.Context,
+	screenshotBase64 string,
+	elementText string,
+	task string,
+) ([]int, error) {
+	provider, modelInfo, err := s.getVisionConfig(c)
+	if err != nil {
+		return nil, err
+	}
+
+	// 构造多模态消息
+	dataURI := "data:image/jpeg;base64," + screenshotBase64
+
+	userContent := []ai.MultiModeChatContent{
+		{Type: "image_url", ImageURL: dataURI},
+		{Type: "text", Text: fmt.Sprintf("【用户任务】\n%s\n\n【元素编号索引】\n%s\n\n请根据截图中的标签编号，找出完成用户任务需要的元素。", task, elementText)},
+	}
+
+	messages := []ai.MultiModeChatMessage{
+		{Role: "system", Content: []ai.MultiModeChatContent{
+			{Type: "text", Text: prompt.BrowserVisionPrompt},
+		}},
+		{Role: "user", Content: userContent},
+	}
+
+	const maxRetries = 2
+	var respJSON []byte
+	var lastErr error
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		respJSON, lastErr = s.AIModelClient.MultiModeChatRequest(
+			c,
+			provider.BaseURL+modelInfo.APIPath,
+			provider.APIKey,
+			ai.DefaultMultiModeChatRequest(modelInfo.Model, messages),
+		)
+		if lastErr == nil {
+			break
+		}
+		zap.L().Warn("调用视觉模型失败，准备重试",
+			zap.Int("attempt", attempt),
+			zap.Error(lastErr),
+		)
+	}
+	if lastErr != nil {
+		return nil, fmt.Errorf("调用视觉模型失败: %w", lastErr)
+	}
+
+	// 解析响应
+	var visionResp ai.ChatCompletionResponse
+	if err := sonic.Unmarshal(respJSON, &visionResp); err != nil {
+		return nil, fmt.Errorf("解析视觉模型响应失败: %w", err)
+	}
+
+	rawContent := strings.TrimSpace(visionResp.FirstText())
+	cleanJSON, err := ai.ExtractJSONFromLLMOutput(rawContent)
+	if err != nil {
+		return nil, fmt.Errorf("提取视觉模型JSON失败: %w", err)
+	}
+
+	// 解析目标索引
+	var visionOutput struct {
+		Thinking      string `json:"thinking"`
+		TargetIndices []int  `json:"target_indices"`
+		Confidence    string `json:"confidence"`
+	}
+	if err := sonic.Unmarshal([]byte(cleanJSON), &visionOutput); err != nil {
+		return nil, fmt.Errorf("解析视觉模型输出失败: %w", err)
+	}
+
+	zap.L().Info("视觉模型分析结果",
+		zap.String("thinking", visionOutput.Thinking),
+		zap.Ints("targetIndices", visionOutput.TargetIndices),
+		zap.String("confidence", visionOutput.Confidence),
+	)
+
+	return visionOutput.TargetIndices, nil
+}
+
+// visionFallback 视觉模型回退：当文本模型请求视觉辅助时，调用视觉模型获取目标元素索引
+func (s *BrowserAgentService) visionFallback(
+	c context.Context,
+	pageState *ws.PageState,
+	task string,
+	textModelResp string,
+) ([]*ws.Action, error) {
+	// 调用视觉模型获取目标元素索引
+	targetIndices, err := s.callVisionModel(
+		c,
+		pageState.Screenshot,
+		pageState.ElementText,
+		task,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(targetIndices) == 0 {
+		return nil, errors.New("视觉模型未找到目标元素")
+	}
+
+	// 从文本模型的原始输出中提取动作意图（action 类型和 value）
+	actionType, actionValue := s.extractActionIntent(textModelResp)
+
+	// 构造标准 Action 列表
+	actions := make([]*ws.Action, 0, len(targetIndices))
+	for _, idx := range targetIndices {
+		action := &ws.Action{
+			Action: actionType,
+			Index:  new(idx),
+		}
+		if actionValue != "" {
+			action.Value = new(actionValue)
+		}
+		actions = append(actions, action)
+	}
+
+	// 校验
+	for _, action := range actions {
+		if err := s.validateAction(action); err != nil {
+			return nil, err
+		}
+	}
+
+	return actions, nil
+}
+
+// extractActionIntent 从文本模型的原始输出中提取动作意图
+func (s *BrowserAgentService) extractActionIntent(textModelResp string) (actionType string, value string) {
+	var partial struct {
+		Action string `json:"action"`
+		Value  string `json:"value,omitempty"`
+	}
+	if err := sonic.Unmarshal([]byte(textModelResp), &partial); err == nil && partial.Action != "" {
+		return partial.Action, partial.Value
+	}
+	// 默认：点击
+	return "click", ""
+}
+
 func (s *BrowserAgentService) decideAction(
 	c context.Context,
 	task string,
@@ -520,6 +700,17 @@ func (s *BrowserAgentService) decideAction(
 	resp, err := s.callLLM(c, prompt.BrowserSystemPrompt, decidePrompt)
 	if err != nil {
 		return nil, err
+	}
+
+	// 检测文本模型是否请求视觉辅助
+	var agentOutput ws.AgentOutput
+	if err := sonic.Unmarshal([]byte(resp), &agentOutput); err == nil && agentOutput.NeedVision && pageState.Screenshot != "" {
+		zap.L().Info("文本模型请求视觉辅助，调用视觉模型")
+		visionActions, visionErr := s.visionFallback(c, pageState, task, resp)
+		if visionErr == nil && len(visionActions) > 0 {
+			return visionActions, nil
+		}
+		zap.L().Warn("视觉模型调用失败，回退到文本模型结果", zap.Error(visionErr))
 	}
 
 	actions, err := s.parseAgentOutput(resp)
@@ -555,6 +746,17 @@ func (s *BrowserAgentService) decideNextAction(
 	if strings.Contains(resp, `"action":"finish_task"`) ||
 		strings.Contains(resp, `"action": "finish_task"`) {
 		return nil, true, nil
+	}
+
+	// 检测文本模型是否请求视觉辅助
+	var agentOutput ws.AgentOutput
+	if err := sonic.Unmarshal([]byte(resp), &agentOutput); err == nil && agentOutput.NeedVision && pageState.Screenshot != "" {
+		zap.L().Info("文本模型请求视觉辅助，调用视觉模型")
+		visionActions, visionErr := s.visionFallback(c, pageState, task, resp)
+		if visionErr == nil && len(visionActions) > 0 {
+			return visionActions, false, nil
+		}
+		zap.L().Warn("视觉模型调用失败，回退到文本模型结果", zap.Error(visionErr))
 	}
 
 	actions, err := s.parseAgentOutput(resp)

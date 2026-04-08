@@ -56,6 +56,7 @@ type PageState struct {
 	Elements    []PageElement `json:"elements"`
 	ElementText string       `json:"elementText,omitempty"`
 	ScrollInfo  *ScrollInfo   `json:"scrollInfo,omitempty"`
+	Screenshot  string       `json:"screenshot,omitempty"` // base64 编码的带标签截图
 }
 
 // AgentOutput 结构化思维输出（LLM 返回的 JSON）
@@ -66,6 +67,7 @@ type AgentOutput struct {
 	NextGoal     string   `json:"next_goal,omitempty"`
 	Action       string   `json:"action,omitempty"`
 	Actions      []Action `json:"actions,omitempty"`
+	NeedVision   bool     `json:"need_vision,omitempty"` // 文本模型请求视觉模型辅助
 }
 
 type ClientMessage struct {

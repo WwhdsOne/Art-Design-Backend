@@ -13,7 +13,7 @@ const (
 	writeWait      = 10 * time.Second
 	pongWait       = 60 * time.Second
 	pingPeriod     = (pongWait * 9) / 10
-	maxMessageSize = 65536
+	maxMessageSize = 2 * 1024 * 1024 // 2MB，支持带截图的 PageState
 )
 
 type BrowserAgentService interface {
