@@ -670,6 +670,21 @@ func (s *BrowserAgentService) visionFallback(
 	return actions, nil
 }
 
+// tryVisionFallback 检测 need_vision 标志，若触发则调用视觉模型回退
+// 返回视觉模型生成的动作列表；未触发或失败时返回 nil
+func (s *BrowserAgentService) tryVisionFallback(c context.Context, pageState *ws.PageState, task, resp string, output *ws.AgentOutput) []*ws.Action {
+	if !output.NeedVision || pageState.Screenshot == "" {
+		return nil
+	}
+	zap.L().Info("文本模型请求视觉辅助，调用视觉模型")
+	visionActions, err := s.visionFallback(c, pageState, task, resp)
+	if err == nil && len(visionActions) > 0 {
+		return visionActions
+	}
+	zap.L().Warn("视觉模型调用失败，回退到文本模型结果", zap.Error(err))
+	return nil
+}
+
 // extractActionIntent 从文本模型的原始输出中提取动作意图
 func (s *BrowserAgentService) extractActionIntent(textModelResp string) (actionType string, value string) {
 	var partial struct {
@@ -702,18 +717,16 @@ func (s *BrowserAgentService) decideAction(
 		return nil, err
 	}
 
-	// 检测文本模型是否请求视觉辅助
-	var agentOutput ws.AgentOutput
-	if err := sonic.Unmarshal([]byte(resp), &agentOutput); err == nil && agentOutput.NeedVision && pageState.Screenshot != "" {
-		zap.L().Info("文本模型请求视觉辅助，调用视觉模型")
-		visionActions, visionErr := s.visionFallback(c, pageState, task, resp)
-		if visionErr == nil && len(visionActions) > 0 {
+	var preParsed *ws.AgentOutput
+	var ao ws.AgentOutput
+	if sonic.Unmarshal([]byte(resp), &ao) == nil {
+		preParsed = &ao
+		if visionActions := s.tryVisionFallback(c, pageState, task, resp, &ao); visionActions != nil {
 			return visionActions, nil
 		}
-		zap.L().Warn("视觉模型调用失败，回退到文本模型结果", zap.Error(visionErr))
 	}
 
-	actions, err := s.parseAgentOutput(resp)
+	actions, err := s.parseAgentOutput(resp, preParsed)
 	if err != nil {
 		return nil, err
 	}
@@ -748,18 +761,16 @@ func (s *BrowserAgentService) decideNextAction(
 		return nil, true, nil
 	}
 
-	// 检测文本模型是否请求视觉辅助
-	var agentOutput ws.AgentOutput
-	if err := sonic.Unmarshal([]byte(resp), &agentOutput); err == nil && agentOutput.NeedVision && pageState.Screenshot != "" {
-		zap.L().Info("文本模型请求视觉辅助，调用视觉模型")
-		visionActions, visionErr := s.visionFallback(c, pageState, task, resp)
-		if visionErr == nil && len(visionActions) > 0 {
+	var preParsed *ws.AgentOutput
+	var ao ws.AgentOutput
+	if sonic.Unmarshal([]byte(resp), &ao) == nil {
+		preParsed = &ao
+		if visionActions := s.tryVisionFallback(c, pageState, task, resp, &ao); visionActions != nil {
 			return visionActions, false, nil
 		}
-		zap.L().Warn("视觉模型调用失败，回退到文本模型结果", zap.Error(visionErr))
 	}
 
-	actions, err := s.parseAgentOutput(resp)
+	actions, err := s.parseAgentOutput(resp, preParsed)
 	if err != nil {
 		return nil, false, err
 	}
@@ -775,10 +786,12 @@ func (s *BrowserAgentService) decideNextAction(
 
 // parseAgentOutput 解析 LLM 返回的结构化输出
 // 支持单动作和多动作格式，返回动作列表
-func (s *BrowserAgentService) parseAgentOutput(resp string) ([]*ws.Action, error) {
+func (s *BrowserAgentService) parseAgentOutput(resp string, preParsed *ws.AgentOutput) ([]*ws.Action, error) {
 	var output ws.AgentOutput
 	zap.L().Debug("LLM返回结果", zap.String("response", resp))
-	if err := sonic.Unmarshal([]byte(resp), &output); err != nil {
+	if preParsed != nil {
+		output = *preParsed
+	} else if err := sonic.Unmarshal([]byte(resp), &output); err != nil {
 		// 降级：尝试直接作为 Action 解析（兼容旧格式）
 		var action ws.Action
 		if err2 := sonic.Unmarshal([]byte(resp), &action); err2 == nil && action.Action != "" {
