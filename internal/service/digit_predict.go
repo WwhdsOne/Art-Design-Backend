@@ -19,7 +19,7 @@ import (
 type DigitPredictService struct {
 	DigitPredictRepo   *repository.DigitPredictRepo
 	DigitPredictClient *digit_client.DigitPredict
-	OssClient          *aliyun.OssClient // 阿里云OSS
+	OssClient          *aliyun.OssClient
 }
 
 func (d *DigitPredictService) GetDigitPredictList(c context.Context, createdBy int64) (digitPredictList []*response.DigitPredict, err error) {

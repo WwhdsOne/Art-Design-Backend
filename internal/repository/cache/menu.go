@@ -3,14 +3,13 @@ package cache
 import (
 	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/internal/model/response"
+	"Art-Design-Backend/internal/repository/cachex"
 	"Art-Design-Backend/pkg/constant/rediskey"
 	"Art-Design-Backend/pkg/errors"
 	"Art-Design-Backend/pkg/redisx"
 	"fmt"
 	"slices"
 	"strings"
-
-	"github.com/bytedance/sonic"
 )
 
 type MenuCache struct {
@@ -32,78 +31,47 @@ func NewMenuCache(redis *redisx.RedisWrapper) *MenuCache {
 //     用户拥有角色1,2和3 → "MENU:LIST:ROLE:1_2_3")
 //
 // 2. 反向依赖关系表：
-//
 //   - 数据结构：Redis Set
-//
 //   - 键格式:   "MENU:ROLE:DEPENDENCIES:{roleID}"
-//
 //   - 值内容：  所有包含该roleID的用户菜单缓存键集合
-//     (例如："MENU:ROLE:DEPENDENCIES:1" 包含 ["MENU:LIST:ROLE:1_2", "MENU:LIST:ROLE:1_3"])
 //
-//     3. 缓存失效机制：
-//     当角色权限变更时：
-//     a) 根据 roleID 从 "MENU:ROLE:DEPENDENCIES:{roleID}" 获取所有关联缓存键
-//     b) 批量删除这些用户菜单缓存
-//     c) 最后清理该角色的依赖记录
-//
-// 示例流程：
-//   - 用户A(角色1,2) → 缓存键: "MENU:LIST:ROLE:1_2"
-//   - 用户B(角色1,3) → 缓存键: "MENU:LIST:ROLE:1_3"
-//   - Redis中会建立：
-//     "MENU:ROLE:DEPENDENCIES:1" → ["MENU:LIST:ROLE:1_2", "MENU:LIST:ROLE:1_3"]
-//     "MENU:ROLE:DEPENDENCIES:2" → ["MENU:LIST:ROLE:1_2"]
-//     "MENU:ROLE:DEPENDENCIES:3" → ["MENU:LIST:ROLE:1_3"]
-//   - 当角色1权限变更时，自动清除两个用户的菜单缓存，以及角色1的依赖缓存表。
-func (m *MenuCache) InvalidateMenuCacheByRoleID(roleID int64) (err error) {
-	// 获取记录角色所关联的菜单缓存 key 的依赖集合 key（Set 类型）
+// 3. 缓存失效机制：
+//   当角色权限变更时：
+//   a) 根据 roleID 从 "MENU:ROLE:DEPENDENCIES:{roleID}" 获取所有关联缓存键
+//   b) 批量删除这些用户菜单缓存
+//   c) 最后清理该角色的依赖记录
+func (m *MenuCache) InvalidateMenuCacheByRoleID(roleID int64) error {
 	depKey := fmt.Sprintf(rediskey.MenuRoleDependencies+"%d", roleID)
-
-	// 构造删除列表：包括依赖集合本身 和 依赖集合中记录的所有菜单缓存 key
-	err = m.redis.DelBySetMembers(depKey)
-
-	return
+	return m.redis.DelBySetMembers(depKey)
 }
 
-// InvalidAllMenuCache 批量清除所有菜单缓存
-func (m *MenuCache) InvalidAllMenuCache() (err error) {
-	// 清除所有菜单相关缓存
-	if err = m.redis.DeleteByPrefix(rediskey.MenuListRole, 100); err != nil {
-		return
+func (m *MenuCache) InvalidAllMenuCache() error {
+	if err := m.redis.DeleteByPrefix(rediskey.MenuListRole, 100); err != nil {
+		return err
 	}
-	err = m.redis.DeleteByPrefix(rediskey.MenuRoleDependencies, 100)
-	return
+	return m.redis.DeleteByPrefix(rediskey.MenuRoleDependencies, 100)
 }
 
 func buildMenuCacheKey(roleIDList []int64) string {
 	slices.Sort(roleIDList)
 	return fmt.Sprintf(rediskey.MenuListRole+"%s", strings.Join(strings.Split(fmt.Sprint(roleIDList), " "), "_"))
 }
-func (m *MenuCache) GetMenuListByRoleIDListFromCache(roleIDList []int64) (menu []*response.Menu, err error) {
+
+func (m *MenuCache) GetMenuListByRoleIDListFromCache(roleIDList []int64) ([]*response.Menu, error) {
 	key := buildMenuCacheKey(roleIDList)
-	val, err := m.redis.Get(key)
-	if err != nil {
-		return
-	}
-	err = sonic.Unmarshal([]byte(val), &menu)
-	return
+	return cachex.GetSlice[*response.Menu](m.redis, key)
 }
 
-// SetMenuListCache 缓存菜单列表
-func (m *MenuCache) SetMenuListCache(roleIDList []int64, menuList []*entity.Menu) (err error) {
+func (m *MenuCache) SetMenuListCache(roleIDList []int64, menuList []*entity.Menu) error {
 	key := buildMenuCacheKey(roleIDList)
-	cacheBytes, err := sonic.Marshal(menuList)
-	if err != nil {
-		return errors.WrapCacheError(err, "菜单列表序列化失败")
-	}
-
-	if err = m.redis.Set(key, string(cacheBytes), rediskey.MenuListRoleTTL); err != nil {
+	if err := cachex.Set(m.redis, key, menuList, rediskey.MenuListRoleTTL); err != nil {
 		return errors.WrapCacheError(err, "菜单列表写入缓存失败")
 	}
 	for _, roleID := range roleIDList {
 		depKey := fmt.Sprintf(rediskey.MenuRoleDependencies+"%d", roleID)
-		if err = m.redis.SAdd(depKey, key); err != nil {
+		if err := m.redis.SAdd(depKey, key); err != nil {
 			return errors.WrapCacheError(err, "设置角色菜单依赖关系失败")
 		}
 	}
-	return
+	return nil
 }

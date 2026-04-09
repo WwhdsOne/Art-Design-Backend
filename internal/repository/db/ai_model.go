@@ -4,10 +4,9 @@ package db
 import (
 	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/internal/model/query"
+	"Art-Design-Backend/internal/repository/dupcheck"
 	"Art-Design-Backend/pkg/errors"
 	"context"
-	"fmt"
-	"strings"
 
 	"gorm.io/gorm"
 )
@@ -22,50 +21,11 @@ func NewAIModelDB(db *gorm.DB) *AIModelDB {
 	}
 }
 
-func (a *AIModelDB) CheckAIDuplicate(c context.Context, model *entity.AIModel) (err error) {
-	var result struct {
-		ModelExists   bool
-		BaseURLExists bool
-		ModelIDExists bool
-	}
-
-	// 假设 AIModel 使用字符串 ID，可选排除逻辑
-	excludeID := ""
-	if model.ID != 0 {
-		excludeID = fmt.Sprintf("AND id != '%d'", model.ID)
-	}
-
-	var queryCondition strings.Builder
-	args := make([]any, 0)
-	conditions := make([]string, 0)
-
-	if model.Model != "" {
-		conditions = append(conditions, "EXISTS(SELECT 1 FROM ai_model WHERE model = ? "+excludeID+") AS model_exists")
-		args = append(args, model.Model)
-	}
-	if model.ModelID != "" {
-		conditions = append(conditions, "EXISTS(SELECT 1 FROM ai_model WHERE model_id = ? "+excludeID+") AS model_id_exists")
-		args = append(args, model.ModelID)
-	}
-
-	if len(conditions) == 0 {
-		return
-	}
-
-	queryCondition.WriteString("SELECT ")
-	queryCondition.WriteString(strings.Join(conditions, ", "))
-
-	if err = DB(c, a.db).Raw(queryCondition.String(), args...).Scan(&result).Error; err != nil {
-		return
-	}
-
-	switch {
-	case result.ModelExists:
-		err = errors.NewDBError("模型名称重复")
-	case result.ModelIDExists:
-		err = errors.NewDBError("模型接口标识重复")
-	}
-	return
+func (a *AIModelDB) CheckAIDuplicate(c context.Context, model *entity.AIModel) error {
+	return dupcheck.Check(DB(c, a.db), "ai_model", model.ID, []dupcheck.Field{
+		{Column: "model", ErrMsg: "模型名称重复", Value: model.Model},
+		{Column: "model_id", ErrMsg: "模型接口标识重复", Value: model.ModelID},
+	})
 }
 
 func (a *AIModelDB) Create(c context.Context, e *entity.AIModel) (err error) {

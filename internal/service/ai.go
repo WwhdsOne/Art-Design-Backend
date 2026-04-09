@@ -31,9 +31,10 @@ type AIService struct {
 	AIModelRepo       *repository.AIModelRepo       // 模型Repo
 	AIProviderRepo    *repository.AIProviderRepo    // 模型供应商Repo
 	KnowledgeBaseRepo *repository.KnowledgeBaseRepo // 知识库Repo
-	ConversationRepo  *repository.ConversationRepo  // 会话Repo
-	OssClient         *aliyun.OssClient             // 阿里云OSS
-	GormTX            *db.GormTransactionManager    // 事务
+	ConversationRepo *repository.ConversationRepo // 会话Repo
+	MessageRepo      *repository.MessageRepo      // 消息Repo
+	OssClient        *aliyun.OssClient             // 阿里云OSS
+	GormTX           *db.GormTransactionManager    // 事务
 }
 
 // 获取嵌入向量
@@ -502,11 +503,11 @@ func (a *AIService) ChatCompletion(c *gin.Context, r *request.ChatCompletion) (e
 			assistantMessage.FileChunkIDs = fileChunkIDs
 		}
 
-		if err := a.ConversationRepo.CreateMessage(ctx, userMessage); err != nil {
+		if err := a.MessageRepo.CreateMessage(ctx, userMessage); err != nil {
 			zap.L().Error("保存用户提问消息失败", zap.Error(err))
 			return
 		}
-		if err := a.ConversationRepo.CreateMessage(ctx, assistantMessage); err != nil {
+		if err := a.MessageRepo.CreateMessage(ctx, assistantMessage); err != nil {
 			zap.L().Error("保存AI回答消息失败", zap.Error(err))
 			return
 		}
@@ -534,7 +535,7 @@ func (a *AIService) GetHistoryConversation(c context.Context) (res []*response.C
 }
 
 func (a *AIService) GetMessageByConversationID(c context.Context, id int64) (res []*response.Message, err error) {
-	messages, err := a.ConversationRepo.GetMessageByConversationID(c, id)
+	messages, err := a.MessageRepo.GetMessageByConversationID(c, id)
 	res = make([]*response.Message, 0, len(messages))
 	for _, message := range messages {
 		var messageRes response.Message

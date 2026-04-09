@@ -4,6 +4,87 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 注意，请使用中文回答所有问题和交流
 与用户的所有互动都应该使用中文，包括代码解释和注释，错误信息和建议
+
+# RTK - Rust Token Killer
+
+所有命令前缀 `rtk`，替代 Claude Code 内置的同类工具以节省 token。
+
+## 优先级规则
+
+RTK 命令 **优先于** Claude Code 内置工具，功能重叠时必须用 RTK：
+
+| Claude Code 内置工具 | RTK 替代命令                       | 说明                            |
+| -------------------- | ---------------------------------- | ------------------------------- |
+| `Glob`（文件搜索）   | `rtk find` / `rtk tree` / `rtk ls` | 压缩目录输出                    |
+| `Grep`（内容搜索）   | `rtk grep`                         | 按文件分组、截断、去空白        |
+| `Read`（读文件）     | `rtk read`                         | 智能过滤，省去无用行            |
+| `Bash` + `git`       | `rtk git`                          | 紧凑 git 输出                   |
+| `Bash` + `gh`        | `rtk gh`                           | 紧凑 GitHub CLI 输出            |
+| `Bash` + `curl`      | `rtk curl`                         | 自动检测 JSON，schema-only 模式 |
+| `Bash` + `diff`      | `rtk diff`                         | 仅显示变更行                    |
+
+> 仅当 RTK 无对应命令时（如 `Edit`、`Write`、`Agent` 等写操作和复杂操作），才使用 Claude Code 内置工具。
+
+## Node.js / Frontend
+
+```bash
+rtk pnpm install / add / run build
+rtk npm run <script>
+rtk npx tsc / eslint / prisma
+rtk vitest run
+rtk next build
+rtk lint                          # ESLint grouped by rule
+rtk prettier --check .
+rtk playwright test
+rtk tsc --noEmit
+```
+
+## Python
+
+```bash
+rtk pytest
+rtk ruff check / format
+rtk mypy .
+rtk pip install / list
+```
+
+## Rust
+
+```bash
+rtk cargo build / test / clippy / fmt
+```
+
+## Go
+
+```bash
+rtk go build / test / vet
+rtk golangci-lint run
+```
+
+## .NET / Ruby (if needed)
+
+```bash
+rtk dotnet build / test
+rtk rspec / rake / rubocop
+```
+
+## Infrastructure
+
+```bash
+rtk aws <service> <command>       # force JSON + compress
+rtk docker ps / logs / compose
+rtk kubectl get / describe / logs
+rtk psql <query>                  # strip borders, compress
+```
+
+## Meta Commands
+
+```bash
+rtk gain              # token savings analytics
+rtk gain --history    # usage history with savings
+rtk discover          # find missed opportunities in session history
+```
+
 ## Development Commands
 
 ### Build & Test
@@ -64,8 +145,11 @@ internal/
   ├── service/                    # Business logic layer
   │   └── *.go                    # Service implementations
   ├── repository/                 # Data access layer
+  │   ├── *.go                    # Repository interfaces (Service 层只依赖此层)
   │   ├── db/                     # Database repositories (GORM)
   │   ├── cache/                  # Cache repositories (Redis)
+  │   ├── cachex/                 # 泛型缓存工具 GetOrNil/GetSlice/Set
+  │   ├── dupcheck/               # 泛型去重检查工具
   │   └── wire_repository.go      # Wire providers for repositories
   └── model/                      # Domain models
 
@@ -111,16 +195,22 @@ Services contain business logic and are injected with repositories. Services sho
 Repositories split concerns between:
 - **DB repositories** (`internal/repository/db/`) - PostgreSQL via GORM
 - **Cache repositories** (`internal/repository/cache/`) - Redis caching
-- **Repository interface** (`internal/repository/*.go`) - Combines DB + Cache
+- **Repository interface** (`internal/repository/*.go`) - Combines DB + Cache, **Service 层只依赖 `repository` 包**（`db.GormTX` 除外）
+- **Generic utilities** (`internal/repository/cachex/`, `internal/repository/dupcheck/`) - 泛型缓存/去重工具
+
+**Important**: Service 层统一通过 `repository` 包访问数据，不直接依赖 `db/*`（`db.GormTX` 事务管理器除外）。
 
 Example:
 ```go
 type UserRepo struct {
-    UserDB    *db.UserDB
-    UserCache *cache.UserCache
-    RoleCache *cache.RoleCache  // Can use multiple caches
+    *db.UserDB
+    *db.UserRolesDB
+    *cache.UserCache
+    *cache.RoleCache
 }
 ```
+
+**cachex 注意事项**：`cachex.GetOrNil`/`GetSlice` 在缓存未命中时返回 `nil, redis.Nil`，调用方必须用 `errors.Is(err, redis.Nil)` 判断缓存 miss，而非检查 `err == nil`。
 
 ## Core Features
 
@@ -128,13 +218,16 @@ type UserRepo struct {
 The Browser Agent is an LLM-powered browser automation system:
 - **WebSocket-based** real-time communication with browser clients
 - **LLM Decision Loop**: LLM analyzes page state → generates action → executes → repeats
+- **Vision Fallback**: Text model (DeepSeek) can request `need_vision: true`, triggering Qwen 3.5 Flash vision model with labeled screenshots
 - **Supported actions**: goto, click, input, select, scroll, wait, close_browser
-- **Models**: DeepSeek, Zhipu AI for decision-making
+- **Models**: DeepSeek (text decision), Qwen 3.5 Flash via 通义千问 (vision), Zhipu AI (legacy)
 
 Key files:
-- `internal/service/browser_agent.go` - Core agent logic
+- `internal/service/browser_agent.go` - Core agent logic + vision fallback
 - `internal/controller/browser_agent.go` - WebSocket endpoint
 - `pkg/ws/` - WebSocket hub for client connections
+- `pkg/constant/llmid/` - Model ID constants
+- `pkg/constant/prompt/` - System prompts + vision prompt
 
 ### AI Services
 Multi-provider AI abstraction supporting:

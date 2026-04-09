@@ -9,11 +9,12 @@ const (
 	browserProviderDeepSeekID = 50361636266975107
 	browserModelDeepSeekID    = 50372307280994179
 
-	// 视觉模型（GLM-4V-Flash via 智谱）
-	browserVisionProviderID = 81681722898382850 // 复用智谱供应商
-	browserVisionModelID    = 0                 // TODO: 需在数据库中创建 GLM-4V-Flash 模型记录后填入
+	// 视觉模型（Qwen 3.5 Flash via 通义千问）
+	browserVisionProviderID = embedProviderQwenID // 复用通义千问供应商
+	browserVisionModelID    = 91702166376415492                  // TODO: 需在数据库中创建 Qwen 3.5 Flash 模型记录后填入
 
 	// 开发使用
+
 	EmbedProviderID       = embedProviderQwenID
 	MultiModelID          = multiModelQwenID
 	BrowserProviderID     = browserProviderDeepSeekID

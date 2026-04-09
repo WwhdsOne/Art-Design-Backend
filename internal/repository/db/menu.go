@@ -2,10 +2,9 @@ package db
 
 import (
 	"Art-Design-Backend/internal/model/entity"
+	"Art-Design-Backend/internal/repository/dupcheck"
 	"Art-Design-Backend/pkg/errors"
 	"context"
-	"fmt"
-	"strings"
 
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -21,57 +20,20 @@ func NewMenuDB(db *gorm.DB) *MenuDB {
 	}
 }
 
-func (m *MenuDB) CheckMenuDuplicate(c context.Context, menu *entity.Menu) (err error) {
-	var result struct {
-		NameExists  bool
-		PathExists  bool
-		TitleExists bool
+func (m *MenuDB) CheckMenuDuplicate(c context.Context, menu *entity.Menu) error {
+	name, nameIsNil := "", menu.Name == nil
+	if !nameIsNil {
+		name = *menu.Name
 	}
-
-	excludeID := ""
-	if menu.ID != 0 {
-		excludeID = fmt.Sprintf("AND id != %d", menu.ID)
+	path, pathIsNil := "", menu.Path == nil
+	if !pathIsNil {
+		path = *menu.Path
 	}
-
-	var query strings.Builder
-	args := make([]any, 0)
-	conditions := make([]string, 0)
-
-	if menu.Name != nil && *menu.Name != "" {
-		conditions = append(conditions, "EXISTS(SELECT 1 FROM \"menu\" WHERE name = ? "+excludeID+") AS name_exists")
-		args = append(args, *menu.Name)
-	}
-
-	if menu.Path != nil && *menu.Path != "" {
-		conditions = append(conditions, "EXISTS(SELECT 1 FROM \"menu\" WHERE path = ? "+excludeID+") AS path_exists")
-		args = append(args, *menu.Path)
-	}
-
-	if menu.Title != "" {
-		conditions = append(conditions, "EXISTS(SELECT 1 FROM \"menu\" WHERE title = ? "+excludeID+") AS title_exists")
-		args = append(args, menu.Title)
-	}
-
-	if len(conditions) == 0 {
-		return nil // 没有需要查重的字段
-	}
-
-	query.WriteString("SELECT ")
-	query.WriteString(strings.Join(conditions, ", "))
-
-	if err = DB(c, m.db).Raw(query.String(), args...).Scan(&result).Error; err != nil {
-		return err
-	}
-
-	switch {
-	case result.NameExists:
-		err = errors.NewDBError("组件名称重复")
-	case result.PathExists:
-		err = errors.NewDBError("路由地址重复")
-	case result.TitleExists:
-		err = errors.NewDBError("菜单名称重复")
-	}
-	return
+	return dupcheck.Check(DB(c, m.db), "\"menu\"", menu.ID, []dupcheck.Field{
+		{Column: "name", ErrMsg: "组件名称重复", Value: name, IsNil: nameIsNil},
+		{Column: "path", ErrMsg: "路由地址重复", Value: path, IsNil: pathIsNil},
+		{Column: "title", ErrMsg: "菜单名称重复", Value: menu.Title},
+	})
 }
 
 func (m *MenuDB) GetAllMenus(c context.Context) (res []*entity.Menu, err error) {
@@ -181,15 +143,4 @@ func (m *MenuDB) UpdateMenu(c context.Context, menu *entity.Menu) (err error) {
 	}
 
 	return nil
-}
-
-func (m *MenuDB) GetMenuIDListByRoleIDList(c context.Context, roleIDList []int64) (menuIDList []int64, err error) {
-	if err = DB(c, m.db).
-		Model(&entity.RoleMenus{}).
-		Where("role_id IN ?", roleIDList).
-		Pluck("menu_id", &menuIDList).Error; err != nil {
-		err = errors.WrapDBError(err, "获取角色菜单关联信息失败")
-		return
-	}
-	return
 }

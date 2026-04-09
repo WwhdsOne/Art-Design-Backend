@@ -2,12 +2,11 @@ package cache
 
 import (
 	"Art-Design-Backend/internal/model/entity"
+	"Art-Design-Backend/internal/repository/cachex"
 	"Art-Design-Backend/pkg/constant/rediskey"
 	myerrors "Art-Design-Backend/pkg/errors"
 	"Art-Design-Backend/pkg/redisx"
 	"fmt"
-
-	"github.com/bytedance/sonic"
 )
 
 type UserCache struct {
@@ -20,28 +19,27 @@ func NewUserCache(redis *redisx.RedisWrapper) *UserCache {
 	}
 }
 
-func (u *UserCache) GetUserRoleList(userID int64) (roleList []*entity.Role, err error) {
+func (u *UserCache) GetUserRoleList(userID int64) ([]*entity.Role, error) {
 	key := fmt.Sprintf("%s%d", rediskey.UserRoleList, userID)
-	val, err := u.redis.Get(key)
-	if err = sonic.Unmarshal([]byte(val), &roleList); err != nil {
-		err = myerrors.NewCacheError("获取用户角色信息缓存失败")
+	roleList, err := cachex.GetSlice[*entity.Role](u.redis, key)
+	if err != nil || len(roleList) == 0 {
+		return nil, myerrors.NewCacheError("获取用户角色信息缓存失败")
 	}
-	return
+	return roleList, nil
 }
 
-func (u *UserCache) InvalidUserRoleCache(userID int64) (err error) {
-	userRoleInfoKey := fmt.Sprintf("%s%d", rediskey.UserRoleList, userID)
-	if err = u.redis.Del(userRoleInfoKey); err != nil {
+func (u *UserCache) InvalidUserRoleCache(userID int64) error {
+	key := fmt.Sprintf("%s%d", rediskey.UserRoleList, userID)
+	if err := u.redis.Del(key); err != nil {
 		return myerrors.WrapCacheError(err, "删除用户角色信息缓存失败")
 	}
-	return
+	return nil
 }
 
-func (u *UserCache) SetUserRoleList(userID int64, roleList []*entity.Role) (err error) {
+func (u *UserCache) SetUserRoleList(userID int64, roleList []*entity.Role) error {
 	key := fmt.Sprintf("%s%d", rediskey.UserRoleList, userID)
-	val, _ := sonic.Marshal(roleList)
-	if err = u.redis.Set(key, string(val), rediskey.UserRoleListTTL); err != nil {
+	if err := cachex.Set(u.redis, key, roleList, rediskey.UserRoleListTTL); err != nil {
 		return myerrors.WrapCacheError(err, "设置用户角色信息缓存失败")
 	}
-	return
+	return nil
 }

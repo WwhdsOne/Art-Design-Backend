@@ -19,7 +19,6 @@ func (o *OperationLogService) GetOperationLogPage(
 	logQuery *query.OperationLog,
 ) (resp *common.PaginationResp[response.OperationLog], err error) {
 
-	// entity 层数据
 	logEntities, total, err := o.OperationLogRepo.GetOperationLogPage(c, logQuery)
 	if err != nil {
 		return

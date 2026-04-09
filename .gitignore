@@ -1,6 +1,4 @@
-myapp
-
-# Go 编译生成文件
+# 构建产物
 /bin/
 /build/
 /dist/
@@ -8,27 +6,32 @@ myapp
 *.test
 *.out
 
-# Go 依赖缓存
+# 依赖
 vendor/
-*.mod.*
 
-# 可选：如果你使用 IDE（比如 Goland）
+# IDE
 .idea/
 .vscode/
+*.swp
+*.swo
 
-# OS 缓存
+# OS
 .DS_Store
 Thumbs.db
 
-# 临时文件
+# 临时/日志
 *.log
 *.tmp
-*.swp
+*.bak
 
-# Git hooks（自动生成，不纳入版本控制）
-.git/hooks/
+# 测试覆盖率
+coverage.out
+coverage.html
 
-# 配置文件（包含敏感信息，请勿提交）
+# 配置（含敏感信息）
 configs/dev.yaml
 configs/*.env
+*.env
 
+# Git hooks
+.git/hooks/

@@ -44,10 +44,11 @@ var RepositorySet = wire.NewSet(
 	wire.Struct(new(RoleRepo), "*"),
 	wire.Struct(new(MenuRepo), "*"),
 	wire.Struct(new(AuthRepo), "*"),
-	wire.Struct(new(DigitPredictRepo), "*"),
 	wire.Struct(new(AIProviderRepo), "*"),
 	wire.Struct(new(KnowledgeBaseRepo), "*"),
-	wire.Struct(new(ConversationRepo), "*"),
 	wire.Struct(new(BrowserAgentRepo), "*"),
+	wire.Struct(new(ConversationRepo), "*"),
+	wire.Struct(new(MessageRepo), "*"),
 	wire.Struct(new(OperationLogRepo), "*"),
+	wire.Struct(new(DigitPredictRepo), "*"),
 )

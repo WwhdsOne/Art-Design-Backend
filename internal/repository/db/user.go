@@ -3,10 +3,9 @@ package db
 import (
 	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/internal/model/query"
+	"Art-Design-Backend/internal/repository/dupcheck"
 	"Art-Design-Backend/pkg/errors"
 	"context"
-	"fmt"
-	"strings"
 
 	"gorm.io/gorm"
 )
@@ -21,64 +20,20 @@ func NewUserDB(db *gorm.DB) *UserDB {
 	}
 }
 
-func (u *UserDB) CheckUserDuplicate(c context.Context, user *entity.User) (err error) {
-	var result struct {
-		UsernameExists bool
-		EmailExists    bool
-		PhoneExists    bool
+func (u *UserDB) CheckUserDuplicate(c context.Context, user *entity.User) error {
+	email, emailIsNil := "", user.Email == nil
+	if !emailIsNil {
+		email = *user.Email
 	}
-
-	// 检查当前记录是否有ID，如果有，则在查询中排除它
-	excludeID := ""
-	if user.ID != 0 {
-		excludeID = fmt.Sprintf("AND id != %d", user.ID)
+	phone, phoneIsNil := "", user.Phone == nil
+	if !phoneIsNil {
+		phone = *user.Phone
 	}
-
-	// 构建动态查询条件
-	var queryConditions strings.Builder
-	args := make([]any, 0)
-	conditions := make([]string, 0)
-
-	// 只检查非空字段
-	if user.Username != "" {
-		conditions = append(conditions, "EXISTS(SELECT 1 FROM \"user\" WHERE username = ? "+excludeID+") AS username_exists")
-		args = append(args, user.Username)
-	}
-
-	if user.Email != nil {
-		conditions = append(conditions, "EXISTS(SELECT 1 FROM \"user\" WHERE email = ? "+excludeID+") AS email_exists")
-		args = append(args, *user.Email) // 注意：解引用指针
-	}
-
-	if user.Phone != nil {
-		conditions = append(conditions, "EXISTS(SELECT 1 FROM \"user\" WHERE phone = ? "+excludeID+") AS phone_exists")
-		args = append(args, *user.Phone) // 注意：解引用指针
-	}
-
-	// 如果没有需要检查的字段，直接返回
-	if len(conditions) == 0 {
-		return nil
-	}
-
-	// 构建完整查询
-	queryConditions.WriteString("SELECT ")
-	queryConditions.WriteString(strings.Join(conditions, ","))
-
-	// 执行查询
-	if err = DB(c, u.db).Raw(queryConditions.String(), args...).Scan(&result).Error; err != nil {
-		return errors.WrapDBError(err, "检查用户重复属性失败")
-	}
-
-	// 检查结果
-	switch {
-	case result.UsernameExists:
-		err = errors.NewDBError("用户名重复")
-	case result.EmailExists:
-		err = errors.NewDBError("邮箱重复")
-	case result.PhoneExists:
-		err = errors.NewDBError("手机号重复")
-	}
-	return
+	return dupcheck.Check(DB(c, u.db), "\"user\"", user.ID, []dupcheck.Field{
+		{Column: "username", ErrMsg: "用户名重复", Value: user.Username},
+		{Column: "email", ErrMsg: "邮箱重复", Value: email, IsNil: emailIsNil},
+		{Column: "phone", ErrMsg: "手机号重复", Value: phone, IsNil: phoneIsNil},
+	})
 }
 
 func (u *UserDB) GetLoginUserByUsername(c context.Context, username string) (user *entity.User, err error) {

@@ -2,6 +2,6 @@ package repository
 
 import "Art-Design-Backend/internal/repository/db"
 
-type DigitPredictRepo struct {
-	*db.DigitPredictDB
+type MessageRepo struct {
+	*db.MessageDB
 }

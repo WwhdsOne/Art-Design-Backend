@@ -32,7 +32,7 @@ func (m *MenuRepo) DeleteMenuByIDList(c context.Context, menuIDList []int64) (er
 }
 
 func (m *MenuRepo) GetMenuListByRoleIDList(c context.Context, roleIDList []int64) (menuList []*entity.Menu, err error) {
-	menuIDList, err := m.MenuDB.GetMenuIDListByRoleIDList(c, roleIDList)
+	menuIDList, err := m.RoleMenusDB.GetMenuIDListByRoleIDList(c, roleIDList)
 	if err != nil {
 		return
 	}

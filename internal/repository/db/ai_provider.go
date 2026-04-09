@@ -3,10 +3,9 @@ package db
 import (
 	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/internal/model/query"
+	"Art-Design-Backend/internal/repository/dupcheck"
 	"Art-Design-Backend/pkg/errors"
 	"context"
-	"fmt"
-	"strings"
 
 	"gorm.io/gorm"
 )
@@ -21,41 +20,10 @@ func NewAIProviderDB(db *gorm.DB) *AIProviderDB {
 	}
 }
 
-func (a *AIProviderDB) CheckAIDuplicate(c context.Context, provider *entity.AIProvider) (err error) {
-	var result struct {
-		NameExists bool
-	}
-
-	// 假设 AIProvider 使用字符串 ID，可选排除逻辑
-	excludeID := ""
-	if provider.ID != 0 {
-		excludeID = fmt.Sprintf("AND id != '%d'", provider.ID)
-	}
-
-	var queryCondition strings.Builder
-	args := make([]any, 0)
-	conditions := make([]string, 0)
-
-	if provider.Name != "" {
-		conditions = append(conditions, "EXISTS(SELECT 1 FROM ai_provider WHERE name = ? "+excludeID+") AS name_exists")
-		args = append(args, provider.Name)
-	}
-
-	if len(conditions) == 0 {
-		return
-	}
-
-	queryCondition.WriteString("SELECT ")
-	queryCondition.WriteString(strings.Join(conditions, ", "))
-
-	if err = DB(c, a.db).Raw(queryCondition.String(), args...).Scan(&result).Error; err != nil {
-		return
-	}
-
-	if result.NameExists {
-		err = errors.NewDBError("模型名称重复")
-	}
-	return
+func (a *AIProviderDB) CheckAIDuplicate(c context.Context, provider *entity.AIProvider) error {
+	return dupcheck.Check(DB(c, a.db), "ai_provider", provider.ID, []dupcheck.Field{
+		{Column: "name", ErrMsg: "模型名称重复", Value: provider.Name},
+	})
 }
 
 func (a *AIProviderDB) Create(c context.Context, provider *entity.AIProvider) (err error) {

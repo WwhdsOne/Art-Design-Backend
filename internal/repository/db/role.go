@@ -3,10 +3,9 @@ package db
 import (
 	"Art-Design-Backend/internal/model/entity"
 	"Art-Design-Backend/internal/model/query"
+	"Art-Design-Backend/internal/repository/dupcheck"
 	"Art-Design-Backend/pkg/errors"
 	"context"
-	"fmt"
-	"strings"
 
 	"gorm.io/gorm"
 )
@@ -21,57 +20,11 @@ func NewRoleDB(db *gorm.DB) *RoleDB {
 	}
 }
 
-func (r *RoleDB) CheckRoleDuplicate(c context.Context, role *entity.Role) (err error) {
-	var result struct {
-		NameExists bool
-		CodeExists bool
-	}
-
-	// 检查当前记录是否有ID，如果有，则在查询中排除它
-	excludeID := ""
-	if role.ID != 0 {
-		excludeID = fmt.Sprintf("AND id != %d", role.ID)
-	}
-
-	// 构建动态查询条件
-	var queryCondition strings.Builder
-	args := make([]any, 0)
-	conditions := make([]string, 0)
-
-	// 只检查非空字段
-	if role.Name != "" {
-		conditions = append(conditions, "EXISTS(SELECT 1 FROM \"role\" WHERE \"name\" = ? "+excludeID+") AS name_exists")
-		args = append(args, role.Name)
-	}
-
-	if role.Code != "" {
-		conditions = append(conditions, "EXISTS(SELECT 1 FROM \"role\" WHERE \"code\" = ? "+excludeID+") AS code_exists")
-		args = append(args, role.Code)
-	}
-
-	// 如果没有需要检查的字段，直接返回
-	if len(conditions) == 0 {
-		return nil
-	}
-
-	// 构建完整查询
-	queryCondition.WriteString("SELECT ")
-	queryCondition.WriteString(strings.Join(conditions, ","))
-
-	// 执行查询
-	if err = DB(c, r.db).Raw(queryCondition.String(), args...).Scan(&result).Error; err != nil {
-		return err
-	}
-
-	// 检查结果
-	switch {
-	case result.NameExists:
-		return errors.NewDBError("角色名称已存在")
-	case result.CodeExists:
-		return errors.NewDBError("角色编码已存在")
-	}
-
-	return nil
+func (r *RoleDB) CheckRoleDuplicate(c context.Context, role *entity.Role) error {
+	return dupcheck.Check(DB(c, r.db), "\"role\"", role.ID, []dupcheck.Field{
+		{Column: "\"name\"", ErrMsg: "角色名称已存在", Value: role.Name},
+		{Column: "\"code\"", ErrMsg: "角色编码已存在", Value: role.Code},
+	})
 }
 func (r *RoleDB) CreateRole(c context.Context, role *entity.Role) (err error) {
 	if err = DB(c, r.db).Create(role).Error; err != nil {

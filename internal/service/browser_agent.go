@@ -542,7 +542,7 @@ func (s *BrowserAgentService) getVisionConfig(c context.Context) (*entity.AIProv
 	return provider, model, nil
 }
 
-// callVisionModel 调用视觉模型（GLM-4V-Flash），传入带标签截图和元素文本，返回目标元素索引
+// callVisionModel 调用视觉模型（Qwen 3.5 Flash），传入带标签截图和元素文本，返回目标元素索引
 func (s *BrowserAgentService) callVisionModel(
 	c context.Context,
 	screenshotBase64 string,
@@ -707,7 +707,10 @@ func (s *BrowserAgentService) decideAction(
 	zap.L().Info(
 		"开始智能任务处理",
 		zap.String("task", task),
-		zap.Any("pageState", pageState),
+		zap.String("url", pageState.URL),
+		zap.String("title", pageState.Title),
+		zap.Int("elementsCount", len(pageState.Elements)),
+		zap.Bool("hasScreenshot", pageState.Screenshot != ""),
 	)
 
 	decidePrompt := s.buildPrompt(task, pageState)

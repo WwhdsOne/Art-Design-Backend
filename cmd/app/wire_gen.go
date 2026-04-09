@@ -136,10 +136,12 @@ func wireApp() *bootstrap.HTTPServer {
 		KnowledgeBaseFileRelDB: knowledgeBaseFileRelDB,
 	}
 	conversationDB := db.NewConversationDB(gormDB)
-	messageDB := db.NewMessageDB(gormDB)
 	conversationRepo := &repository.ConversationRepo{
 		ConversationDB: conversationDB,
-		MessageDB:      messageDB,
+	}
+	messageDB := db.NewMessageDB(gormDB)
+	messageRepo := &repository.MessageRepo{
+		MessageDB: messageDB,
 	}
 	aiService := &service.AIService{
 		AIModelClient:     aiModelClient,
@@ -147,6 +149,7 @@ func wireApp() *bootstrap.HTTPServer {
 		AIProviderRepo:    aiProviderRepo,
 		KnowledgeBaseRepo: knowledgeBaseRepo,
 		ConversationRepo:  conversationRepo,
+		MessageRepo:       messageRepo,
 		OssClient:         ossClient,
 		GormTX:            gormTransactionManager,
 	}
