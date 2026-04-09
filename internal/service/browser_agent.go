@@ -227,6 +227,16 @@ func (s *BrowserAgentService) HandleTask(c context.Context, messageID int64, pag
 		zap.Int("elementsCount", elementsCount),
 	)
 
+	// 记录任务初始页面信息和 LLM 模型
+	_, llmCfgModel, cfgErr := s.getLLMConfig(c)
+	pageInfoModel := ""
+	if cfgErr == nil {
+		pageInfoModel = llmCfgModel.Model
+	}
+	if err := s.BrowserAgentRepo.UpdateMessagePageInfo(c, messageID, pageState.URL, elementsCount, pageInfoModel); err != nil {
+		zap.L().Warn("更新任务页面信息失败", zap.Error(err))
+	}
+
 	elements := make([]string, elementsCount)
 
 	for i, elem := range pageState.Elements {
@@ -235,14 +245,14 @@ func (s *BrowserAgentService) HandleTask(c context.Context, messageID int64, pag
 
 	zap.L().Info("可交互元素", zap.Strings("elements", elements))
 
-	actions, err := s.decideAction(c, msg.Content, pageState)
+	actions, stepData, err := s.decideAction(c, msg.Content, pageState)
 	if err != nil {
 		return nil, err
 	}
 
 	// 所有动作存入数据库
 	for _, action := range actions {
-		dbAction := s.wsActionToEntity(messageID, action)
+		dbAction := s.wsActionToEntity(messageID, action, pageState, stepData)
 		if err = s.BrowserAgentRepo.CreateAction(c, dbAction); err != nil {
 			return nil, err
 		}
@@ -309,22 +319,22 @@ func (s *BrowserAgentService) HandleResult(c context.Context, msg *ws.ClientMess
 		)
 	}
 
-	nextActions, finished, err := s.decideNextAction(c, pageState, msg.Task, action.MessageID)
+	nextActions, finished, stepData, err := s.decideNextAction(c, pageState, msg.Task, action.MessageID)
 	if err != nil {
 		return nil, false, err
 	}
 
 	if finished {
 		zap.L().Info("任务完成", zap.Int64("messageID", msg.MessageID))
-		if err = s.BrowserAgentRepo.UpdateMessageState(c, msg.MessageID, entity.MessageStateFinished); err != nil {
-			return nil, false, err
+		if finishErr := s.finishMessage(c, msg.MessageID); finishErr != nil {
+			zap.L().Warn("回填任务统计信息失败", zap.Error(finishErr))
 		}
 		return nil, true, nil
 	}
 
 	// 所有动作存入数据库
 	for _, nextAction := range nextActions {
-		dbAction := s.wsActionToEntity(action.MessageID, nextAction)
+		dbAction := s.wsActionToEntity(action.MessageID, nextAction, pageState, stepData)
 		if err = s.BrowserAgentRepo.CreateAction(c, dbAction); err != nil {
 			return nil, false, err
 		}
@@ -339,7 +349,15 @@ func (s *BrowserAgentService) HandleResult(c context.Context, msg *ws.ClientMess
 	return nextActions, false, nil
 }
 
-func (s *BrowserAgentService) wsActionToEntity(messageID int64, action *ws.Action) *entity.BrowserAgentAction {
+func (s *BrowserAgentService) wsActionToEntity(messageID int64, action *ws.Action, pageState *ws.PageState, stepData *LLMStepData) *entity.BrowserAgentAction {
+	var pageURL *string
+	if pageState != nil {
+		pageURL = &pageState.URL
+	}
+	var isVision *bool
+	if stepData != nil && stepData.IsVision {
+		isVision = new(true)
+	}
 	return &entity.BrowserAgentAction{
 		MessageID:    messageID,
 		ActionType:   action.Action,
@@ -350,7 +368,55 @@ func (s *BrowserAgentService) wsActionToEntity(messageID int64, action *ws.Actio
 		Value:        action.Value,
 		Distance:     action.Distance,
 		Timeout:      action.Timeout,
+		PageURL:      pageURL,
+		ElementText:  strPtr(getElementText(pageState, action.Index)),
+		LLMThinking:  strPtr(stepData.Thinking),
+		LLMResponse:  strPtr(stepData.Response),
+		LLMTokenUsage: serializeTokenUsage(stepData.TokenUsage),
+		IsVision:     isVision,
 	}
+}
+
+// strPtr 对非空字符串返回 *string，否则返回 nil
+func strPtr(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+// finishMessage 任务完成时回填统计数据：总步数、总耗时、累计 token 消耗
+func (s *BrowserAgentService) finishMessage(c context.Context, messageID int64) error {
+	actions, err := s.BrowserAgentRepo.ListActionsByMessageID(c, messageID)
+	if err != nil {
+		return err
+	}
+
+	totalSteps := len(actions)
+	totalExecTime := 0
+	promptTokens, completionTokens, totalTokens := 0, 0, 0
+
+	for _, a := range actions {
+		if a.ExecutionTime != nil {
+			totalExecTime += *a.ExecutionTime
+		}
+		if a.LLMTokenUsage != nil {
+			var usage ai.ChatCompletionUsage
+			if sonic.Unmarshal([]byte(*a.LLMTokenUsage), &usage) == nil {
+				promptTokens += usage.PromptTokens
+				completionTokens += usage.CompletionTokens
+				totalTokens += usage.TotalTokens
+			}
+		}
+	}
+
+	tokenUsageJSON, _ := sonic.Marshal(ai.ChatCompletionUsage{
+		PromptTokens:     promptTokens,
+		CompletionTokens: completionTokens,
+		TotalTokens:      totalTokens,
+	})
+
+	return s.BrowserAgentRepo.UpdateMessageOnFinish(c, messageID, totalSteps, totalExecTime, string(tokenUsageJSON))
 }
 
 func (s *BrowserAgentService) logAction(stage string, action *ws.Action) {
@@ -403,12 +469,12 @@ func (s *BrowserAgentService) callLLM(
 	c context.Context,
 	systemPrompt,
 	promptText string,
-) (string, error) {
+) (string, *ai.ChatCompletionUsage, error) {
 
 	// 获取 LLM 配置（内存缓存 10 分钟，过期后重新查 Redis）
 	provider, modelInfo, err := s.getLLMConfig(c)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 
 	const maxRetries = 3
@@ -442,18 +508,18 @@ func (s *BrowserAgentService) callLLM(
 	if lastErr != nil {
 		zap.L().Error("调用LLM失败（已重试"+strconv.Itoa(maxRetries)+"次）",
 			zap.String("promptText", promptText), zap.Error(lastErr))
-		return "", fmt.Errorf("调用LLM失败（已重试%d次）: %w", maxRetries, lastErr)
+		return "", nil, fmt.Errorf("调用LLM失败（已重试%d次）: %w", maxRetries, lastErr)
 	}
 
 	var browserResp ai.ChatCompletionResponse
 	if err := sonic.Unmarshal(respJSON, &browserResp); err != nil {
 		zap.L().Error("解析 LLM 原始响应失败", zap.Error(err))
-		return "", fmt.Errorf("解析 LLM 原始响应失败: %w", err)
+		return "", nil, fmt.Errorf("解析 LLM 原始响应失败: %w", err)
 	}
 
 	rawContent := strings.TrimSpace(browserResp.FirstText())
 	if rawContent == "" {
-		return "", errors.New("LLM 返回内容为空")
+		return "", nil, errors.New("LLM 返回内容为空")
 	}
 
 	cleanJSON, err := ai.ExtractJSONFromLLMOutput(rawContent)
@@ -463,7 +529,7 @@ func (s *BrowserAgentService) callLLM(
 			zap.String("raw", rawContent),
 			zap.Error(err),
 		)
-		return "", err
+		return "", nil, err
 	}
 
 	zap.L().Debug(
@@ -472,7 +538,7 @@ func (s *BrowserAgentService) callLLM(
 		zap.String("json", cleanJSON),
 	)
 
-	return cleanJSON, nil
+	return cleanJSON, browserResp.Usage, nil
 }
 
 // getLLMConfig 获取 LLM 供应商和模型配置，内存缓存 10 分钟
@@ -548,10 +614,10 @@ func (s *BrowserAgentService) callVisionModel(
 	screenshotBase64 string,
 	elementText string,
 	task string,
-) ([]int, error) {
+) ([]int, *ai.ChatCompletionUsage, error) {
 	provider, modelInfo, err := s.getVisionConfig(c)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// 构造多模态消息
@@ -588,19 +654,19 @@ func (s *BrowserAgentService) callVisionModel(
 		)
 	}
 	if lastErr != nil {
-		return nil, fmt.Errorf("调用视觉模型失败: %w", lastErr)
+		return nil, nil, fmt.Errorf("调用视觉模型失败: %w", lastErr)
 	}
 
 	// 解析响应
 	var visionResp ai.ChatCompletionResponse
 	if err := sonic.Unmarshal(respJSON, &visionResp); err != nil {
-		return nil, fmt.Errorf("解析视觉模型响应失败: %w", err)
+		return nil, nil, fmt.Errorf("解析视觉模型响应失败: %w", err)
 	}
 
 	rawContent := strings.TrimSpace(visionResp.FirstText())
 	cleanJSON, err := ai.ExtractJSONFromLLMOutput(rawContent)
 	if err != nil {
-		return nil, fmt.Errorf("提取视觉模型JSON失败: %w", err)
+		return nil, nil, fmt.Errorf("提取视觉模型JSON失败: %w", err)
 	}
 
 	// 解析目标索引
@@ -610,7 +676,7 @@ func (s *BrowserAgentService) callVisionModel(
 		Confidence    string `json:"confidence"`
 	}
 	if err := sonic.Unmarshal([]byte(cleanJSON), &visionOutput); err != nil {
-		return nil, fmt.Errorf("解析视觉模型输出失败: %w", err)
+		return nil, nil, fmt.Errorf("解析视觉模型输出失败: %w", err)
 	}
 
 	zap.L().Info("视觉模型分析结果",
@@ -619,7 +685,7 @@ func (s *BrowserAgentService) callVisionModel(
 		zap.String("confidence", visionOutput.Confidence),
 	)
 
-	return visionOutput.TargetIndices, nil
+	return visionOutput.TargetIndices, visionResp.Usage, nil
 }
 
 // visionFallback 视觉模型回退：当文本模型请求视觉辅助时，调用视觉模型获取目标元素索引
@@ -628,20 +694,20 @@ func (s *BrowserAgentService) visionFallback(
 	pageState *ws.PageState,
 	task string,
 	textModelResp string,
-) ([]*ws.Action, error) {
+) ([]*ws.Action, *ai.ChatCompletionUsage, error) {
 	// 调用视觉模型获取目标元素索引
-	targetIndices, err := s.callVisionModel(
+	targetIndices, visionUsage, err := s.callVisionModel(
 		c,
 		pageState.Screenshot,
 		pageState.ElementText,
 		task,
 	)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if len(targetIndices) == 0 {
-		return nil, errors.New("视觉模型未找到目标元素")
+		return nil, nil, errors.New("视觉模型未找到目标元素")
 	}
 
 	// 从文本模型的原始输出中提取动作意图（action 类型和 value）
@@ -663,26 +729,26 @@ func (s *BrowserAgentService) visionFallback(
 	// 校验
 	for _, action := range actions {
 		if err := s.validateAction(action); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
-	return actions, nil
+	return actions, visionUsage, nil
 }
 
 // tryVisionFallback 检测 need_vision 标志，若触发则调用视觉模型回退
-// 返回视觉模型生成的动作列表；未触发或失败时返回 nil
-func (s *BrowserAgentService) tryVisionFallback(c context.Context, pageState *ws.PageState, task, resp string, output *ws.AgentOutput) []*ws.Action {
+// 返回视觉模型生成的动作列表和 token usage；未触发或失败时返回 nil
+func (s *BrowserAgentService) tryVisionFallback(c context.Context, pageState *ws.PageState, task, resp string, output *ws.AgentOutput) ([]*ws.Action, *ai.ChatCompletionUsage) {
 	if !output.NeedVision || pageState.Screenshot == "" {
-		return nil
+		return nil, nil
 	}
 	zap.L().Info("文本模型请求视觉辅助，调用视觉模型")
-	visionActions, err := s.visionFallback(c, pageState, task, resp)
+	visionActions, visionUsage, err := s.visionFallback(c, pageState, task, resp)
 	if err == nil && len(visionActions) > 0 {
-		return visionActions
+		return visionActions, visionUsage
 	}
 	zap.L().Warn("视觉模型调用失败，回退到文本模型结果", zap.Error(err))
-	return nil
+	return nil, nil
 }
 
 // extractActionIntent 从文本模型的原始输出中提取动作意图
@@ -698,11 +764,60 @@ func (s *BrowserAgentService) extractActionIntent(textModelResp string) (actionT
 	return "click", ""
 }
 
+// LLMStepData 单步 LLM 调用的元数据，用于记录到数据库
+type LLMStepData struct {
+	Thinking   string
+	Response   string
+	TokenUsage *ai.ChatCompletionUsage
+	IsVision   bool
+}
+
+// mergeUsage 合并两次 LLM 调用的 token 使用统计
+func mergeUsage(a, b *ai.ChatCompletionUsage) *ai.ChatCompletionUsage {
+	if a == nil {
+		return b
+	}
+	if b == nil {
+		return a
+	}
+	return &ai.ChatCompletionUsage{
+		PromptTokens:     a.PromptTokens + b.PromptTokens,
+		CompletionTokens: a.CompletionTokens + b.CompletionTokens,
+		TotalTokens:      a.TotalTokens + b.TotalTokens,
+	}
+}
+
+// serializeTokenUsage 将 token 使用统计序列化为 JSON 字符串
+func serializeTokenUsage(usage *ai.ChatCompletionUsage) *string {
+	if usage == nil {
+		return nil
+	}
+	b, _ := sonic.Marshal(usage)
+	s := string(b)
+	return &s
+}
+
+// getElementText 从 pageState 中提取指定索引元素的可见文本
+func getElementText(pageState *ws.PageState, index *int) string {
+	if index == nil || pageState == nil {
+		return ""
+	}
+	idx := *index
+	if idx < 0 || idx >= len(pageState.Elements) {
+		return ""
+	}
+	text := pageState.Elements[idx].Text
+	if len(text) > 200 {
+		text = text[:200]
+	}
+	return text
+}
+
 func (s *BrowserAgentService) decideAction(
 	c context.Context,
 	task string,
 	pageState *ws.PageState,
-) ([]*ws.Action, error) {
+) ([]*ws.Action, *LLMStepData, error) {
 
 	zap.L().Info(
 		"开始智能任务处理",
@@ -715,32 +830,37 @@ func (s *BrowserAgentService) decideAction(
 
 	decidePrompt := s.buildPrompt(task, pageState)
 
-	resp, err := s.callLLM(c, prompt.BrowserSystemPrompt, decidePrompt)
+	resp, textUsage, err := s.callLLM(c, prompt.BrowserSystemPrompt, decidePrompt)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+
+	stepData := &LLMStepData{Response: resp, TokenUsage: textUsage}
 
 	var preParsed *ws.AgentOutput
 	var ao ws.AgentOutput
 	if sonic.Unmarshal([]byte(resp), &ao) == nil {
 		preParsed = &ao
-		if visionActions := s.tryVisionFallback(c, pageState, task, resp, &ao); visionActions != nil {
-			return visionActions, nil
+		stepData.Thinking = ao.Thinking
+		if visionActions, visionUsage := s.tryVisionFallback(c, pageState, task, resp, &ao); visionActions != nil {
+			stepData.IsVision = true
+			stepData.TokenUsage = mergeUsage(textUsage, visionUsage)
+			return visionActions, stepData, nil
 		}
 	}
 
 	actions, err := s.parseAgentOutput(resp, preParsed)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	for _, action := range actions {
 		if err = s.validateAction(action); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
-	return actions, nil
+	return actions, stepData, nil
 }
 
 func (s *BrowserAgentService) decideNextAction(
@@ -748,43 +868,48 @@ func (s *BrowserAgentService) decideNextAction(
 	pageState *ws.PageState,
 	task string,
 	messageID int64,
-) ([]*ws.Action, bool, error) {
+) ([]*ws.Action, bool, *LLMStepData, error) {
 
 	// 获取已完成的操作历史，帮助 AI 判断任务进度
 	completedActions := s.buildCompletedActionsSummary(c, messageID)
 	nextActionPrompt := s.buildNextPrompt(pageState, task, completedActions)
 
-	resp, err := s.callLLM(c, prompt.BrowserSystemPrompt, nextActionPrompt)
+	resp, textUsage, err := s.callLLM(c, prompt.BrowserSystemPrompt, nextActionPrompt)
 	if err != nil {
-		return nil, false, err
+		return nil, false, nil, err
 	}
+
+	stepData := &LLMStepData{Response: resp, TokenUsage: textUsage}
 
 	if strings.Contains(resp, `"action":"finish_task"`) ||
 		strings.Contains(resp, `"action": "finish_task"`) {
-		return nil, true, nil
+		return nil, true, stepData, nil
 	}
 
 	var preParsed *ws.AgentOutput
 	var ao ws.AgentOutput
 	if sonic.Unmarshal([]byte(resp), &ao) == nil {
 		preParsed = &ao
-		if visionActions := s.tryVisionFallback(c, pageState, task, resp, &ao); visionActions != nil {
-			return visionActions, false, nil
+		stepData.Thinking = ao.Thinking
+		if visionActions, visionUsage := s.tryVisionFallback(c, pageState, task, resp, &ao); visionActions != nil {
+			stepData.IsVision = true
+			stepData.TokenUsage = mergeUsage(textUsage, visionUsage)
+			return visionActions, false, stepData, nil
 		}
 	}
 
 	actions, err := s.parseAgentOutput(resp, preParsed)
 	if err != nil {
-		return nil, false, err
+		return nil, false, nil, err
 	}
 
 	for _, action := range actions {
 		if err = s.validateAction(action); err != nil {
-			return nil, false, err
+			return nil, false, nil, err
 		}
 	}
 
-	return actions, false, nil
+	return actions, false, stepData, nil
 }
 
 // parseAgentOutput 解析 LLM 返回的结构化输出

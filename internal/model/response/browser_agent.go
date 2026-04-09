@@ -12,11 +12,18 @@ type ConversationResponse struct {
 }
 
 type MessageResponse struct {
-	ID             int64     `json:"id,string"`
-	ConversationID int64     `json:"conversation_id,string"`
-	Content        string    `json:"content"`
-	State          string    `json:"state"`
-	CreatedAt      time.Time `json:"created_at"`
+	ID                 int64      `json:"id,string"`
+	ConversationID     int64      `json:"conversation_id,string"`
+	Content            string     `json:"content"`
+	State              string     `json:"state"`
+	PageURL            *string    `json:"page_url,omitempty"`
+	ElementCount       *int       `json:"element_count,omitempty"`
+	TotalSteps         *int       `json:"total_steps,omitempty"`
+	TotalExecutionTime *int       `json:"total_execution_time,omitempty"`
+	LLMModel           *string    `json:"llm_model,omitempty"`
+	LLMTokenUsage      *string    `json:"llm_token_usage,omitempty"`
+	FinishedAt         *time.Time `json:"finished_at,omitempty"`
+	CreatedAt          time.Time  `json:"created_at"`
 }
 
 type ActionResponse struct {
@@ -32,6 +39,12 @@ type ActionResponse struct {
 	Timeout       *int      `json:"timeout,omitempty"`
 	ErrorMessage  *string   `json:"error_message,omitempty"`
 	ExecutionTime *int      `json:"execution_time,omitempty"`
+	PageURL       *string   `json:"page_url,omitempty"`
+	ElementText   *string   `json:"element_text,omitempty"`
+	LLMThinking   *string   `json:"llm_thinking,omitempty"`
+	LLMResponse   *string   `json:"llm_response,omitempty"`
+	LLMTokenUsage *string   `json:"llm_token_usage,omitempty"`
+	IsVision      *bool     `json:"is_vision,omitempty"`
 	CreatedAt     time.Time `json:"created_at"`
 }
 

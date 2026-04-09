@@ -164,6 +164,35 @@ func (r *BrowserAgentDB) UpdateMessageState(ctx context.Context, id int64, state
 	return nil
 }
 
+func (r *BrowserAgentDB) UpdateMessagePageInfo(ctx context.Context, id int64, pageURL string, elementCount int, llmModel string) error {
+	updates := map[string]any{
+		"page_url":      pageURL,
+		"element_count": elementCount,
+		"llm_model":     llmModel,
+	}
+	if err := DB(ctx, r.db).Model(&entity.BrowserAgentMessage{}).
+		Where("id = ?", id).Updates(updates).Error; err != nil {
+		return errors.WrapDBError(err, "更新任务页面信息失败")
+	}
+	return nil
+}
+
+func (r *BrowserAgentDB) UpdateMessageOnFinish(ctx context.Context, id int64, totalSteps, totalExecTime int, tokenUsageJSON string) error {
+	now := time.Now()
+	updates := map[string]any{
+		"state":                entity.MessageStateFinished,
+		"total_steps":          totalSteps,
+		"total_execution_time": totalExecTime,
+		"llm_token_usage":      tokenUsageJSON,
+		"finished_at":          now,
+	}
+	if err := DB(ctx, r.db).Model(&entity.BrowserAgentMessage{}).
+		Where("id = ?", id).Updates(updates).Error; err != nil {
+		return errors.WrapDBError(err, "更新任务完成信息失败")
+	}
+	return nil
+}
+
 func (r *BrowserAgentDB) MarkStaleAndFailedMessages(ctx context.Context, duration time.Duration) error {
 	cutoff := time.Now().Add(-duration)
 

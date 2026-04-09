@@ -28,6 +28,12 @@ type BrowserAgentAction struct {
 	Timeout       *int      `gorm:"column:timeout;comment:等待时间"`
 	ErrorMessage  *string   `gorm:"column:error_message;type:text;comment:错误信息"`
 	ExecutionTime *int      `gorm:"column:execution_time;comment:执行耗时(毫秒)"`
+	PageURL       *string   `gorm:"column:page_url;type:varchar(500);comment:执行动作时的页面URL"`
+	ElementText   *string   `gorm:"column:element_text;type:varchar(200);comment:操作元素的可见文本"`
+	LLMThinking   *string   `gorm:"column:llm_thinking;type:text;comment:LLM思维链"`
+	LLMResponse   *string   `gorm:"column:llm_response;type:text;comment:LLM原始返回JSON"`
+	LLMTokenUsage *string   `gorm:"column:llm_token_usage;type:jsonb;comment:单步token消耗"`
+	IsVision      *bool     `gorm:"column:is_vision;comment:是否经过视觉模型回退"`
 	CreatedAt     time.Time `gorm:"type:timestamp;column:created_at;autoCreateTime"`
 	UpdatedAt     time.Time `gorm:"type:timestamp;column:updated_at;autoUpdateTime"`
 }
