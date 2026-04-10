@@ -359,21 +359,21 @@ func (s *BrowserAgentService) wsActionToEntity(messageID int64, action *ws.Actio
 		isVision = new(true)
 	}
 	return &entity.BrowserAgentAction{
-		MessageID:    messageID,
-		ActionType:   action.Action,
-		ElementIndex: action.Index,
-		Status:       entity.ActionStatusPending,
-		URL:          action.URL,
-		Selector:     action.Selector,
-		Value:        action.Value,
-		Distance:     action.Distance,
-		Timeout:      action.Timeout,
-		PageURL:      pageURL,
-		ElementText:  strPtr(getElementText(pageState, action.Index)),
-		LLMThinking:  strPtr(stepData.Thinking),
-		LLMResponse:  strPtr(stepData.Response),
+		MessageID:     messageID,
+		ActionType:    action.Action,
+		ElementIndex:  action.Index,
+		Status:        entity.ActionStatusPending,
+		URL:           action.URL,
+		Selector:      action.Selector,
+		Value:         action.Value,
+		Distance:      action.Distance,
+		Timeout:       action.Timeout,
+		PageURL:       pageURL,
+		ElementText:   strPtr(getElementText(pageState, action.Index)),
+		LLMThinking:   strPtr(stepData.Thinking),
+		LLMResponse:   strPtr(stepData.Response),
 		LLMTokenUsage: serializeTokenUsage(stepData.TokenUsage),
-		IsVision:     isVision,
+		IsVision:      isVision,
 	}
 }
 
