@@ -134,8 +134,57 @@ const (
 		1. 文本输入框: {"action": "input", "index": N, "value": "内容"}
 		2. 下拉选择框: {"action": "select", "index": N, "value": "选项值"}
 		   - 查看元素的 options 字段获取可用选项
-		3. 单选/多选: {"action": "click", "index": N}
-		4. 按钮/链接: {"action": "click", "index": N}
+		3. 按钮/链接: {"action": "click", "index": N}
+
+		-----------------------
+		【选择题处理（嵌套结构）】
+		选择题（单选/多选）使用特殊的嵌套数据结构：
+
+		结构说明：
+		- type 字段为 "question" 表示这是一个选择题
+		- question 字段包含题目文本（如 "1. 您的性别？"）
+		- options 数组包含所有可选项
+		- 每个选项有独立的 index（在options数组中的位置）和 selector
+
+		数据示例：
+		{
+		  "index": 5,
+		  "type": "question",
+		  "text": "1. 您的性别？",
+		  "question": "1. 您的性别？",
+		  "options": [
+		    {"index": 0, "text": "A. 男", "selector": "input[name=\"q1\"][value=\"1\"]"},
+		    {"index": 1, "text": "B. 女", "selector": "input[name=\"q1\"][value=\"2\"]"},
+		    {"index": 2, "text": "C. 其他", "selector": "input[name=\"q1\"][value=\"3\"]"}
+		  ]
+		}
+
+		如何选择选项：
+		{"action": "click", "index": N, "option_index": M}
+		- N: 题目在元素列表中的 index（如上面示例中的 5）
+		- M: 选项在 options 数组中的 index（如选项A是0，选项B是1，选项C是2）
+
+		示例1：用户说"第1题选A"
+		1. 找到 question 字段为 "1. 您的性别？" 的元素，假设其 index=5
+		2. 在 options 数组中找到 text 包含 "A" 的选项，假设其 option_index=0
+		3. 生成动作：{"action": "click", "index": 5, "option_index": 0}
+
+		示例2：用户说"选择B选项"
+		1. 在所有选择题中找到包含 "B" 选项的题目
+		2. 假设找到第2题 index=6，选项B的 option_index=1
+		3. 生成动作：{"action": "click", "index": 6, "option_index": 1}
+
+		示例3：多选题"第3题选A、B、C"
+		需要3个独立的动作：
+		{"action": "click", "index": 7, "option_index": 0}  // 第3题选项A
+		{"action": "click", "index": 7, "option_index": 1}  // 第3题选项B
+		{"action": "click", "index": 7, "option_index": 2}  // 第3题选项C
+
+		注意事项：
+		- 必须同时提供 index 和 option_index 两个参数
+		- 单选题每次只能选一个，新选择会覆盖旧选择
+		- 多选题需要多次点击来选择多个选项
+		- 如果用户只说"选A"而没说第几题，需要根据上下文判断是哪道题
 
 		-----------------------
 		【表单完整性检查】

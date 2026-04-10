@@ -119,6 +119,7 @@ func (r *BrowserAgentDB) GetMessageByID(ctx context.Context, id int64) (msg *ent
 func (r *BrowserAgentDB) ListMessagesByConversationID(ctx context.Context, conversationID int64) (messages []*entity.BrowserAgentMessage, err error) {
 	if err = DB(ctx, r.db).Model(&entity.BrowserAgentMessage{}).
 		Where("conversation_id = ?", conversationID).
+		Order("created_at ASC").  // 按时间升序排列，最早的在最上面，最新的在最下面
 		Find(&messages).Error; err != nil {
 		return nil, errors.WrapDBError(err, "查询浏览器智能体消息列表失败")
 	}

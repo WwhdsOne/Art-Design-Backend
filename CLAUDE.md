@@ -334,6 +334,8 @@ Configuration: `.golangci.yml` and `revive.toml`
 
 5. **Strong password validator**: Custom validator requires passwords to have uppercase, lowercase, and numbers
 
+6. **Message sorting (2026-04-10 fixed)**: `ListMessagesByConversationID` now returns messages in `created_at ASC` order (oldest first, newest last) to match natural conversation flow. The related `ListMessagesPage` uses `DESC` order for pagination, which is intentional.
+
 ## Go 版本新特性（1.25 & 1.26）
 
 项目当前使用 Go 1.26。以下是 1.25（2025.8）和 1.26（2026.2）中常见的、可在本项目中使用的 API 和语法更新。写代码时优先使用新写法。

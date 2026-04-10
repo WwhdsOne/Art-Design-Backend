@@ -1283,9 +1283,21 @@ func (s *BrowserAgentService) validateAction(action *ws.Action) error {
 			return errors.New("goto 缺少 url")
 		}
 	case "click":
-		// 支持 index 或 selector 两种定位方式
+		// 支持三种定位方式：
+		// 1. index + option_index（选择题选项）
+		// 2. index（普通元素）
+		// 3. selector（直接定位）
 		if action.Index == nil && (action.Selector == nil || *action.Selector == "") {
 			return errors.New("click 缺少 index 或 selector")
+		}
+		// 如果提供了 option_index，必须有 index
+		if action.OptionIndex != nil && action.Index == nil {
+			return errors.New("使用 option_index 时必须同时提供 index（题目索引）")
+		}
+		if action.Selector != nil {
+			if err := s.validateSelector(*action.Selector); err != nil {
+				return err
+			}
 		}
 	case "input", "select":
 		if action.Index == nil && (action.Selector == nil || *action.Selector == "") {
@@ -1293,6 +1305,11 @@ func (s *BrowserAgentService) validateAction(action *ws.Action) error {
 		}
 		if action.Value == nil {
 			return fmt.Errorf("%s 缺少 value", action.Action)
+		}
+		if action.Selector != nil {
+			if err := s.validateSelector(*action.Selector); err != nil {
+				return err
+			}
 		}
 	case "scroll":
 		if action.Distance == nil {
@@ -1304,5 +1321,22 @@ func (s *BrowserAgentService) validateAction(action *ws.Action) error {
 		}
 	}
 
+	return nil
+}
+
+// validateSelector 验证 selector 是否包含禁止的伪选择器
+func (s *BrowserAgentService) validateSelector(selector string) error {
+	// 禁止的伪选择器和伪类（jQuery 风格）
+	forbiddenPatterns := []string{
+		":contains(", ":visible", ":hidden", ":first", ":last",
+		":eq(", ":nth-of-type(", ":nth-child(", ":gt(", ":lt(",
+		":not(", ":has(", ":parent", ":odd", ":even",
+	}
+
+	for _, pattern := range forbiddenPatterns {
+		if strings.Contains(selector, pattern) {
+			return fmt.Errorf("禁止使用伪选择器: %s（请使用 index 而非 selector）", pattern)
+		}
+	}
 	return nil
 }

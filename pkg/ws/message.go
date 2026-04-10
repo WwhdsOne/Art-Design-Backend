@@ -1,21 +1,15 @@
 package ws
 
 type Action struct {
-	ActionID int64   `json:"action_id,string"`
-	Action   string  `json:"action"`
-	Index    *int    `json:"index,omitempty"`
-	Selector *string `json:"selector,omitempty"`
-	Value    *string `json:"value,omitempty"`
-	URL      *string `json:"url,omitempty"`
-	Distance *int    `json:"distance,omitempty"`
-	Timeout  *int    `json:"timeout,omitempty"`
-}
-
-type Position struct {
-	X      float64 `json:"x"`
-	Y      float64 `json:"y"`
-	Width  float64 `json:"width"`
-	Height float64 `json:"height"`
+	ActionID     int64   `json:"action_id,string"`
+	Action       string  `json:"action"`
+	Index        *int    `json:"index,omitempty"`
+	OptionIndex  *int    `json:"option_index,omitempty"`  // 用于选择题的选项索引
+	Selector     *string `json:"selector,omitempty"`
+	Value        *string `json:"value,omitempty"`
+	URL          *string `json:"url,omitempty"`
+	Distance     *int    `json:"distance,omitempty"`
+	Timeout      *int    `json:"timeout,omitempty"`
 }
 
 type SelectOption struct {
@@ -24,22 +18,22 @@ type SelectOption struct {
 }
 
 type PageElement struct {
-	Index       int            `json:"index"`
-	Tag         string         `json:"tag"`
-	Text        string         `json:"text"`
-	Selector    string         `json:"selector"`
-	Value       *string        `json:"value,omitempty"`
-	Type        *string        `json:"type,omitempty"`
-	Label       *string        `json:"label,omitempty"`
-	Role        *string        `json:"role,omitempty"`
-	AriaLabel   *string        `json:"ariaLabel,omitempty"`
-	AriaExpanded *string       `json:"ariaExpanded,omitempty"`
-	AriaChecked  *string       `json:"ariaChecked,omitempty"`
-	Required    *bool          `json:"required,omitempty"`
-	Disabled    *bool          `json:"disabled,omitempty"`
-	Options     []SelectOption `json:"options,omitempty"`
-	IsNew       *bool          `json:"isNew,omitempty"`
-	Position    *Position      `json:"position,omitempty"`
+	Index       int             `json:"index"`
+	Tag         string          `json:"tag"`
+	Text        string          `json:"text"`
+	Selector    string          `json:"selector"`
+	Type        *string         `json:"type,omitempty"`           // 元素类型（input, button, question等）
+	Question    *string         `json:"question,omitempty"`      // 题目文本（仅当type=question时有值）
+	Value       *string         `json:"value,omitempty"`
+	Label       *string         `json:"label,omitempty"`
+	Role        *string         `json:"role,omitempty"`
+	AriaLabel   *string         `json:"ariaLabel,omitempty"`
+	AriaExpanded *string        `json:"ariaExpanded,omitempty"`
+	AriaChecked  *string        `json:"ariaChecked,omitempty"`
+	Required    *bool           `json:"required,omitempty"`
+	Disabled    *bool           `json:"disabled,omitempty"`
+	Options     []PageElement   `json:"options,omitempty"`      // 选项列表（仅question类型使用）
+	IsNew       *bool           `json:"isNew,omitempty"`
 }
 
 type ScrollInfo struct {
